@@ -1,0 +1,11 @@
+{
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.codeActionsOnSave": { "source.fixAll.eslint": "explicit" },
+  "java.configuration.runtimes": [{ "name": "JavaSE-17", "default": true }],
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/target": true,
+    "**/.next": true
+  }
+}

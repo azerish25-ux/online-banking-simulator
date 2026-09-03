@@ -1,0 +1,13 @@
+#!/bin/sh
+# Minimal Maven wrapper (Part 1) for macOS/Linux.
+set -e
+MAVEN_VERSION=3.9.6
+WRAPPER_DIR="$(dirname "$0")/.mvn/wrapper"
+MAVEN_BIN="$WRAPPER_DIR/apache-maven-$MAVEN_VERSION/bin/mvn"
+if command -v mvn >/dev/null 2>&1; then exec mvn "$@"; fi
+if [ -x "$MAVEN_BIN" ]; then exec "$MAVEN_BIN" "$@"; fi
+echo "[mvnw] Downloading Apache Maven $MAVEN_VERSION ..."
+mkdir -p "$WRAPPER_DIR"
+curl -fsSL -o "$WRAPPER_DIR/maven.zip" "https://repo.maven.apache.org/maven2/org/apache/maven/apache-maven/$MAVEN_VERSION/apache-maven-$MAVEN_VERSION-bin.zip"
+(cd "$WRAPPER_DIR" && unzip -q -o maven.zip && rm maven.zip)
+exec "$MAVEN_BIN" "$@"

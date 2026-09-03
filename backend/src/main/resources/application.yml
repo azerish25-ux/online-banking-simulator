@@ -1,0 +1,18 @@
+server:
+  port: 8080
+spring:
+  application:
+    name: bank-platform
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
+info:
+  app:
+    name: bank-platform
+    version: 0.1.0
+    part: "1-foundation"

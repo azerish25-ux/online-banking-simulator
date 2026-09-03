@@ -1,0 +1,28 @@
+﻿# Node / Next.js
+node_modules/
+frontend/.next/
+frontend/out/
+*.log
+.env*.local
+
+# Java / Maven
+target/
+*.class
+*.jar
+!mvnw*.jar
+.mvn/wrapper/maven-wrapper.jar
+
+# VS Code (keep settings, ignore workspace cache)
+.vscode/.ropeproject/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker / DB
+*.dump
+postgres-data/
+
+# Maven wrapper distribution (downloaded on first run)
+backend/.mvn/wrapper/apache-maven-*/
+backend/.mvn/wrapper/maven.zip

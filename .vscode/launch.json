@@ -1,0 +1,7 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    { "name": "Next.js: dev", "type": "node-terminal", "request": "launch", "command": "npm run dev", "cwd": "${workspaceFolder}/frontend" },
+    { "name": "Spring Boot: run", "type": "java", "request": "launch", "mainClass": "com.bank.platform.PlatformApplication", "projectName": "platform", "cwd": "${workspaceFolder}/backend" }
+  ]
+}
