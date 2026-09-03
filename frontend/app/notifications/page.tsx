@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
@@ -9,13 +9,13 @@ import { EmptyState } from "../../components/ui/empty-state";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/feedback/toast";
 import { api } from "../../lib/api";
+import type { NotificationItem } from "../../lib/api-types";
 import { fmtDate } from "../../lib/format";
 
-type Item = { id: string; type: string; title: string; body: string; read: boolean; createdAt: string };
 
 export default function NotificationsPage() {
   const { push } = useToast();
-  const [items, setItems] = React.useState<Item[] | null>(null);
+  const [items, setItems] = React.useState<NotificationItem[] | null>(null);
 
   const load = React.useCallback(async () => {
     const page = await api("/v1/notifications?size=30");

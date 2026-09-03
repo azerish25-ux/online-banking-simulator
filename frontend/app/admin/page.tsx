@@ -11,14 +11,10 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { api, getToken } from "../../lib/api";
+import type { Account, AdminUser, Audit, DayTotal, Tx } from "../../lib/api-types";
 import { adminStatementUrl } from "../../lib/statements";
 import { fmtDate, usd } from "../../lib/format";
 
-type AdminUser = { id: string; email: string; fullName: string; role: string };
-type Account = { id: string; iban: string; type: string; balance: string; status: string };
-type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; createdAt: string };
-type Audit = { id: number; actorId: string | null; action: string; entity: string; entityId: string; createdAt: string };
-type DayTotal = { date: string; transfers: number; transferVolume: string; deposits: number; depositVolume: string; interestEvents: number; interestNet: string };
 
 export default function AdminPage() {
   const { push } = useToast();

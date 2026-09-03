@@ -12,11 +12,9 @@ import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { api, getToken } from "../../lib/api";
 import { statementUrl } from "../../lib/statements";
+import type { Account, Page, Tx } from "../../lib/api-types";
 import { fmtDate, usd } from "../../lib/format";
 
-type Account = { id: string; iban: string; type: string; balance: string };
-type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; createdAt: string; flagged?: boolean; reviewed?: boolean };
-type Page<T> = { content: T[]; totalPages: number; number: number };
 
 const SIZE = 10;
 

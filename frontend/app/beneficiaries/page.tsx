@@ -13,8 +13,8 @@ import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/feedback/toast";
 import { api } from "../../lib/api";
+import type { Beneficiary } from "../../lib/api-types";
 
-type Beneficiary = { id: string; nickname: string; iban: string };
 
 
 

@@ -13,9 +13,8 @@ import { Field, Input } from "../../components/ui/input";
 import { useToast } from "../../components/feedback/toast";
 import { api } from "../../lib/api";
 import { usd } from "../../lib/format";
+import type { Account, Beneficiary } from "../../lib/api-types";
 
-type Account = { id: string; iban: string; type: string; balance: string };
-type Beneficiary = { id: string; nickname: string; iban: string };
 
 export default function TransfersPage() {
   const { push } = useToast();

@@ -13,12 +13,11 @@ import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
-import { SpendingChart, type MonthPoint } from "../../components/charts/spending-chart";
+import { SpendingChart } from "../../components/charts/spending-chart";
 import { ApiError, api, type User } from "../../lib/api";
+import type { Account, MonthPoint, Tx } from "../../lib/api-types";
 import { fmtDate, usd } from "../../lib/format";
 
-type Account = { id: string; iban: string; type: string; balance: string; status: string };
-type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; status: string; createdAt: string };
 
 export default function DashboardPage() {
   const { push } = useToast();

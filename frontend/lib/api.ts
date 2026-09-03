@@ -1,5 +1,6 @@
-export type User = { id: string; email: string; fullName: string; role: string };
-export type AuthResponse = { accessToken: string; tokenType: string; expiresInSeconds: number; user: User };
+import type { AuthResponse, User } from "./api-types";
+export type { AuthResponse, User };
+
 
 export class ApiError extends Error {
   status: number;
@@ -54,7 +55,7 @@ function rotateSession(): Promise<void> {
   return refreshing;
 }
 
-export async function api(path: string, options: RequestInit = {}, retried = false): Promise<any> {
+export async function api<T = any>(path: string, options: RequestInit = {}, retried = false): Promise<T> {
   const token = getToken();
   const res = await fetch("/backend" + path, {
     ...options,
@@ -81,5 +82,5 @@ export async function api(path: string, options: RequestInit = {}, retried = fal
       (data && data.detail) || "Request failed: " + res.status
     );
   }
-  return data;
+  return data as T;
 }
