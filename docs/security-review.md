@@ -24,9 +24,16 @@ Method: code review + automated tests (AdminFlowTest, RateLimitTest) + live veri
 
 1. **Default admin password** (`change-me-admin-123`) if env is unset - boot log warns loudly; production checklists must set `APP_ADMIN_PASSWORD`.
 2. **Rate limiter is in-memory** - correct for one instance; move to Redis behind a load balancer.
-3. **No refresh-token rotation / 2FA yet** - access tokens are short-lived (15m); TOTP is a Part 8+ candidate.
+3. **Refresh rotation + TOTP shipped (Phase C)** - 7-day HttpOnly rotating refresh with reuse detection (family burn on replay), TOTP setup/QR/enable/disable plus a 5-minute purpose-bound login challenge. Remaining: no WebAuthn/passkeys yet.
 4. **No account lockout** - rate limiting + BCrypt cost make online brute force uneconomical; lockout risks user-enumeration and support load.
 5. **Middleware role check is UX-only** - it decodes (not verifies) the JWT for routing; the API re-verifies signature + role on every call.
+
+## v2 - hardening series (Phase C)
+
+- `X-Forwarded-For` is ignored unless `TRUST_PROXY_HEADERS=true`; deposits capped at `DEPOSIT_MAX` (default 100000) and flagged at the review threshold.
+- Actuator matchers narrowed to health/info; CORS allows + exposes `X-Request-Id`.
+- Refresh cookie: `HttpOnly; Path=/api/v1/auth; SameSite=Lax`, `Secure` iff `COOKIE_SECURE=true`.
+- Access cookie stays readable for edge routing only - blast radius 15 minutes; documented in `middleware.ts`.
 
 ## How to re-verify
 

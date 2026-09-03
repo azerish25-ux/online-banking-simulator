@@ -10,6 +10,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpHeaders;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -32,18 +33,21 @@ public class AuthController {
   private final RefreshService refreshService;
   private final TotpService totpService;
   private final UserRepository users;
+  private final boolean cookieSecure;
 
   public AuthController(
       AuthService authService,
       JwtService jwtService,
       RefreshService refreshService,
       TotpService totpService,
-      UserRepository users) {
+      UserRepository users,
+      @Value("${app.cookie.secure:false}") boolean cookieSecure) {
     this.authService = authService;
     this.jwtService = jwtService;
     this.refreshService = refreshService;
     this.totpService = totpService;
     this.users = users;
+    this.cookieSecure = cookieSecure;
   }
 
   public record MfaRequiredResponse(String mfaToken, String message) {}
@@ -167,7 +171,8 @@ public class AuthController {
   }
 
   private String refreshCookie(String value, long maxAge) {
-    return RefreshService.COOKIE + "=" + value
+    String cookie = RefreshService.COOKIE + "=" + value
         + "; Path=/api/v1/auth; Max-Age=" + maxAge + "; HttpOnly; SameSite=Lax";
+    return cookieSecure ? cookie + "; Secure" : cookie;
   }
 }

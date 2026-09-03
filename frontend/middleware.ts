@@ -18,6 +18,12 @@ export function middleware(request: NextRequest) {
   const token = request.cookies.get("bank_token")?.value;
   const path = request.nextUrl.pathname;
 
+  // Session posture (deliberate split):
+  // - bank_token (access, 15m) is readable here FOR ROUTING ONLY.
+  // - refresh_token is HttpOnly: invisible to JS and to this middleware.
+  // The API re-verifies signature + role on every call; a stolen access
+  // token is therefore blast-radius-limited to 15 minutes. A full BFF
+  // (no browser tokens at all) is the next step if threat posture demands it.
   // UX-only routing gate: the backend re-verifies the signature and role on every call.
   if (path.startsWith("/admin")) {
     if (!token) return NextResponse.redirect(new URL("/login", request.url));

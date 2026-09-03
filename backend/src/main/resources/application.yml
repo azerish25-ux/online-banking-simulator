@@ -30,6 +30,8 @@ app:
       per-minute: ${AUTH_RATE_LIMIT:20}
     refresh-days: ${AUTH_REFRESH_DAYS:7}
   trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+  cookie:
+    secure: ${COOKIE_SECURE:false}
   deposit:
     max-amount: ${DEPOSIT_MAX:100000}
   interest:
