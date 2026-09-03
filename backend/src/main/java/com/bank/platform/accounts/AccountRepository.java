@@ -8,7 +8,7 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 
 public interface AccountRepository extends JpaRepository<Account, UUID> {
-  java.util.List<Account> findByUserId(UUID userId);
+  java.util.List<Account> findByUserIdOrderByCreatedAtAsc(UUID userId);
 
   Optional<Account> findByIban(String iban);
 

@@ -48,7 +48,7 @@ public class MoneyService {
 
   @Transactional(readOnly = true)
   public List<Account> myAccounts(String email) {
-    return accounts.findByUserId(userOf(email).getId());
+    return accounts.findByUserIdOrderByCreatedAtAsc(userOf(email).getId());
   }
 
   @Transactional(readOnly = true)

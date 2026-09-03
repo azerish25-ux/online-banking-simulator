@@ -21,7 +21,5 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
   @Query("select t from Transaction t where t.createdAt >= :since order by t.createdAt asc")
   java.util.List<Transaction> findSince(java.time.Instant since);
 
-  @Query("select t from Transaction t where t.fromAccountId = :accountId or t.toAccountId = :accountId")
-  Page<Transaction> findByAccountId(UUID accountId, Pageable pageable);
 }
 

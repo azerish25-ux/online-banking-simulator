@@ -82,7 +82,7 @@ public class AdminController {
 
   @GetMapping("/users/{id}/accounts")
   public java.util.List<AccountResponse> userAccounts(@PathVariable UUID id) {
-    return accounts.findByUserId(id).stream().map(AdminController::toDto).toList();
+    return accounts.findByUserIdOrderByCreatedAtAsc(id).stream().map(AdminController::toDto).toList();
   }
 
   @GetMapping("/transactions")
