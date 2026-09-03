@@ -32,6 +32,12 @@ public class User {
   @Enumerated(EnumType.STRING)
   private Role role = Role.CUSTOMER;
 
+  @Column(name = "totp_secret", length = 64)
+  private String totpSecret;
+
+  @Column(name = "totp_enabled", nullable = false)
+  private boolean totpEnabled;
+
   @Column(name = "updated_at")
   private Instant updatedAt;
 
@@ -66,6 +72,10 @@ public class User {
   public String getFullName() { return fullName; }
   public Role getRole() { return role; }
   public Instant getUpdatedAt() { return updatedAt; }
+  public String getTotpSecret() { return totpSecret; }
+  public void setTotpSecret(String v) { totpSecret = v; }
+  public boolean isTotpEnabled() { return totpEnabled; }
+  public void setTotpEnabled(boolean v) { totpEnabled = v; }
   public Instant getCreatedAt() { return createdAt; }
 }
 
