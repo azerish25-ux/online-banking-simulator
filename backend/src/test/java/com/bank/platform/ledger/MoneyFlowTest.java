@@ -28,6 +28,7 @@ class MoneyFlowTest {
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper objectMapper;
   @Autowired AuditLogRepository auditLogs;
+  @Autowired jakarta.persistence.EntityManagerFactory emf;
 
   @Test
   void depositTransferIdempotencyAndHistory() throws Exception {
@@ -128,6 +129,24 @@ class MoneyFlowTest {
         .get(0).get("iban").asText();
   }
 
+  private void deposit(String token, String accountId) throws Exception {
+    mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"amount":"100.00"}"""))
+        .andExpect(status().isOk());
+  }
+
+  private void transfer(String token, String toIban) throws Exception {
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"toIban":"%s","amount":"10.00"}""".formatted(toIban)))
+        .andExpect(status().isCreated());
+  }
+
   private String accountId(String token) throws Exception {
     MvcResult result = mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
@@ -223,5 +242,26 @@ class MoneyFlowTest {
       org.junit.jupiter.api.Assertions.assertTrue(created.compareTo(previous) <= 0, "page must be newest-first");
       previous = created;
     }
+  }
+
+  @Test
+  void historyIssuesBoundedQueries() throws Exception {
+    String token = register("qc@example.com", "Qc User");
+    String accountId = accountId(token);
+    String other = accountIban(register("qc-b@example.com", "Qc Bee"));
+    deposit(token, accountId);
+    for (int i = 0; i < 3; i++) {
+      transfer(token, other);
+    }
+    var stats = emf.unwrap(org.hibernate.SessionFactory.class).getStatistics();
+    stats.setStatisticsEnabled(true);
+    stats.clear();
+    mvc.perform(get("/api/v1/transactions")
+            .header("Authorization", "Bearer " + token)
+            .param("accountId", accountId))
+        .andExpect(status().isOk());
+    // Exactly five: auth lookup, ownership check, UNION page, count, batched IBAN map.
+    org.junit.jupiter.api.Assertions.assertTrue(stats.getQueryExecutionCount() <= 5,
+        "history must stay bounded, ran " + stats.getQueryExecutionCount());
   }
 }
