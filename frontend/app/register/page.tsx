@@ -3,21 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { registerSchema as schema, type RegisterForm as Form } from "../../lib/validation";
 import { AuthShell } from "../../components/layout/auth-shell";
 import { Button } from "../../components/ui/button";
 import { Field, Input } from "../../components/ui/input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
 
-const schema = z.object({
-  fullName: z.string().min(2, "Enter your full name"),
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(8, "Minimum 8 characters")
-});
 
-type Form = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const router = useRouter();

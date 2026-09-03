@@ -3,8 +3,8 @@
 import * as React from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { transferSchema as schema, type TransferForm as Form } from "../../lib/validation";
 import { AppShell } from "../../components/layout/app-shell";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -14,14 +14,6 @@ import { useToast } from "../../components/feedback/toast";
 import { api } from "../../lib/api";
 import { usd } from "../../lib/format";
 
-const schema = z.object({
-  fromAccountId: z.string().min(1, "Choose a source account"),
-  toIban: z.string().trim().min(8, "Enter the full recipient IBAN").max(34),
-  amount: z.string().regex(/^\d+(\.\d{1,4})?$/, "Positive amount, up to 4 decimals"),
-  memo: z.string().max(140, "Max 140 characters").optional()
-});
-
-type Form = z.infer<typeof schema>;
 type Account = { id: string; iban: string; type: string; balance: string };
 type Beneficiary = { id: string; nickname: string; iban: string };
 

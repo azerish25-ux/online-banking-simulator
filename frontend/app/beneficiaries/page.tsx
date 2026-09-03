@@ -2,8 +2,8 @@
 
 import * as React from "react";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { beneficiarySchema as schema, type BeneficiaryForm as Form } from "../../lib/validation";
 import { AppShell } from "../../components/layout/app-shell";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
@@ -16,12 +16,7 @@ import { api } from "../../lib/api";
 
 type Beneficiary = { id: string; nickname: string; iban: string };
 
-const schema = z.object({
-  nickname: z.string().trim().min(1, "Nickname is required").max(80),
-  iban: z.string().trim().min(8, "Enter the full IBAN").max(34)
-});
 
-type Form = z.infer<typeof schema>;
 
 export default function BeneficiariesPage() {
   const { push } = useToast();

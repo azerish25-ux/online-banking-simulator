@@ -3,20 +3,15 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useForm } from "react-hook-form";
-import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { loginSchema as schema, type LoginForm as Form } from "../../lib/validation";
 import { AuthShell } from "../../components/layout/auth-shell";
 import { Button } from "../../components/ui/button";
 import { Field, Input } from "../../components/ui/input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
 
-const schema = z.object({
-  email: z.string().email("Enter a valid email"),
-  password: z.string().min(1, "Password is required")
-});
 
-type Form = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();

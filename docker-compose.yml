@@ -1,4 +1,5 @@
-﻿services:
+# Production-like full stack (CI builds this; local dev stays Docker-free - see start-all.ps1).
+services:
   db:
     image: postgres:16-alpine
     container_name: bank-postgres
@@ -6,7 +7,7 @@
     environment:
       POSTGRES_DB: bankdb
       POSTGRES_USER: bankapp
-      POSTGRES_PASSWORD: bankapp_secret_change_me
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-bankapp_secret_change_me}
     ports:
       - "5432:5432"
     volumes:
@@ -18,15 +19,33 @@
       timeout: 3s
       retries: 10
 
-  # Full-stack run targets (wired in Part 7):
-  # backend:
-  #   build: ./backend
-  #   ports: ["8080:8080"]
-  #   depends_on: [db]
-  # frontend:
-  #   build: ./frontend
-  #   ports: ["3000:3000"]
-  #   depends_on: [backend]
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    environment:
+      PG_URL: jdbc:postgresql://db:5432/bankdb
+      PG_USER: bankapp
+      PG_PASSWORD: ${PG_PASSWORD:-bankapp_secret_change_me}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-production-0123456789abcdef-0123456789abcdef}
+      APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-change-me-admin-123}
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        BACKEND_URL: http://backend:8080
+    restart: unless-stopped
+    environment:
+      BACKEND_URL: http://backend:8080
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
 
 volumes:
   postgres-data:

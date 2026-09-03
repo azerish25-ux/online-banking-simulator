@@ -1,0 +1,37 @@
+import { z } from "zod";
+
+/** Single source of truth for form rules - mirrors the API validation. */
+export const loginSchema = z.object({
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(1, "Password is required")
+});
+export type LoginForm = z.infer<typeof loginSchema>;
+
+export const registerSchema = z.object({
+  fullName: z.string().min(2, "Enter your full name"),
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(8, "Minimum 8 characters")
+});
+export type RegisterForm = z.infer<typeof registerSchema>;
+
+const amountRule = z
+  .string()
+  .regex(/^\d+(\.\d{1,4})?$/, "Positive amount, up to 4 decimals");
+
+export const transferSchema = z.object({
+  fromAccountId: z.string().min(1, "Choose a source account"),
+  toIban: z.string().trim().min(8, "Enter the full recipient IBAN").max(34),
+  amount: amountRule,
+  memo: z.string().max(140, "Max 140 characters").optional()
+});
+export type TransferForm = z.infer<typeof transferSchema>;
+
+export const beneficiarySchema = z.object({
+  nickname: z.string().trim().min(1, "Nickname is required").max(80),
+  iban: z.string().trim().min(8, "Enter the full IBAN").max(34)
+});
+export type BeneficiaryForm = z.infer<typeof beneficiarySchema>;
+
+export const depositSchema = z.object({
+  amount: amountRule
+});
