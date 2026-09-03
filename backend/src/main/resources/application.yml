@@ -1,6 +1,9 @@
 server:
+  shutdown: graceful
   port: 8080
 spring:
+  lifecycle:
+    timeout-per-shutdown-phase: 20s
   application:
     name: bank-platform
   datasource:

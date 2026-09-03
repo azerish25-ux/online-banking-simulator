@@ -5,7 +5,21 @@
     </encoder>
   </appender>
   <logger name="com.bank.platform" level="INFO"/>
-  <root level="INFO">
-    <appender-ref ref="CONSOLE"/>
-  </root>
+
+  <springProfile name="!prod">
+    <root level="INFO">
+      <appender-ref ref="CONSOLE"/>
+    </root>
+  </springProfile>
+
+  <springProfile name="prod">
+    <appender name="JSON" class="ch.qos.logback.core.ConsoleAppender">
+      <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+        <includeMdcKeyName>traceId</includeMdcKeyName>
+      </encoder>
+    </appender>
+    <root level="INFO">
+      <appender-ref ref="JSON"/>
+    </root>
+  </springProfile>
 </configuration>
