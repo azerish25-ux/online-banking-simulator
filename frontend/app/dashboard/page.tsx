@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { AppShell } from "../../components/layout/app-shell";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -13,7 +14,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { SpendingChart, type MonthPoint } from "../../components/charts/spending-chart";
-import { api, type User } from "../../lib/api";
+import { ApiError, api, type User } from "../../lib/api";
 import { fmtDate, usd } from "../../lib/format";
 
 type Account = { id: string; iban: string; type: string; balance: string; status: string };
@@ -21,6 +22,7 @@ type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: 
 
 export default function DashboardPage() {
   const { push } = useToast();
+  const router = useRouter();
   const [user, setUser] = React.useState<User | null>(null);
   const [accounts, setAccounts] = React.useState<Account[] | null>(null);
   const [recent, setRecent] = React.useState<Tx[]>([]);
@@ -45,7 +47,10 @@ export default function DashboardPage() {
   }, []);
 
   React.useEffect(() => {
-    load().catch((e) => push(e instanceof Error ? e.message : "Failed to load dashboard", "error"));
+    load().catch((e) => {
+      if (e instanceof ApiError && e.status === 401) { router.push("/login"); return; }
+      push(e instanceof Error ? e.message : "Failed to load dashboard", "error");
+    });
   }, [load, push]);
 
   async function deposit() {

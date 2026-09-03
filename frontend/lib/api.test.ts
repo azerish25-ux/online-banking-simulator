@@ -49,3 +49,27 @@ describe("api", () => {
     );
   });
 });
+describe("silent refresh", () => {
+  it("retries once after a successful refresh", async () => {
+    setToken("expired");
+    (global.fetch as ReturnType<typeof vi.fn>) = vi.fn()
+      .mockResolvedValueOnce(new Response(JSON.stringify({ title: "x", detail: "expired" }), { status: 401 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ id: "1" }), { status: 200 }));
+    const data = await api("/v1/auth/me");
+    expect(data).toEqual({ id: "1" });
+    const calls = (global.fetch as ReturnType<typeof vi.fn>).mock.calls;
+    expect(calls[1][0]).toBe("/backend/v1/auth/refresh");
+  });
+
+  it("clears the session when refresh fails", async () => {
+    setToken("expired");
+    (global.fetch as ReturnType<typeof vi.fn>) = vi.fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 401 }))
+      .mockResolvedValueOnce(new Response("{}", { status: 401 }));
+    const err = await api("/v1/auth/me").catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(401);
+    expect(getToken()).toBeNull();
+  });
+});

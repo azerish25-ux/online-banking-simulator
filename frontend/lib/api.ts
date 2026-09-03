@@ -36,7 +36,25 @@ function safeJson(text: string): { detail?: string; title?: string } | null {
   }
 }
 
-export async function api(path: string, options: RequestInit = {}): Promise<any> {
+// Single-flight refresh: parallel 401s trigger exactly one rotation call.
+// Token endpoints never retry: they mint rather than consume the session.
+const NO_RETRY = new Set(["/v1/auth/login", "/v1/auth/register", "/v1/auth/refresh", "/v1/auth/logout"]);
+let refreshing: Promise<void> | null = null;
+
+function rotateSession(): Promise<void> {
+  if (!refreshing) {
+    refreshing = fetch("/backend/v1/auth/refresh", { method: "POST" })
+      .then((res) => {
+        if (!res.ok) throw new Error("refresh failed: " + res.status);
+      })
+      .finally(() => {
+        refreshing = null;
+      });
+  }
+  return refreshing;
+}
+
+export async function api(path: string, options: RequestInit = {}, retried = false): Promise<any> {
   const token = getToken();
   const res = await fetch("/backend" + path, {
     ...options,
@@ -46,6 +64,15 @@ export async function api(path: string, options: RequestInit = {}): Promise<any>
       ...(options.headers || {})
     }
   });
+  if (res.status === 401 && !retried && !NO_RETRY.has(path)) {
+    try {
+      await rotateSession();
+      return api(path, options, true);
+    } catch {
+      clearToken();
+      throw new ApiError(401, "Unauthorized", "Session expired. Please log in again.");
+    }
+  }
   const data = safeJson(await res.text());
   if (!res.ok) {
     throw new ApiError(
