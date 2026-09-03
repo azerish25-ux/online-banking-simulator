@@ -5,6 +5,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -30,11 +32,14 @@ public class NotificationService {
   }
 
   private final NotificationRepository notifications;
+  private final long retentionDays;
   private final EmailSender emails;
 
-  public NotificationService(NotificationRepository notifications, EmailSender emails) {
+  public NotificationService(NotificationRepository notifications, EmailSender emails,
+      @Value("${app.notifications.retention-days:90}") long retentionDays) {
     this.notifications = notifications;
     this.emails = emails;
+    this.retentionDays = retentionDays;
   }
 
   @Transactional
@@ -59,6 +64,18 @@ public class NotificationService {
   @Transactional(readOnly = true)
   public long unreadCount(UUID userId) {
     return notifications.countByUserIdAndReadFalse(userId);
+  }
+
+  @Scheduled(cron = "0 0 4 * * *")
+  @Transactional
+  public long purgeOld() {
+    long removed = notifications.deleteByCreatedAtBefore(
+        java.time.Instant.now().minusSeconds(retentionDays * 24 * 3600));
+    if (removed > 0) {
+      org.slf4j.LoggerFactory.getLogger(NotificationService.class)
+          .info("Purged {} notifications older than {} days", removed, retentionDays);
+    }
+    return removed;
   }
 
   @Transactional
