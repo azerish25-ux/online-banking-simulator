@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
 import * as React from "react";
 import Link from "next/link";
 import { AppShell } from "../../../components/layout/app-shell";
@@ -65,7 +66,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
 
   return (
     <AppShell>
-      <p className="text-sm"><Link href={Routes.dashboard} className="text-brand-300 hover:underline">← Overview</Link></p>
+      <p className="text-sm"><Link href={Routes.dashboard} className="text-brand-300 hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Overview</Link></p>
       {account == null ? (
         <div className="mt-3 space-y-2"><Skeleton className="h-24" /><Skeleton className="h-40" /></div>
       ) : (
