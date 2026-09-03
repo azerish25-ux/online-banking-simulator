@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import * as React from "react";
 import Link from "next/link";
 import { useForm } from "react-hook-form";
@@ -57,7 +58,7 @@ export default function TransfersPage() {
       <h1 className="text-2xl font-bold tracking-tight">Send money</h1>
       <p className="muted mt-1 text-sm">
         Debited and credited atomically. Retries with the same key never double-send.{" "}
-        <Link href={Routes.dashboard} className="text-brand-300 hover:underline">Back to overview</Link>
+        <Link href={Routes.dashboard} className="text-brand-300 hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Back to overview</Link>
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -91,7 +92,7 @@ export default function TransfersPage() {
             <CardDescription>Tap to fill the recipient.</CardDescription>
             {beneficiaries.length === 0 ? (
               <p className="muted mt-3 text-sm">
-                None saved. <Link href={Routes.beneficiaries} className="text-brand-300 hover:underline">Add one →</Link>
+                None saved. <Link href={Routes.beneficiaries} className="text-brand-300 hover:underline">Add one <ArrowRight size={14} aria-hidden="true" /></Link>
               </p>
             ) : (
               <ul className="mt-3 space-y-2">

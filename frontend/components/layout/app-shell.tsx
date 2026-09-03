@@ -4,6 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { api, clearToken, type User } from "../../lib/api";
+import { Bell } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { Routes } from "../../lib/routes";
 
@@ -85,7 +86,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               )}
             </div>
             <Link href={Routes.notifications} aria-label={"Notifications" + (unread > 0 ? ", " + unread + " unread" : "")} className="relative rounded-lg border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700">
-              🔔{unread > 0 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-brand-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
+              <Bell size={16} aria-hidden="true" />{unread > 0 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-brand-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
             </Link>
             <button
               onClick={logout}

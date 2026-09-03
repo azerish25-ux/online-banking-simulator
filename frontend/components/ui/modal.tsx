@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { X } from "lucide-react";
 
 export function Modal({
   open,
@@ -43,7 +44,7 @@ export function Modal({
             aria-label="Close dialog"
             className="rounded-md px-2 py-1 text-slate-400 hover:bg-ink-700 hover:text-slate-100"
           >
-            ✕
+              <X size={16} aria-hidden="true" />
           </button>
         </div>
         {children}

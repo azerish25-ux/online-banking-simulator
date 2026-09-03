@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowRight } from "lucide-react";
 import * as React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -118,7 +119,7 @@ export default function DashboardPage() {
           {accounts.map((a) => (
             <Card key={a.id}>
               <div className="flex items-center justify-between">
-                <Link href={Routes.account(a.id)}><CardTitle className="hover:underline">{a.type} →</CardTitle></Link>
+                <Link href={Routes.account(a.id)}><CardTitle className="hover:underline">{a.type} <ArrowRight size={14} aria-hidden="true" className="inline" /></CardTitle></Link>
                 <Badge tone={a.status === "ACTIVE" ? "success" : "neutral"}>{a.status}</Badge>
               </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(a.balance)}</p>

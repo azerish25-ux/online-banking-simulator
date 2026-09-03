@@ -6,6 +6,7 @@ import { EmptyState } from "../../components/ui/empty-state";
 import { Field, Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
+import { ArrowLeft, ArrowRight, Bell, Download, Plus, Search, ShieldCheck, X } from "lucide-react";
 import { usd } from "../../lib/format";
 
 export default function DesignPage() {
@@ -81,6 +82,17 @@ export default function DesignPage() {
             <Skeleton className="h-6 w-1/2" />
           </div>
         </Card>
+      <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-line bg-ink-800 p-5">
+        <span className="muted text-sm">Icons:</span>
+        <Bell size={18} aria-hidden="true" />
+        <X size={18} aria-hidden="true" />
+        <ArrowLeft size={18} aria-hidden="true" />
+        <ArrowRight size={18} aria-hidden="true" />
+        <Plus size={18} aria-hidden="true" />
+        <Download size={18} aria-hidden="true" />
+        <Search size={18} aria-hidden="true" />
+        <ShieldCheck size={18} aria-hidden="true" />
+      </div>
         <EmptyState title="Nothing here yet" description="Empty states explain what to do next." />
       </div>
     </AppShell>

@@ -1,5 +1,6 @@
 "use client";
 
+import { ArrowLeft, ArrowRight } from "lucide-react";
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
 import { Badge } from "../../components/ui/badge";
@@ -138,8 +139,8 @@ export default function ActivityPage() {
             <div className="mt-3 flex items-center justify-between text-sm">
               <span className="muted">Page {(page.number ?? 0) + 1} of {Math.max(1, page.totalPages ?? 1)}</span>
               <div className="flex gap-2">
-                <Button variant="secondary" size="sm" disabled={index === 0} onClick={() => setIndex((i) => i - 1)}>← Prev</Button>
-                <Button variant="secondary" size="sm" disabled={index + 1 >= (page.totalPages ?? 1)} onClick={() => setIndex((i) => i + 1)}>Next →</Button>
+                <Button variant="secondary" size="sm" disabled={index === 0} onClick={() => setIndex((i) => i - 1)}><ArrowLeft size={14} aria-hidden="true" /> Prev</Button>
+                <Button variant="secondary" size="sm" disabled={index + 1 >= (page.totalPages ?? 1)} onClick={() => setIndex((i) => i + 1)}>Next <ArrowRight size={14} aria-hidden="true" /></Button>
               </div>
             </div>
           </>
