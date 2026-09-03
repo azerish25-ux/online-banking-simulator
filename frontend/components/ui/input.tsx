@@ -7,8 +7,8 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         ref={ref}
         className={cn(
-          "h-10 w-full rounded-lg border border-line bg-ink-950 px-3 text-sm text-slate-100",
-          "placeholder:text-slate-500 focus:border-brand-500 focus:outline-none focus:ring-1 focus:ring-brand-500",
+          "h-10 w-full rounded-md border border-line bg-ink-950/70 px-3 text-sm text-slate-100",
+          "placeholder:text-slate-500 focus:border-brass-500 focus:outline-none focus:ring-1 focus:ring-brass-500",
           className
         )}
         {...props}
@@ -31,7 +31,7 @@ export function Field({
   const id = React.useId();
   return (
     <div>
-      <label htmlFor={id} className="mb-1.5 block text-sm font-medium text-slate-200">
+      <label htmlFor={id} className="caps mb-1.5 block font-medium text-slate-300 normal-case">
         {label}
       </label>
       {React.isValidElement(children)

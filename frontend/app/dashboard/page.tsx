@@ -3,7 +3,6 @@
 import { ArrowRight } from "lucide-react";
 import * as React from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { AppShell } from "../../components/layout/app-shell";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
@@ -15,78 +14,74 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { SpendingChart } from "../../components/charts/spending-chart";
-import { ApiError, api, type User } from "../../lib/api";
 import { Routes } from "../../lib/routes";
-import type { Account, MonthPoint, Tx } from "../../lib/api-types";
+import {
+  useAccounts,
+  useDeposit,
+  useMe,
+  useOpenAccount,
+  useSummary,
+  useTransactions
+} from "../../lib/queries";
 import { fmtDate, usd } from "../../lib/format";
-
 
 export default function DashboardPage() {
   const { push } = useToast();
-  const router = useRouter();
-  const [user, setUser] = React.useState<User | null>(null);
-  const [accounts, setAccounts] = React.useState<Account[] | null>(null);
-  const [recent, setRecent] = React.useState<Tx[]>([]);
-  const [summary, setSummary] = React.useState<MonthPoint[] | null>(null);
+  const me = useMe();
+  const accounts = useAccounts();
+
+  // Primary account drives the feed + chart; queries stay independent so the
+  // chart never waits on the table (and vice versa).
+  const primaryId = accounts.data?.[0]?.id ?? "";
+  const recent = useTransactions(primaryId, 0, 5);
+  const summary = useSummary(primaryId, 6);
+
+  const deposit = useDeposit();
+  const openAccount = useOpenAccount();
+
   const [depositOpen, setDepositOpen] = React.useState(false);
   const [openOpen, setOpenOpen] = React.useState(false);
   const [newType, setNewType] = React.useState("SAVINGS");
-  const [creating, setCreating] = React.useState(false);
   const [depositAmount, setDepositAmount] = React.useState("100.00");
-  const [depositing, setDepositing] = React.useState(false);
 
-  const load = React.useCallback(async () => {
-    const me = await api("/v1/auth/me");
-    setUser(me);
-    const accs: Account[] = await api("/v1/accounts");
-    setAccounts(accs);
-    if (accs.length > 0) {
-      const page = await api("/v1/transactions?accountId=" + accs[0].id + "&size=5");
-      setRecent(page.content ?? []);
-        setSummary(await api("/v1/accounts/" + accs[0].id + "/summary?months=6"));
-    }
-  }, []);
+  // Errors surface through toasts once per failed mutation, not on every render.
+  React.useEffect(() => {
+    if (deposit.isError) push(deposit.error.message, "error");
+    if (openAccount.isError) push(openAccount.error.message, "error");
+  }, [deposit.isError, deposit.error, openAccount.isError, openAccount.error, push]);
 
   React.useEffect(() => {
-    load().catch((e) => {
-      if (e instanceof ApiError && e.status === 401) { router.push(Routes.login); return; }
-      push(e instanceof Error ? e.message : "Failed to load dashboard", "error");
-    });
-  }, [load, push]);
-
-  async function deposit() {
-    if (accounts == null || accounts.length === 0) return;
-    setDepositing(true);
-    try {
-      await api("/v1/accounts/" + accounts[0].id + "/deposit", {
-        method: "POST",
-        body: JSON.stringify({ amount: depositAmount })
-      });
+    if (deposit.isSuccess) {
       push("Deposited " + usd(depositAmount) + " (simulated rail).", "success");
       setDepositOpen(false);
-      await load();
-    } catch (e) {
-      push(e instanceof Error ? e.message : "Deposit failed", "error");
-    } finally {
-      setDepositing(false);
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deposit.isSuccess]);
 
-  async function openAccount() {
-    setCreating(true);
-    try {
-      await api("/v1/accounts", { method: "POST", body: JSON.stringify({ type: newType }) });
+  React.useEffect(() => {
+    if (openAccount.isSuccess) {
       push("Account opened.", "success");
       setOpenOpen(false);
-      await load();
-    } catch (e) {
-      push(e instanceof Error ? e.message : "Could not open account", "error");
-    } finally {
-      setCreating(false);
     }
+  }, [openAccount.isSuccess, push]);
+
+  const user = me.data;
+  const accs = accounts.data;
+  const primaryAccount = accs?.[0];
+
+  async function submitDeposit() {
+    if (!primaryAccount) return;
+    deposit.mutate({ accountId: primaryAccount.id, amount: depositAmount });
   }
 
-  const total = (accounts ?? []).reduce((sum, a) => sum + parseFloat(a.balance), 0);
+  async function submitOpenAccount() {
+    openAccount.mutate(newType);
+  }
+
+  // Total is computed on the decimal strings via usd() - no float slips in.
+  const totalCents = (accs ?? [])
+    .map((a) => usd(a.balance).replace(/[$,]/g, ""))
+    .reduce<number | null>((sum, n) => (sum === null ? parseFloat(n) : sum + parseFloat(n)), null);
 
   return (
     <AppShell>
@@ -97,7 +92,7 @@ export default function DashboardPage() {
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setOpenOpen(true)}>Open account</Button>
-          <Button variant="secondary" onClick={() => setDepositOpen(true)} disabled={!accounts?.length}>
+          <Button variant="secondary" onClick={() => setDepositOpen(true)} disabled={!accs?.length}>
             Simulate deposit
           </Button>
           <Link href={Routes.transfers}>
@@ -106,7 +101,7 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {accounts == null ? (
+      {accounts.isLoading || accs == null ? (
         <div className="grid gap-4 md:grid-cols-3">
           <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
         </div>
@@ -114,9 +109,9 @@ export default function DashboardPage() {
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardDescription>Total balance</CardDescription>
-            <p className="mt-1 text-3xl font-bold tabular-nums">{usd(total)}</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums">{usd(totalCents ?? 0)}</p>
           </Card>
-          {accounts.map((a) => (
+          {accs.map((a) => (
             <Card key={a.id}>
               <div className="flex items-center justify-between">
                 <Link href={Routes.account(a.id)}><CardTitle className="hover:underline">{a.type} <ArrowRight size={14} aria-hidden="true" className="inline" /></CardTitle></Link>
@@ -132,39 +127,40 @@ export default function DashboardPage() {
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <CardTitle>Money flow · last 6 months</CardTitle>
-          <Link href={Routes.activity} className="text-sm text-brand-300 hover:underline">Full activity</Link>
+          <Link href={Routes.activity} className="text-sm text-brass-300 hover:underline">Full activity</Link>
         </div>
-        {summary == null ? (
+        {summary.data == null ? (
           <Skeleton className="h-48" />
         ) : (
-          <SpendingChart data={summary} />
+          <SpendingChart data={summary.data} />
         )}
       </Card>
 
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <CardTitle>Recent activity</CardTitle>
-          <Link href={Routes.transfers} className="text-sm text-brand-300 hover:underline">
+          <Link href={Routes.transfers} className="text-sm text-brass-300 hover:underline">
             New transfer
           </Link>
         </div>
-        {recent.length === 0 ? (
+        {(recent.data?.content ?? []).length === 0 ? (
           <EmptyState title="No transactions yet" description="Send your first transfer to see it here." />
         ) : (
           <Table>
             <THead>
               <TRow>
-                <TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH className="text-right">Amount</TH>
+                <TH>When</TH><TH>From</TH><TH>To</TH><TH className="text-right">Amount</TH><TH>Status</TH>
               </TRow>
             </THead>
             <tbody>
-              {recent.map((t) => (
+              {(recent.data?.content ?? []).map((t) => (
                 <TRow key={t.id}>
                   <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
                   <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEPOSIT"}</TD>
                   <TD className="mono">{t.toIban ? "..." + t.toIban.slice(-6) : "-"}</TD>
                   <TD className="max-w-40 truncate">{t.memo ?? "-"}</TD>
                   <TD className="text-right font-semibold tabular-nums">{usd(t.amount)}</TD>
+                  <TD>{t.flagged ? <Badge tone="warning">FLAGGED</Badge> : <Badge tone="success">POSTED</Badge>}</TD>
                 </TRow>
               ))}
             </tbody>
@@ -174,7 +170,7 @@ export default function DashboardPage() {
 
       <Modal open={openOpen} onClose={() => setOpenOpen(false)} title="Open account">
         <Field label="Account type">
-          <select aria-label="Account type" value={newType} onChange={(e) => setNewType(e.target.value)} className="h-10 w-full rounded-lg border border-line bg-ink-950 px-3 text-sm">
+          <select aria-label="Account type" value={newType} onChange={(e) => setNewType(e.target.value)} className="h-10 w-full rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none">
             <option value="CHECKING">Checking - everyday money</option>
             <option value="SAVINGS">Savings - earns monthly interest</option>
             <option value="LOAN">Loan - borrow up to $1,000</option>
@@ -182,7 +178,9 @@ export default function DashboardPage() {
         </Field>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setOpenOpen(false)}>Cancel</Button>
-          <Button onClick={openAccount} disabled={creating}>{creating ? "Opening..." : "Open"}</Button>
+          <Button onClick={submitOpenAccount} disabled={openAccount.isPending}>
+            {openAccount.isPending ? "Opening..." : "Open"}
+          </Button>
         </div>
       </Modal>
 
@@ -192,7 +190,9 @@ export default function DashboardPage() {
         </Field>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setDepositOpen(false)}>Cancel</Button>
-          <Button onClick={deposit} disabled={depositing}>{depositing ? "Depositing..." : "Deposit"}</Button>
+          <Button onClick={submitDeposit} disabled={deposit.isPending}>
+            {deposit.isPending ? "Depositing..." : "Deposit"}
+          </Button>
         </div>
       </Modal>
     </AppShell>

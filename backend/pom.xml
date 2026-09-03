@@ -15,7 +15,7 @@
   <artifactId>platform</artifactId>
   <version>1.0.0</version>
   <name>platform</name>
-  <description>Enterprise banking platform - backend (Part 2: database + auth)</description>
+  <description>Northbank - enterprise banking platform backend</description>
 
   <properties>
     <java.version>17</java.version>

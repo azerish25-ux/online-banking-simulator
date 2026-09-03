@@ -34,7 +34,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             role="status"
             className={cn(
               "panel px-4 py-3 text-sm",
-              t.tone === "success" && "border-emerald-800",
+              t.tone === "success" && "border-emerald-900/60",
               t.tone === "error" && "border-red-800"
             )}
           >

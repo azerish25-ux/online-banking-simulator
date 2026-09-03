@@ -12,40 +12,22 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { api, getToken } from "../../lib/api";
+import { useAccounts, useTransactions } from "../../lib/queries";
 import { statementUrl } from "../../lib/statements";
-import type { Account, Page, Tx } from "../../lib/api-types";
 import { fmtDate, usd } from "../../lib/format";
-
 
 const SIZE = 10;
 
 export default function ActivityPage() {
   const { push } = useToast();
-  const [accounts, setAccounts] = React.useState<Account[]>([]);
-  const [accountId, setAccountId] = React.useState("");
+  const accounts = useAccounts();
+  const accountId = accounts.data?.[0]?.id ?? "";
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
   const [applied, setApplied] = React.useState({ from: "", to: "" });
-  const [page, setPage] = React.useState<Page<Tx> | null>(null);
   const [index, setIndex] = React.useState(0);
 
-  React.useEffect(() => {
-    api("/v1/accounts").then((accs: Account[]) => {
-      setAccounts(accs);
-      if (accs.length > 0) setAccountId(accs[0].id);
-    }).catch((e) => push(e instanceof Error ? e.message : "Failed to load accounts", "error"));
-  }, [push]);
-
-  React.useEffect(() => {
-    if (!accountId) return;
-    setPage(null);
-    let url = "/v1/transactions?accountId=" + accountId + "&page=" + index + "&size=" + SIZE;
-    if (applied.from) url += "&from=" + applied.from;
-    if (applied.to) url += "&to=" + applied.to;
-    api(url).then(setPage).catch((e) => push(e instanceof Error ? e.message : "Failed to load activity", "error"));
-  }, [accountId, index, applied, push]);
-
-
+  const page = useTransactions(accountId, index, SIZE, applied.from, applied.to);
 
   async function download(kind: "csv" | "pdf") {
     try {
@@ -76,6 +58,9 @@ export default function ActivityPage() {
     setApplied({ from, to });
   }
 
+  const rows = page.data?.content ?? [];
+  const totalPages = page.data?.totalPages ?? 1;
+
   return (
     <AppShell>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
@@ -87,10 +72,10 @@ export default function ActivityPage() {
           <select
             aria-label="Account"
             value={accountId}
-            onChange={(e) => { setAccountId(e.target.value); setIndex(0); }}
-            className="h-10 rounded-lg border border-line bg-ink-950 px-3 text-sm"
+            onChange={() => setIndex(0)}
+            className="h-10 rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none"
           >
-            {accounts.map((a) => (
+            {(accounts.data ?? []).map((a) => (
               <option key={a.id} value={a.id}>{a.type} ...{a.iban.slice(-6)}</option>
             ))}
           </select>
@@ -113,9 +98,9 @@ export default function ActivityPage() {
       </Card>
 
       <Card>
-        {page == null ? (
+        {page.isLoading ? (
           <div className="space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
-        ) : page.content.length === 0 ? (
+        ) : rows.length === 0 ? (
           <EmptyState title="No transactions" description="Transfers and deposits will appear here." />
         ) : (
           <>
@@ -124,7 +109,7 @@ export default function ActivityPage() {
                 <TRow><TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH></TRow>
               </THead>
               <tbody>
-                {page.content.map((t) => (
+                {rows.map((t) => (
                   <TRow key={t.id}>
                     <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
                     <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEPOSIT"}</TD>
@@ -137,10 +122,10 @@ export default function ActivityPage() {
               </tbody>
             </Table>
             <div className="mt-3 flex items-center justify-between text-sm">
-              <span className="muted">Page {(page.number ?? 0) + 1} of {Math.max(1, page.totalPages ?? 1)}</span>
+              <span className="muted">Page {index + 1} of {Math.max(1, totalPages)}</span>
               <div className="flex gap-2">
                 <Button variant="secondary" size="sm" disabled={index === 0} onClick={() => setIndex((i) => i - 1)}><ArrowLeft size={14} aria-hidden="true" /> Prev</Button>
-                <Button variant="secondary" size="sm" disabled={index + 1 >= (page.totalPages ?? 1)} onClick={() => setIndex((i) => i + 1)}>Next <ArrowRight size={14} aria-hidden="true" /></Button>
+                <Button variant="secondary" size="sm" disabled={index + 1 >= totalPages} onClick={() => setIndex((i) => i + 1)}>Next <ArrowRight size={14} aria-hidden="true" /></Button>
               </div>
             </div>
           </>

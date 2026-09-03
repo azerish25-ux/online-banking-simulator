@@ -12,7 +12,7 @@ import { Field, Input } from "../../components/ui/input";
 import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/feedback/toast";
-import { api } from "../../lib/api";
+import { useAddBeneficiary, useBeneficiaries, useRemoveBeneficiary } from "../../lib/queries";
 import type { Beneficiary } from "../../lib/api-types";
 
 
@@ -20,39 +20,39 @@ import type { Beneficiary } from "../../lib/api-types";
 
 export default function BeneficiariesPage() {
   const { push } = useToast();
-  const [items, setItems] = React.useState<Beneficiary[] | null>(null);
+  const beneficiaries = useBeneficiaries();
+  const items = beneficiaries.data;
+  const add = useAddBeneficiary();
+  const removeBeneficiary = useRemoveBeneficiary();
   const [confirm, setConfirm] = React.useState<Beneficiary | null>(null);
   const { register, handleSubmit, reset, formState } = useForm<Form>({ resolver: zodResolver(schema) });
 
-  const load = React.useCallback(async () => {
-    setItems(await api("/v1/beneficiaries"));
-  }, []);
-
   React.useEffect(() => {
-    load().catch((e) => push(e instanceof Error ? e.message : "Failed to load beneficiaries", "error"));
-  }, [load, push]);
-
-  async function onSubmit(values: Form) {
-    try {
-      await api("/v1/beneficiaries", { method: "POST", body: JSON.stringify(values) });
+    if (add.isSuccess) {
       push("Beneficiary saved.", "success");
       reset({ nickname: "", iban: "" });
-      await load();
-    } catch (e) {
-      push(e instanceof Error ? e.message : "Could not save beneficiary", "error");
     }
-  }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [add.isSuccess]);
 
-  async function remove() {
-    if (!confirm) return;
-    try {
-      await api("/v1/beneficiaries/" + confirm.id, { method: "DELETE" });
+  React.useEffect(() => {
+    if (add.isError) push(add.error.message, "error");
+  }, [add.isError, add.error, push]);
+
+  React.useEffect(() => {
+    if (removeBeneficiary.isSuccess) {
       push("Beneficiary removed.", "success");
       setConfirm(null);
-      await load();
-    } catch (e) {
-      push(e instanceof Error ? e.message : "Could not remove beneficiary", "error");
     }
+  }, [removeBeneficiary.isSuccess, push]);
+
+  function onSubmit(values: Form) {
+    add.mutate(values);
+  }
+
+  function remove() {
+    if (!confirm) return;
+    removeBeneficiary.mutate(confirm.id);
   }
 
   return (
@@ -70,14 +70,14 @@ export default function BeneficiariesPage() {
             <Field label="IBAN" error={formState.errors.iban?.message}>
               <Input placeholder="DE..." autoComplete="off" {...register("iban")} />
             </Field>
-            <Button type="submit" disabled={formState.isSubmitting}>
-              {formState.isSubmitting ? "Saving..." : "Save beneficiary"}
+            <Button type="submit" disabled={add.isPending}>
+              {add.isPending ? "Saving..." : "Save beneficiary"}
             </Button>
           </form>
         </Card>
 
         <div>
-          {items == null ? (
+          {beneficiaries.isLoading || items == null ? (
             <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
           ) : items.length === 0 ? (
             <EmptyState title="No beneficiaries" description="Save one to send money in one tap." />

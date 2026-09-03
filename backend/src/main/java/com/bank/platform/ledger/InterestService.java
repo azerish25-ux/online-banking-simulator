@@ -54,12 +54,10 @@ public class InterestService {
   @Transactional
   public Map<String, Integer> accrueMonthly() {
     YearMonth month = YearMonth.now(ZoneOffset.UTC);
-    List<Account> candidates = accounts.findAll().stream()
-        .filter(a -> a.getType() == AccountType.SAVINGS || a.getType() == AccountType.LOAN)
-        .filter(a -> a.getStatus() == AccountStatus.ACTIVE)
-        .filter(a -> a.getLastInterestAt() == null
-            || YearMonth.from(a.getLastInterestAt().atZone(ZoneOffset.UTC)).isBefore(month))
-        .toList();
+    // Pushed down to the database: only savings/loan, active, not-yet-accrued-this-month rows leave it.
+    List<Account> candidates = accounts.findInterestCandidates(
+        List.of(AccountType.SAVINGS, AccountType.LOAN), AccountStatus.ACTIVE,
+        month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant());
 
     int posted = 0;
     for (Account account : candidates) {

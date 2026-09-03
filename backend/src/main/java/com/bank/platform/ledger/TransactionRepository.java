@@ -1,5 +1,6 @@
 package com.bank.platform.ledger;
 
+import java.math.BigDecimal;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -35,6 +36,12 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
 
   @Query("select t from Transaction t where t.createdAt >= :since order by t.createdAt asc")
   java.util.List<Transaction> findSince(java.time.Instant since);
+
+  @Query("select count(t) from Transaction t where t.fromAccountId is not null")
+  long countByFromAccountIdNotNull();
+
+  @Query("select coalesce(sum(t.amount), 0) from Transaction t where t.fromAccountId is not null")
+  java.util.Optional<BigDecimal> sumTransferVolume();
 
 }
 

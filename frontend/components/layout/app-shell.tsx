@@ -3,7 +3,9 @@
 import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { api, clearToken, type User } from "../../lib/api";
+import { useQueryClient } from "@tanstack/react-query";
+import { clearToken } from "../../lib/api";
+import { useMe, useUnreadCount } from "../../lib/queries";
 import { Bell } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { Routes } from "../../lib/routes";
@@ -20,20 +22,26 @@ const NAV = [
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [user, setUser] = React.useState<User | null>(null);
-  const [unread, setUnread] = React.useState(0);
+  const qc = useQueryClient();
+  // Cached session + unread badge: no refetch churn on navigation.
+  const me = useMe();
+  const unread = useUnreadCount();
+  const user = me.data ?? null;
+  const unreadCount = unread.data ?? 0;
   const navItems = user?.role === "ADMIN"
     ? [...NAV.slice(0, 4), { href: Routes.admin, label: "Operations" }, ...NAV.slice(4)]
     : NAV;
 
-  React.useEffect(() => {
-    api("/v1/auth/me").then(setUser).catch(() => {});
-    api("/v1/notifications/unread-count").then((r) => setUnread(r.unread ?? 0)).catch(() => {});
-  }, [pathname]);
-
-  function logout() {
-    clearToken();
-    router.push(Routes.login);
+  async function logout() {
+    // Revoke server-side first - clearing the cookie alone used to leave the
+    // refresh token valid for its full lifetime.
+    try {
+      await fetch("/backend/v1/auth/logout", { method: "POST" });
+    } finally {
+      clearToken();
+      qc.clear();
+      router.push(Routes.login);
+    }
   }
 
   return (
@@ -43,10 +51,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
       <div className="mx-auto flex min-h-screen max-w-6xl">
         <aside className="hidden w-56 shrink-0 border-r border-line p-5 md:block" aria-label="Primary">
-          <p className="text-lg font-bold tracking-tight">
-            Northbank <span className="text-brand-400">·</span>
+          <p className="display text-xl font-semibold tracking-tight">
+            Northbank
           </p>
-          <p className="muted mt-0.5 text-xs">Enterprise banking</p>
+          <p className="caps muted mt-1 normal-case text-brass-400">Private banking · demo</p>
           <nav className="mt-6 flex flex-col gap-1">
             {navItems.map((item) => (
               <Link
@@ -54,8 +62,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 href={item.href}
                 aria-current={pathname === item.href ? "page" : undefined}
                 className={cn(
-                  "rounded-lg px-3 py-2 text-sm transition-colors hover:bg-ink-700",
-                  pathname === item.href ? "bg-ink-700 text-white" : "text-slate-300"
+                  "rounded-md px-3 py-2 text-sm transition-colors hover:bg-ink-800",
+                  pathname === item.href
+                    ? "bg-ink-800 text-white shadow-[inset_2px_0_0_0_var(--brand)]"
+                    : "text-slate-400"
                 )}
               >
                 {item.label}
@@ -85,12 +95,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 "..."
               )}
             </div>
-            <Link href={Routes.notifications} aria-label={"Notifications" + (unread > 0 ? ", " + unread + " unread" : "")} className="relative rounded-lg border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700">
-              <Bell size={16} aria-hidden="true" />{unread > 0 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-brand-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
+            <Link href={Routes.notifications} aria-label={"Notifications" + (unreadCount > 0 ? ", " + unreadCount + " unread" : "")} className="relative rounded-md border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700">
+              <Bell size={16} aria-hidden="true" />{unreadCount > 0 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-brass-500 px-1.5 text-[11px] font-bold text-white">{unreadCount}</span>}
             </Link>
             <button
-              onClick={logout}
-              className="rounded-lg border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700"
+              onClick={() => void logout()}
+              className="rounded-md border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700"
             >
               Log out
             </button>

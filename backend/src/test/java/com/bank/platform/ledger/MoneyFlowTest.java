@@ -6,9 +6,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
 import com.bank.platform.audit.AuditLogRepository;
+import com.bank.platform.support.ApiTestClient;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
@@ -30,13 +32,20 @@ class MoneyFlowTest {
   @Autowired AuditLogRepository auditLogs;
   @Autowired jakarta.persistence.EntityManagerFactory emf;
 
+  ApiTestClient client;
+
+  @BeforeEach
+  void wire() {
+    client = new ApiTestClient(mvc, objectMapper);
+  }
+
   @Test
   void depositTransferIdempotencyAndHistory() throws Exception {
     String aliceToken = register("alice@example.com", "Alice");
     String bobToken = register("bob@example.com", "Bob");
 
-    String aliceIban = accountIban(aliceToken);
-    String bobIban = accountIban(bobToken);
+    String aliceIban = client.accountIban(aliceToken);
+    String bobIban = client.accountIban(bobToken);
     String aliceId = accountId(aliceToken);
 
     // Fund Alice with $500.
@@ -111,48 +120,11 @@ class MoneyFlowTest {
   }
 
   private String register(String email, String name) throws Exception {
-    MvcResult result = mvc.perform(post("/api/v1/auth/register")
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"email":"%s","password":"secret123","fullName":"%s"}""".formatted(email, name)))
-        .andExpect(status().isCreated())
-        .andReturn();
-    return objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
-        .get("accessToken").asText();
-  }
-
-  private String accountIban(String token) throws Exception {
-    MvcResult result = mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk())
-        .andReturn();
-    return objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
-        .get(0).get("iban").asText();
-  }
-
-  private void deposit(String token, String accountId) throws Exception {
-    mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
-            .header("Authorization", "Bearer " + token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"amount":"100.00"}"""))
-        .andExpect(status().isOk());
-  }
-
-  private void transfer(String token, String toIban) throws Exception {
-    mvc.perform(post("/api/v1/transfers")
-            .header("Authorization", "Bearer " + token)
-            .contentType(MediaType.APPLICATION_JSON)
-            .content("""
-                {"toIban":"%s","amount":"10.00"}""".formatted(toIban)))
-        .andExpect(status().isCreated());
+    return client.register(email, name);
   }
 
   private String accountId(String token) throws Exception {
-    MvcResult result = mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + token))
-        .andExpect(status().isOk())
-        .andReturn();
-    return objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
-        .get(0).get("id").asText();
+    return client.accountId(token);
   }
 
   @Test
@@ -160,7 +132,7 @@ class MoneyFlowTest {
     String aliceToken = register("meta-alice@example.com", "Meta Alice");
     String bobToken = register("meta-bob@example.com", "Meta Bob");
     String aliceId = accountId(aliceToken);
-    String bobIban = accountIban(bobToken);
+    String bobIban = client.accountIban(bobToken);
 
     mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
             .header("Authorization", "Bearer " + aliceToken)
@@ -248,10 +220,10 @@ class MoneyFlowTest {
   void historyIssuesBoundedQueries() throws Exception {
     String token = register("qc@example.com", "Qc User");
     String accountId = accountId(token);
-    String other = accountIban(register("qc-b@example.com", "Qc Bee"));
-    deposit(token, accountId);
+    String other = client.accountIban(register("qc-b@example.com", "Qc Bee"));
+    client.deposit(token, accountId, "100.00");
     for (int i = 0; i < 3; i++) {
-      transfer(token, other);
+      client.transfer(token, other, "10.00");
     }
     var stats = emf.unwrap(org.hibernate.SessionFactory.class).getStatistics();
     stats.setStatisticsEnabled(true);

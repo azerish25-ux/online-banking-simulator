@@ -90,7 +90,7 @@ public class MoneyService {
   }
 
   /** Simulated external rail (ATM/teller). Only the owning customer can fund their own account. */
-  @CacheEvict(value = "summaries", allEntries = true)
+  @CacheEvict(value = {"summaries", "public-stats"}, allEntries = true)
   @Transactional
   public Account deposit(String email, UUID accountId, BigDecimal amount) {
     if (amount.compareTo(depositMax) > 0) {
@@ -125,7 +125,7 @@ public class MoneyService {
    * (deadlock-safe), debits then credits atomically, and returns the original
    * row when the caller's idempotency key is replayed.
    */
-  @CacheEvict(value = "summaries", allEntries = true)
+  @CacheEvict(value = {"summaries", "public-stats"}, allEntries = true)
   @Transactional
   public Transaction transfer(
       String email,

@@ -31,6 +31,7 @@ public class AuthService {
   }
 
   @Transactional
+  @org.springframework.cache.annotation.CacheEvict(value = "public-stats", allEntries = true)
   public User register(String email, String rawPassword, String fullName) {
     String normalized = email.trim().toLowerCase();
     if (users.existsByEmail(normalized)) {

@@ -8,6 +8,7 @@ import { registerSchema as schema, type RegisterForm as Form } from "../../lib/v
 import { AuthShell } from "../../components/layout/auth-shell";
 import { Button } from "../../components/ui/button";
 import { Field, Input } from "../../components/ui/input";
+import { PasswordInput } from "../../components/ui/password-input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
 import { Routes } from "../../lib/routes";
@@ -34,7 +35,7 @@ export default function RegisterPage() {
     <AuthShell
       title="Create your account"
       subtitle="A checking account is opened automatically."
-      footer={<>Have an account? <Link className="text-brand-300" href={Routes.login}>Log in</Link></>}
+      footer={<>Have an account? <Link className="text-brass-300" href={Routes.login}>Log in</Link></>}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Field label="Full name" error={formState.errors.fullName?.message}>
@@ -44,7 +45,7 @@ export default function RegisterPage() {
           <Input type="email" autoComplete="email" placeholder="you@example.com" {...register("email")} />
         </Field>
         <Field label="Password" error={formState.errors.password?.message} hint="Minimum 8 characters.">
-          <Input type="password" autoComplete="new-password" {...register("password")} />
+          <PasswordInput autoComplete="new-password" {...register("password")} />
         </Field>
         <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
           {formState.isSubmitting ? "Creating..." : "Create account"}

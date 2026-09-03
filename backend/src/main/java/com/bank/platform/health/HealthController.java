@@ -15,7 +15,7 @@ public class HealthController {
     return Map.of(
         "status", "UP",
         "service", "bank-platform",
-        "version", "0.1.0",
+        "version", "1.0.0",
         "timestamp", Instant.now().toString());
   }
 

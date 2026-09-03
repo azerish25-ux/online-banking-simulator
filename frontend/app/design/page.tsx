@@ -4,6 +4,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field, Input } from "../../components/ui/input";
+import { PasswordInput } from "../../components/ui/password-input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { ArrowLeft, ArrowRight, Bell, Download, Plus, Search, ShieldCheck, X } from "lucide-react";
@@ -33,6 +34,7 @@ export default function DesignPage() {
           <div className="mt-3 flex flex-wrap gap-2">
             <Badge tone="info">PENDING</Badge>
             <Badge tone="success">POSTED</Badge>
+            <Badge tone="warning">UNDER REVIEW</Badge>
             <Badge tone="danger">FAILED</Badge>
             <Badge tone="neutral">DRAFT</Badge>
           </div>
@@ -46,6 +48,9 @@ export default function DesignPage() {
             </Field>
             <Field label="Amount" error="Enter a positive amount.">
               <Input placeholder="0.00" />
+            </Field>
+            <Field label="Password" hint="Toggle visibility with the eye button.">
+              <PasswordInput placeholder="••••••••" />
             </Field>
           </div>
         </Card>
@@ -82,7 +87,7 @@ export default function DesignPage() {
             <Skeleton className="h-6 w-1/2" />
           </div>
         </Card>
-      <div className="mt-4 flex flex-wrap items-center gap-4 rounded-xl border border-line bg-ink-800 p-5">
+      <div className="mt-4 flex flex-wrap items-center gap-4 rounded-md border border-line bg-ink-850 p-5">
         <span className="muted text-sm">Icons:</span>
         <Bell size={18} aria-hidden="true" />
         <X size={18} aria-hidden="true" />

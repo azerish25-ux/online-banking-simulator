@@ -2,6 +2,10 @@ import { usd } from "../../lib/format";
 
 export type MonthPoint = { month: string; inflow: string; outflow: string };
 
+/**
+ * Hand-rolled SVG bar pair per month. Statement aesthetic: hairline grid,
+ * brass for money in, slate-blue for money out, serif month labels.
+ */
 export function SpendingChart({ data }: { data: MonthPoint[] }) {
   const max = Math.max(1, ...data.flatMap((d) => [parseFloat(d.inflow), parseFloat(d.outflow)]));
   const W = 560;
@@ -10,6 +14,8 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
   const group = (W - pad * 2) / Math.max(1, data.length);
   const barW = Math.min(26, group / 3);
   const scale = (v: number) => (v / max) * (H - pad * 2);
+  const monthLabel = (iso: string) =>
+    new Date(iso + "-02").toLocaleString("en-US", { month: "short" });
 
   return (
     <svg viewBox={"0 0 " + W + " " + H} className="w-full" role="img" aria-label="Monthly money in and out">
@@ -19,7 +25,7 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           key={f}
           x1={pad} x2={W - pad}
           y1={H - pad - f * (H - pad * 2)} y2={H - pad - f * (H - pad * 2)}
-          stroke="#24365c" strokeDasharray="3 3"
+          stroke="#26324e" strokeWidth="1" strokeDasharray="2 4"
         />
       ))}
       {data.map((d, i) => {
@@ -28,22 +34,23 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
         const outH = scale(parseFloat(d.outflow));
         return (
           <g key={d.month}>
-            <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(1, inH)} rx={3} fill="#34d399">
+            <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(1, inH)} rx={1.5} fill="#c9a35c">
               <title>{"In " + d.month + ": " + usd(d.inflow)}</title>
             </rect>
-            <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(1, outH)} rx={3} fill="#38bdf8">
+            <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(1, outH)} rx={1.5} fill="#5b7ea6">
               <title>{"Out " + d.month + ": " + usd(d.outflow)}</title>
             </rect>
-            <text x={x} y={H - 8} textAnchor="middle" fontSize={11} fill="#93a4c4">
-              {d.month.slice(5)}
+            <text x={x} y={H - 8} textAnchor="middle" fontSize={11} fill="#97a3bd"
+              fontFamily="var(--font-display), Georgia, serif" fontStyle="italic">
+              {monthLabel(d.month)}
             </text>
           </g>
         );
       })}
-      <g fontSize={11} fill="#93a4c4">
-        <rect x={pad} y={4} width={10} height={10} rx={2} fill="#34d399" />
+      <g fontSize={11} fill="#97a3bd">
+        <rect x={pad} y={4} width={10} height={10} rx={1.5} fill="#c9a35c" />
         <text x={pad + 14} y={13}>In</text>
-        <rect x={pad + 52} y={4} width={10} height={10} rx={2} fill="#38bdf8" />
+        <rect x={pad + 52} y={4} width={10} height={10} rx={1.5} fill="#5b7ea6" />
         <text x={pad + 66} y={13}>Out</text>
       </g>
     </svg>

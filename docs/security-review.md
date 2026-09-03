@@ -1,4 +1,7 @@
-# Security Review - Part 6
+# Security Review
+
+(Originally "Part 6"; re-verified through the hardening release - refresh
+rotation, TOTP, proxy-header trust flag, deposit caps, RFC-7807 everywhere.)
 
 Scope: Spring Boot API + Next.js frontend, local single-instance deployment.
 Method: code review + automated tests (AdminFlowTest, RateLimitTest) + live verification.

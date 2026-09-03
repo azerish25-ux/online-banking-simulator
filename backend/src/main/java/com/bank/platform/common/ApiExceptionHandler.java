@@ -1,46 +1,50 @@
 package com.bank.platform.common;
 
 import com.bank.platform.accounts.AccountNotFoundException;
+import com.bank.platform.auth.EmailTakenException;
 import com.bank.platform.beneficiaries.BeneficiaryExistsException;
 import com.bank.platform.beneficiaries.BeneficiaryNotFoundException;
-import com.bank.platform.ledger.TransactionNotFoundException;
-import com.bank.platform.auth.EmailTakenException;
 import com.bank.platform.ledger.InsufficientFundsException;
+import com.bank.platform.ledger.TransactionNotFoundException;
 import com.bank.platform.ledger.TransferValidationException;
+import jakarta.validation.ConstraintViolationException;
 import java.time.Instant;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
-  @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
-  public ResponseEntity<Map<String, Object>> unreadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+  @ExceptionHandler(HttpMessageNotReadableException.class)
+  public ResponseEntity<Map<String, Object>> unreadable(HttpMessageNotReadableException ex) {
     Throwable cause = ex.getMostSpecificCause();
     return problem(HttpStatus.BAD_REQUEST, "Malformed Request",
         cause == null ? "Malformed request" : cause.getMessage());
   }
 
-  @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
-  public ResponseEntity<Map<String, Object>> typeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+  @ExceptionHandler(MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<Map<String, Object>> typeMismatch(MethodArgumentTypeMismatchException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Bad Request",
         "Parameter \u0027" + ex.getName() + "\u0027 has an invalid value");
   }
 
-  @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
-  public ResponseEntity<Map<String, Object>> constraint(jakarta.validation.ConstraintViolationException ex) {
+  @ExceptionHandler(ConstraintViolationException.class)
+  public ResponseEntity<Map<String, Object>> constraint(ConstraintViolationException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Validation Failed", ex.getMessage());
   }
 
-  @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
-  public ResponseEntity<Map<String, Object>> noRoute(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+  @ExceptionHandler(NoResourceFoundException.class)
+  public ResponseEntity<Map<String, Object>> noRoute(NoResourceFoundException ex) {
     return problem(HttpStatus.NOT_FOUND, "Not Found", "No such endpoint");
   }
 

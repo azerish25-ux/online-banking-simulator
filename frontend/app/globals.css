@@ -4,14 +4,14 @@
 
 :root {
   color-scheme: dark;
-  --bg: #0b1220;
-  --panel: #111c33;
-  --line: #24365c;
-  --text: #e8eef7;
-  --muted: #93a4c4;
-  --brand: #38bdf8;
-  --mint: #86efac;
-  --rose: #fca5a5;
+  --bg: #0c101d;
+  --panel: #151e33;
+  --line: #26324e;
+  --text: #e9edf5;
+  --muted: #97a3bd;
+  --brand: #c9a35c;
+  --mint: #9fdcb4;
+  --rose: #f2a9a9;
 }
 
 html, body {
@@ -20,14 +20,35 @@ html, body {
 }
 
 body {
-  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: rgba(56, 189, 248, 0.35); }
+::selection { background: rgba(201, 163, 92, 0.30); }
+
+/* Refined focus: brass ring, visible on every interactive element. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+}
 
 @layer components {
-  .panel { @apply rounded-xl border bg-ink-800 shadow-card; border-color: var(--line); }
+  .panel {
+    @apply rounded-lg border bg-ink-850 shadow-card;
+    border-color: var(--line);
+  }
   .muted { color: var(--muted); }
   .mono { @apply font-mono text-[13px]; }
+
+  /* Serif display headlines - the private-bank voice. */
+  .display {
+    font-family: var(--font-display), Georgia, serif;
+    letter-spacing: -0.01em;
+  }
+
+  /* Small caps labels: table headers, stat labels, eyebrow text. */
+  .caps {
+    @apply text-[11px] uppercase;
+    letter-spacing: 0.08em;
+  }
 }

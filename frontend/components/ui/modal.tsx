@@ -14,13 +14,20 @@ export function Modal({
   title: string;
   children: React.ReactNode;
 }) {
+  const closeRef = React.useRef<HTMLButtonElement>(null);
+  const opener = React.useRef<Element | null>(null);
   React.useEffect(() => {
     if (!open) return;
+    opener.current = document.activeElement;
+    closeRef.current?.focus();
+    document.addEventListener("keydown", onKey);
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
     }
-    document.addEventListener("keydown", onKey);
-    return () => document.removeEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("keydown", onKey);
+      (opener.current as HTMLElement | null)?.focus?.();
+    };
   }, [open, onClose]);
 
   if (!open) return null;
@@ -34,7 +41,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className="panel w-full max-w-md p-5"
+        className="panel w-full max-w-md p-5 border-line"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -42,6 +49,7 @@ export function Modal({
           <button
             onClick={onClose}
             aria-label="Close dialog"
+            ref={closeRef}
             className="rounded-md px-2 py-1 text-slate-400 hover:bg-ink-700 hover:text-slate-100"
           >
               <X size={16} aria-hidden="true" />

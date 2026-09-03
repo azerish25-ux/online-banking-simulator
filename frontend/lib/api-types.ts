@@ -20,3 +20,7 @@ export type AuthResponse = Omit<Required<Schemas["AuthResponse"]>, "user"> & { u
 
 // Spring Data page envelope (framework-stable shape, not domain drift).
 export type Page<T> = { content: T[]; totalPages: number; number: number };
+
+// Public landing numbers - intentionally outside the OpenAPI spec (marketing
+// data, not part of the authenticated banking contract).
+export type PublicStats = { users: number; transfers: number; volume: string };
