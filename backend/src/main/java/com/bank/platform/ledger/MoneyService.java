@@ -87,6 +87,7 @@ public class MoneyService {
   }
 
   /** Simulated external rail (ATM/teller). Only the owning customer can fund their own account. */
+  @org.springframework.cache.annotation.CacheEvict(value = "summaries", allEntries = true)
   @Transactional
   public Account deposit(String email, UUID accountId, BigDecimal amount) {
     requirePositive(amount);
@@ -114,6 +115,7 @@ public class MoneyService {
    * (deadlock-safe), debits then credits atomically, and returns the original
    * row when the caller's idempotency key is replayed.
    */
+  @org.springframework.cache.annotation.CacheEvict(value = "summaries", allEntries = true)
   @Transactional
   public Transaction transfer(
       String email,
@@ -191,7 +193,8 @@ public class MoneyService {
     return tx;
   }
 
-  /** Monthly inflow/outflow for the last N months (oldest first), zero-filled. */
+  /** Monthly inflow/outflow (oldest first, zero-filled). Cached; evicted on any money mutation. */
+  @org.springframework.cache.annotation.Cacheable(value = "summaries", key = "#accountId.toString() + '-' + #months")
   @Transactional(readOnly = true)
   public java.util.List<com.bank.platform.ledger.TransferDtos.MonthSummary> summary(String email, UUID accountId, int months) {
     Account account = accountDetail(email, accountId);

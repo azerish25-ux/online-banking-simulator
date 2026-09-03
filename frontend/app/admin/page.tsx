@@ -11,6 +11,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { api, getToken } from "../../lib/api";
+import { adminStatementUrl } from "../../lib/statements";
 import { fmtDate, usd } from "../../lib/format";
 
 type AdminUser = { id: string; email: string; fullName: string; role: string };
@@ -98,7 +99,7 @@ export default function AdminPage() {
 
   async function downloadAccountPdf(accountId: string) {
     try {
-      const res = await fetch("/backend/v1/admin/accounts/" + accountId + "/statement.pdf", {
+      const res = await fetch(adminStatementUrl(accountId), {
         headers: { Authorization: "Bearer " + (getToken() ?? "") }
       });
       if (!res.ok) throw new Error("Export failed: " + res.status);

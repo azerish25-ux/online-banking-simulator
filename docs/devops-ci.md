@@ -32,3 +32,11 @@ Instead, Flyway migrations run against H2 in PostgreSQL-compatibility mode in te
 and every migration is additionally booted against real PostgreSQL via `start-all.ps1`
 before merging a part. If CI ever gains a Postgres service, add a
 `@DataJpaTest`-with-Testcontainers class reusing `V1__*.sql` - the migrations are already portable.
+
+## Performance notes (measured 2026-09-02, local PG 16)
+
+- Indexes: `idx_accounts_user`, `idx_tx_from`, `idx_tx_to`, `idx_tx_flagged`, beneficiary/audit/card indexes (see V1/V4/V5/V7).
+- `EXPLAIN` on the history query (`from = X OR to = X ORDER BY created_at DESC LIMIT 20`) shows a **seq scan**: the OR across two single-column indexes is not index-friendly. Fine at demo scale; if volume grows, rewrite as `UNION ALL` of two halves over a composite `(account_id, created_at)` access path.
+- N+1 audit: every multi-row read resolves counterpart IBANs with one batched `findAllById` (`ibanMap`); no per-row queries in hot paths.
+- `GET .../summary` is Caffeine-cached (5 min, 2000 entries) and evicted on every money mutation incl. the interest job.
+- Responses carry `X-Request-Id` (minted or propagated) and logs embed it via the `traceId` MDC slot.

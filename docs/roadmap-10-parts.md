@@ -1,6 +1,8 @@
 # 10-Part Roadmap - Enterprise Banking Platform
 
 > Goal: portfolio-grade, enterprise-style banking system. Each part is independently runnable and ends with a verifiable checkpoint.
+>
+> **Status 2026-09-02: all 10 parts complete and verified.** Backend 14 tests + JaCoCo gate, frontend 20 Vitest + 4 Playwright, live Postgres proving runs per part.
 
 ## Part 1 - Foundation & Monorepo Scaffold (CURRENT)
 - Monorepo layout (frontend / backend / db / docs)

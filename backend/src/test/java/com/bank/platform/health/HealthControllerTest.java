@@ -2,6 +2,7 @@ package com.bank.platform.health;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import org.junit.jupiter.api.Test;
@@ -17,6 +18,20 @@ import org.springframework.test.web.servlet.MockMvc;
 class HealthControllerTest {
 
   @Autowired MockMvc mvc;
+
+  @Test
+  void requestIdIsMintedWhenAbsent() throws Exception {
+    mvc.perform(get("/api/health"))
+        .andExpect(status().isOk())
+        .andExpect(header().exists("X-Request-Id"));
+  }
+
+  @Test
+  void requestIdIsPropagatedWhenProvided() throws Exception {
+    mvc.perform(get("/api/health").header("X-Request-Id", "demo-trace-1"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("X-Request-Id", "demo-trace-1"));
+  }
 
   @Test
   void healthReturnsUp() throws Exception {

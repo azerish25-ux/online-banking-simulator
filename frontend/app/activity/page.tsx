@@ -11,6 +11,7 @@ import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { api, getToken } from "../../lib/api";
+import { statementUrl } from "../../lib/statements";
 import { fmtDate, usd } from "../../lib/format";
 
 type Account = { id: string; iban: string; type: string; balance: string };
@@ -45,16 +46,11 @@ export default function ActivityPage() {
     api(url).then(setPage).catch((e) => push(e instanceof Error ? e.message : "Failed to load activity", "error"));
   }, [accountId, index, applied, push]);
 
-  function rangeParams(): string {
-    let q = "";
-    if (applied.from) q += "&from=" + applied.from;
-    if (applied.to) q += "&to=" + applied.to;
-    return q;
-  }
+
 
   async function download(kind: "csv" | "pdf") {
     try {
-      const res = await fetch("/backend/v1/accounts/" + accountId + "/statement." + kind + "?x=1" + rangeParams(), {
+      const res = await fetch(statementUrl(accountId, kind, applied), {
         headers: { Authorization: "Bearer " + (getToken() ?? "") }
       });
       if (!res.ok) throw new Error("Export failed: " + res.status);

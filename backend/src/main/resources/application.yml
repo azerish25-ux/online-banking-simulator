@@ -31,6 +31,9 @@ app:
   interest:
     savings-annual-rate: ${SAVINGS_RATE:0.04}
     loan-annual-rate: ${LOAN_RATE:0.12}
+  cache:
+    caffeine:
+      spec: maximumSize=2000,expireAfterWrite=5m
   cors:
     allowed-origins: ${APP_CORS_ORIGINS:http://localhost:3000}
 management:
