@@ -22,7 +22,7 @@ public final class TransferDtos {
 
   public record TransferResponse(
       UUID id, String fromIban, String toIban, String amount, String currency,
-      String memo, String status, String createdAt) {}
+      String memo, String status, String createdAt, boolean flagged) {}
 
   public record AccountResponse(
       UUID id, String iban, String type, String balance, String status) {}
@@ -31,6 +31,6 @@ public final class TransferDtos {
 
   public record TransactionResponse(
       UUID id, String fromIban, String toIban, String amount, String currency,
-      String memo, String status, String createdAt) {}
+      String memo, String status, String createdAt, boolean flagged, boolean reviewed) {}
 }
 

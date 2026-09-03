@@ -35,6 +35,12 @@ public class Transaction {
   @Column(nullable = false, length = 32)
   private String status = "POSTED";
 
+  @Column(nullable = false)
+  private boolean flagged;
+
+  @Column(nullable = false)
+  private boolean reviewed;
+
   @Column(length = 140)
   private String memo;
 
@@ -65,4 +71,8 @@ public class Transaction {
   public void setCurrency(String v) { currency = v; }
   public void setIdempotencyKey(String v) { idempotencyKey = v; }
   public void setMemo(String v) { memo = v; }
+  public boolean isFlagged() { return flagged; }
+  public void setFlagged(boolean v) { flagged = v; }
+  public boolean isReviewed() { return reviewed; }
+  public void setReviewed(boolean v) { reviewed = v; }
 }

@@ -2,9 +2,11 @@
 
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
+import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
+import { Field, Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
@@ -12,7 +14,7 @@ import { api, getToken } from "../../lib/api";
 import { fmtDate, usd } from "../../lib/format";
 
 type Account = { id: string; iban: string; type: string; balance: string };
-type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; createdAt: string };
+type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; createdAt: string; flagged?: boolean; reviewed?: boolean };
 type Page<T> = { content: T[]; totalPages: number; number: number };
 
 const SIZE = 10;
@@ -21,6 +23,9 @@ export default function ActivityPage() {
   const { push } = useToast();
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [accountId, setAccountId] = React.useState("");
+  const [from, setFrom] = React.useState("");
+  const [to, setTo] = React.useState("");
+  const [applied, setApplied] = React.useState({ from: "", to: "" });
   const [page, setPage] = React.useState<Page<Tx> | null>(null);
   const [index, setIndex] = React.useState(0);
 
@@ -34,14 +39,22 @@ export default function ActivityPage() {
   React.useEffect(() => {
     if (!accountId) return;
     setPage(null);
-    api("/v1/transactions?accountId=" + accountId + "&page=" + index + "&size=" + SIZE)
-      .then(setPage)
-      .catch((e) => push(e instanceof Error ? e.message : "Failed to load activity", "error"));
-  }, [accountId, index, push]);
+    let url = "/v1/transactions?accountId=" + accountId + "&page=" + index + "&size=" + SIZE;
+    if (applied.from) url += "&from=" + applied.from;
+    if (applied.to) url += "&to=" + applied.to;
+    api(url).then(setPage).catch((e) => push(e instanceof Error ? e.message : "Failed to load activity", "error"));
+  }, [accountId, index, applied, push]);
 
-  async function downloadCsv() {
+  function rangeParams(): string {
+    let q = "";
+    if (applied.from) q += "&from=" + applied.from;
+    if (applied.to) q += "&to=" + applied.to;
+    return q;
+  }
+
+  async function download(kind: "csv" | "pdf") {
     try {
-      const res = await fetch("/backend/accounts/" + accountId + "/statement.csv", {
+      const res = await fetch("/backend/v1/accounts/" + accountId + "/statement." + kind + "?x=1" + rangeParams(), {
         headers: { Authorization: "Bearer " + (getToken() ?? "") }
       });
       if (!res.ok) throw new Error("Export failed: " + res.status);
@@ -49,7 +62,7 @@ export default function ActivityPage() {
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = "statement.csv";
+      a.download = "statement." + kind;
       a.click();
       URL.revokeObjectURL(url);
       push("Statement downloaded.", "success");
@@ -58,12 +71,22 @@ export default function ActivityPage() {
     }
   }
 
+  function applyRange(e: React.FormEvent) {
+    e.preventDefault();
+    if (from && to && from > to) {
+      push("Start date must be before end date.", "error");
+      return;
+    }
+    setIndex(0);
+    setApplied({ from, to });
+  }
+
   return (
     <AppShell>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
-          <p className="muted text-sm">Full transaction history with CSV export.</p>
+          <p className="muted text-sm">Full transaction history with statement export.</p>
         </div>
         <div className="flex gap-2">
           <select
@@ -76,11 +99,23 @@ export default function ActivityPage() {
               <option key={a.id} value={a.id}>{a.type} ...{a.iban.slice(-6)}</option>
             ))}
           </select>
-          <Button variant="secondary" onClick={downloadCsv} disabled={!accountId}>
-            Export CSV
-          </Button>
+          <Button variant="secondary" onClick={() => download("csv")} disabled={!accountId}>CSV</Button>
+          <Button variant="secondary" onClick={() => download("pdf")} disabled={!accountId}>PDF</Button>
         </div>
       </div>
+
+      <Card className="mb-4">
+        <form onSubmit={applyRange} className="flex flex-wrap items-end gap-3">
+          <Field label="From"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
+          <Field label="To"><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+          <Button type="submit" variant="secondary">Apply</Button>
+          {(applied.from || applied.to) && (
+            <Button type="button" variant="ghost" onClick={() => { setFrom(""); setTo(""); setApplied({ from: "", to: "" }); setIndex(0); }}>
+              Clear
+            </Button>
+          )}
+        </form>
+      </Card>
 
       <Card>
         {page == null ? (
@@ -91,7 +126,7 @@ export default function ActivityPage() {
           <>
             <Table>
               <THead>
-                <TRow><TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH className="text-right">Amount</TH></TRow>
+                <TRow><TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH></TRow>
               </THead>
               <tbody>
                 {page.content.map((t) => (
@@ -100,6 +135,7 @@ export default function ActivityPage() {
                     <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEPOSIT"}</TD>
                     <TD className="mono">{t.toIban ? "..." + t.toIban.slice(-6) : "-"}</TD>
                     <TD className="max-w-48 truncate">{t.memo ?? "-"}</TD>
+                    <TD>{t.flagged ? <Badge tone="danger">FLAGGED</Badge> : <span className="muted text-xs">posted</span>}</TD>
                     <TD className="text-right font-semibold tabular-nums">{usd(t.amount)}</TD>
                   </TRow>
                 ))}

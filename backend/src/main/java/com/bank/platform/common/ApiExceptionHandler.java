@@ -3,6 +3,7 @@ package com.bank.platform.common;
 import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.beneficiaries.BeneficiaryExistsException;
 import com.bank.platform.beneficiaries.BeneficiaryNotFoundException;
+import com.bank.platform.ledger.TransactionNotFoundException;
 import com.bank.platform.auth.EmailTakenException;
 import com.bank.platform.ledger.InsufficientFundsException;
 import com.bank.platform.ledger.TransferValidationException;
@@ -46,6 +47,11 @@ public class ApiExceptionHandler {
   @ExceptionHandler(BeneficiaryExistsException.class)
   public ResponseEntity<Map<String, Object>> beneficiaryConflict(BeneficiaryExistsException ex) {
     return problem(HttpStatus.CONFLICT, "Beneficiary Exists", ex.getMessage());
+  }
+
+  @ExceptionHandler(TransactionNotFoundException.class)
+  public ResponseEntity<Map<String, Object>> transactionNotFound(TransactionNotFoundException ex) {
+    return problem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 
   @ExceptionHandler(BeneficiaryNotFoundException.class)

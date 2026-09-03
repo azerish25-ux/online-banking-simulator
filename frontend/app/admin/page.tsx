@@ -10,13 +10,14 @@ import { Field, Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
-import { api } from "../../lib/api";
+import { api, getToken } from "../../lib/api";
 import { fmtDate, usd } from "../../lib/format";
 
 type AdminUser = { id: string; email: string; fullName: string; role: string };
 type Account = { id: string; iban: string; type: string; balance: string; status: string };
 type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; createdAt: string };
 type Audit = { id: number; actorId: string | null; action: string; entity: string; entityId: string; createdAt: string };
+type DayTotal = { date: string; transfers: number; transferVolume: string; deposits: number; depositVolume: string; interestEvents: number; interestNet: string };
 
 export default function AdminPage() {
   const { push } = useToast();
@@ -26,6 +27,8 @@ export default function AdminPage() {
   const [accounts, setAccounts] = React.useState<Account[]>([]);
   const [recent, setRecent] = React.useState<Tx[]>([]);
   const [audits, setAudits] = React.useState<Audit[]>([]);
+  const [queue, setQueue] = React.useState<Tx[]>([]);
+  const [totals, setTotals] = React.useState<DayTotal[]>([]);
   const [auditAction, setAuditAction] = React.useState("");
   const [forbidden, setForbidden] = React.useState(false);
 
@@ -45,6 +48,9 @@ export default function AdminPage() {
       setRecent(txPage.content ?? []);
       const auditPage = await api("/v1/admin/audit-logs?size=15" + (auditAction ? "&action=" + encodeURIComponent(auditAction) : ""));
       setAudits(auditPage.content ?? []);
+      const flagged = await api("/v1/admin/transactions?flagged=true&reviewed=false&size=20");
+      setQueue(flagged.content ?? []);
+      setTotals(await api("/v1/admin/reports/daily-totals?days=14"));
     } catch (e) {
       push(e instanceof Error ? e.message : "Failed to load ops data", "error");
     }
@@ -80,6 +86,35 @@ export default function AdminPage() {
     }
   }
 
+  async function review(id: string) {
+    try {
+      await api("/v1/admin/transactions/" + id + "/review", { method: "POST" });
+      push("Transfer marked reviewed.", "success");
+      await loadSide();
+    } catch (e) {
+      push(e instanceof Error ? e.message : "Review failed", "error");
+    }
+  }
+
+  async function downloadAccountPdf(accountId: string) {
+    try {
+      const res = await fetch("/backend/v1/admin/accounts/" + accountId + "/statement.pdf", {
+        headers: { Authorization: "Bearer " + (getToken() ?? "") }
+      });
+      if (!res.ok) throw new Error("Export failed: " + res.status);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "statement.pdf";
+      a.click();
+      URL.revokeObjectURL(url);
+      push("Statement downloaded.", "success");
+    } catch (e) {
+      push(e instanceof Error ? e.message : "Export failed", "error");
+    }
+  }
+
   if (forbidden) {
     return (
       <AppShell>
@@ -92,6 +127,49 @@ export default function AdminPage() {
     <AppShell>
       <h1 className="text-2xl font-bold tracking-tight">Operations</h1>
       <p className="muted mt-1 text-sm">Users, account status, money flow and the audit trail.</p>
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <Card>
+          <div className="mb-3 flex items-center justify-between">
+            <CardTitle>Review queue</CardTitle>
+            <Badge tone={queue.length > 0 ? "danger" : "success"}>{queue.length} open</Badge>
+          </div>
+          {queue.length === 0 ? (
+            <CardDescription>No flagged transfers awaiting review.</CardDescription>
+          ) : (
+            <ul className="space-y-2">
+              {queue.map((t) => (
+                <li key={t.id} className="flex items-center justify-between gap-2 rounded-lg border border-line p-3">
+                  <div className="text-sm">
+                    <span className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "-"} → {t.toIban ? "..." + t.toIban.slice(-6) : "-"}</span>
+                    <span className="ml-2 font-semibold tabular-nums">{usd(t.amount)}</span>
+                    <span className="muted ml-2 text-xs">{fmtDate(t.createdAt)}</span>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => review(t.id)}>Mark reviewed</Button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </Card>
+        <Card>
+          <CardTitle>Daily totals · last 14 days</CardTitle>
+          <div className="mt-3">
+            <Table>
+              <THead><TRow><TH>Date</TH><TH className="text-right">Transfers</TH><TH className="text-right">Volume</TH><TH className="text-right">Deposits</TH></TRow></THead>
+              <tbody>
+                {totals.slice(-14).map((d) => (
+                  <TRow key={d.date}>
+                    <TD className="whitespace-nowrap">{d.date}</TD>
+                    <TD className="text-right tabular-nums">{d.transfers}</TD>
+                    <TD className="text-right tabular-nums">{usd(d.transferVolume)}</TD>
+                    <TD className="text-right tabular-nums">{d.deposits}</TD>
+                  </TRow>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        </Card>
+      </div>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <Card>
@@ -131,11 +209,14 @@ export default function AdminPage() {
                     <p className="mono text-sm">{a.iban}</p>
                     <p className="text-sm">{usd(a.balance)} · <Badge tone={a.status === "ACTIVE" ? "success" : "danger"}>{a.status}</Badge></p>
                   </div>
+                  <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" onClick={() => downloadAccountPdf(a.id)}>PDF</Button>
                   {a.status === "ACTIVE" ? (
                     <Button size="sm" variant="danger" onClick={() => setStatus(a, true)}>Freeze</Button>
                   ) : (
                     <Button size="sm" variant="secondary" onClick={() => setStatus(a, false)}>Unfreeze</Button>
                   )}
+                  </div>
                 </div>
               ))}
             </div>

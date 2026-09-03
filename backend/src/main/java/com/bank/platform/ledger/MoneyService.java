@@ -13,6 +13,7 @@ import java.math.RoundingMode;
 import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -27,6 +28,7 @@ public class MoneyService {
   private final TransactionRepository transactions;
   private final AuditLogRepository audits;
   private final NotificationService notifications;
+  private final BigDecimal reviewThreshold;
   private final SecureRandom random = new SecureRandom();
 
   public MoneyService(
@@ -34,12 +36,14 @@ public class MoneyService {
       AccountRepository accounts,
       TransactionRepository transactions,
       AuditLogRepository audits,
-      NotificationService notifications) {
+      NotificationService notifications,
+      @Value("${app.review.large-transfer-threshold:10000}") BigDecimal reviewThreshold) {
     this.users = users;
     this.accounts = accounts;
     this.transactions = transactions;
     this.audits = audits;
     this.notifications = notifications;
+    this.reviewThreshold = reviewThreshold;
   }
 
   @Transactional(readOnly = true)
@@ -166,6 +170,7 @@ public class MoneyService {
     tx.setCurrency(currency == null || currency.isBlank() ? "USD" : currency.trim().toUpperCase());
     tx.setMemo(memo != null && memo.length() > 140 ? memo.substring(0, 140) : memo);
     tx.setIdempotencyKey(idempotencyKey != null && idempotencyKey.isBlank() ? null : idempotencyKey);
+    tx.setFlagged(scaled.compareTo(reviewThreshold) >= 0);
     try {
       transactions.saveAndFlush(tx);
     } catch (DataIntegrityViolationException concurrentReplay) {

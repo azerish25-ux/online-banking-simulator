@@ -40,11 +40,14 @@ public class TransferController {
   private final MoneyService money;
   private final TransactionRepository transactions;
   private final AccountRepository accounts;
+  private final StatementService statements;
 
-  public TransferController(MoneyService money, TransactionRepository transactions, AccountRepository accounts) {
+  public TransferController(MoneyService money, TransactionRepository transactions, AccountRepository accounts,
+      StatementService statements) {
     this.money = money;
     this.transactions = transactions;
     this.accounts = accounts;
+    this.statements = statements;
   }
 
   @PostMapping("/transfers")
@@ -74,10 +77,15 @@ public class TransferController {
   public Page<TransactionResponse> history(
       Authentication authentication,
       @RequestParam UUID accountId,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     // Ownership check first: throws 403/404 for foreign or missing accounts.
     money.accountDetail(authentication.getName(), accountId);
-    Page<Transaction> page = transactions.findByAccountId(accountId, pageable);
+    java.time.Instant fromInstant = from == null ? null : from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    java.time.Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    Page<Transaction> page = transactions.findAll(
+        TransactionSpecs.filters(accountId, null, null, fromInstant, toInstant), pageable);
     return page.map(tx -> toDto(tx, ibanMap(page.getContent())));
   }
 
@@ -90,12 +98,15 @@ public class TransferController {
   }
 
   @GetMapping("/accounts/{id}/statement.csv")
-  public ResponseEntity<String> statement(Authentication authentication, @PathVariable UUID id) {
-    var account = money.accountDetail(authentication.getName(), id);
-    List<Transaction> rows = transactions
-        .findByAccountId(id, PageRequest.of(0, 5000, Sort.by(Sort.Direction.DESC, "createdAt")))
-        .getContent();
-    Map<UUID, String> ibans = ibanMap(rows);
+  public ResponseEntity<String> statement(
+      Authentication authentication,
+      @PathVariable UUID id,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+    StatementService.Statement statement = statements.customerStatement(authentication.getName(), id, from, to);
+    var account = statement.account();
+    List<Transaction> rows = statement.rows();
+    Map<UUID, String> ibans = statements.ibanMap(rows);
 
     StringBuilder csv = new StringBuilder("id,created_at,from_iban,to_iban,amount,currency,memo,status\n");
     for (Transaction tx : rows) {
@@ -115,6 +126,22 @@ public class TransferController {
             ContentDisposition.attachment().filename(filename).build().toString())
         .contentType(MediaType.parseMediaType("text/csv"))
         .body(csv.toString());
+  }
+
+  @GetMapping("/accounts/{id}/statement.pdf")
+  public ResponseEntity<byte[]> statementPdf(
+      Authentication authentication,
+      @PathVariable UUID id,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+    StatementService.Statement statement = statements.customerStatement(authentication.getName(), id, from, to);
+    byte[] pdf = statements.renderPdf(statement);
+    String filename = "statement-" + statement.account().getIban() + ".pdf";
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(filename).build().toString())
+        .contentType(MediaType.APPLICATION_PDF)
+        .body(pdf);
   }
 
   private Map<UUID, String> ibanMap(List<Transaction> rows) {
@@ -145,7 +172,7 @@ public class TransferController {
         tx.getCurrency(),
         tx.getMemo(),
         tx.getStatus(),
-        tx.getCreatedAt().toString());
+        tx.getCreatedAt().toString(), tx.isFlagged());
   }
 
   private TransactionResponse toDto(Transaction tx, Map<UUID, String> ibans) {
@@ -157,6 +184,6 @@ public class TransferController {
         tx.getCurrency(),
         tx.getMemo(),
         tx.getStatus(),
-        tx.getCreatedAt().toString());
+        tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
   }
 }

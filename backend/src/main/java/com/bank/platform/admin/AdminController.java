@@ -9,6 +9,7 @@ import com.bank.platform.auth.AuthDtos.UserResponse;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.ledger.TransactionRepository;
 import com.bank.platform.ledger.TransferDtos.AccountResponse;
+import com.bank.platform.ledger.StatementService;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
 import java.util.Map;
 import java.util.UUID;
@@ -37,6 +38,8 @@ public class AdminController {
   private final AuditLogRepository audits;
   private final AdminService adminService;
   private final com.bank.platform.ledger.InterestService interestService;
+  private final com.bank.platform.admin.ReportService reportService;
+  private final com.bank.platform.ledger.StatementService statementService;
 
   public AdminController(
       UserRepository users,
@@ -44,13 +47,17 @@ public class AdminController {
       TransactionRepository transactions,
       AuditLogRepository audits,
       AdminService adminService,
-      com.bank.platform.ledger.InterestService interestService) {
+      com.bank.platform.ledger.InterestService interestService,
+      com.bank.platform.admin.ReportService reportService,
+      com.bank.platform.ledger.StatementService statementService) {
     this.users = users;
     this.accounts = accounts;
     this.transactions = transactions;
     this.audits = audits;
     this.adminService = adminService;
     this.interestService = interestService;
+    this.reportService = reportService;
+    this.statementService = statementService;
   }
 
   public record AuditResponse(
@@ -80,8 +87,17 @@ public class AdminController {
 
   @GetMapping("/transactions")
   public Page<TransactionResponse> transactions(
+      @RequestParam(required = false) UUID accountId,
+      @RequestParam(required = false) Boolean flagged,
+      @RequestParam(required = false) Boolean reviewed,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-    Page<com.bank.platform.ledger.Transaction> page = transactions.findAll(pageable);
+    java.time.Instant fromInstant = from == null ? null : from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    java.time.Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    Page<com.bank.platform.ledger.Transaction> page = transactions.findAll(
+        com.bank.platform.ledger.TransactionSpecs.filters(accountId, flagged, reviewed, fromInstant, toInstant),
+        pageable);
     java.util.Set<UUID> ids = page.getContent().stream()
         .flatMap(tx -> java.util.stream.Stream.of(tx.getFromAccountId(), tx.getToAccountId()))
         .filter(value -> value != null)
@@ -96,7 +112,7 @@ public class AdminController {
         tx.getCurrency(),
         tx.getMemo(),
         tx.getStatus(),
-        tx.getCreatedAt().toString()));
+        tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed()));
   }
 
   @GetMapping("/audit-logs")
@@ -114,6 +130,32 @@ public class AdminController {
     return interestService.accrueMonthly();
   }
 
+  @PostMapping("/transactions/{id}/review")
+  public TransactionResponse review(Authentication authentication, @PathVariable UUID id) {
+    com.bank.platform.ledger.Transaction tx = adminService.reviewTransaction(authentication.getName(), id);
+    Map<UUID, String> ibans = statementService.ibanMap(java.util.List.of(tx));
+    return new TransactionResponse(
+        tx.getId(),
+        tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
+        tx.getToAccountId() == null ? null : ibans.getOrDefault(tx.getToAccountId(), tx.getToAccountId().toString()),
+        tx.getAmount().toPlainString(), tx.getCurrency(), tx.getMemo(), tx.getStatus(),
+        tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
+  }
+
+  @GetMapping("/reports/daily-totals")
+  public java.util.List<ReportService.DayTotal> dailyTotals(@RequestParam(defaultValue = "30") int days) {
+    return reportService.dailyTotals(days);
+  }
+
+  @GetMapping("/accounts/{id}/statement.pdf")
+  public org.springframework.http.ResponseEntity<byte[]> adminStatementPdf(
+      @PathVariable UUID id,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
+      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+    StatementService.Statement statement = statementService.adminStatement(id, from, to);
+    return pdf(statement);
+  }
+
   @PostMapping("/accounts/{id}/freeze")
   public AccountResponse freeze(Authentication authentication, @PathVariable UUID id) {
     return toDto(adminService.setStatus(authentication.getName(), id, "FROZEN"));
@@ -122,6 +164,16 @@ public class AdminController {
   @PostMapping("/accounts/{id}/unfreeze")
   public AccountResponse unfreeze(Authentication authentication, @PathVariable UUID id) {
     return toDto(adminService.setStatus(authentication.getName(), id, "ACTIVE"));
+  }
+
+  private org.springframework.http.ResponseEntity<byte[]> pdf(StatementService.Statement statement) {
+    byte[] pdf = statementService.renderPdf(statement);
+    String filename = "statement-" + statement.account().getIban() + ".pdf";
+    return org.springframework.http.ResponseEntity.ok()
+        .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+            org.springframework.http.ContentDisposition.attachment().filename(filename).build().toString())
+        .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+        .body(pdf);
   }
 
   private static AccountResponse toDto(Account account) {

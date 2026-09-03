@@ -5,6 +5,9 @@ import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
+import com.bank.platform.ledger.Transaction;
+import com.bank.platform.ledger.TransactionNotFoundException;
+import com.bank.platform.ledger.TransactionRepository;
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.notifications.NotificationService;
@@ -20,13 +23,27 @@ public class AdminService {
   private final AccountRepository accounts;
   private final AuditLogRepository audits;
   private final NotificationService notifications;
+  private final TransactionRepository transactions;
 
   public AdminService(UserRepository users, AccountRepository accounts, AuditLogRepository audits,
-      NotificationService notifications) {
+      NotificationService notifications, TransactionRepository transactions) {
     this.users = users;
     this.accounts = accounts;
     this.audits = audits;
     this.notifications = notifications;
+    this.transactions = transactions;
+  }
+
+  @Transactional
+  public Transaction reviewTransaction(String adminEmail, UUID transactionId) {
+    User admin = users.findByEmail(adminEmail)
+        .orElseThrow(() -> new UsernameNotFoundException("Admin not found"));
+    Transaction tx = transactions.findById(transactionId)
+        .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+    tx.setReviewed(true);
+    transactions.save(tx);
+    audits.save(new AuditLog(admin.getId(), "TRANSACTION_REVIEWED", "Transaction", tx.getId().toString()));
+    return tx;
   }
 
   @Transactional
