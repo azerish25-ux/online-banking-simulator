@@ -11,12 +11,15 @@ import com.bank.platform.ledger.TransactionRepository;
 import com.bank.platform.ledger.TransferDtos.AccountResponse;
 import com.bank.platform.ledger.StatementService;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
@@ -90,8 +93,8 @@ public class AdminController {
       @RequestParam(required = false) UUID accountId,
       @RequestParam(required = false) Boolean flagged,
       @RequestParam(required = false) Boolean reviewed,
-      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
-      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     java.time.Instant fromInstant = from == null ? null : from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
     java.time.Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
@@ -133,7 +136,7 @@ public class AdminController {
   @PostMapping("/transactions/{id}/review")
   public TransactionResponse review(Authentication authentication, @PathVariable UUID id) {
     com.bank.platform.ledger.Transaction tx = adminService.reviewTransaction(authentication.getName(), id);
-    Map<UUID, String> ibans = statementService.ibanMap(java.util.List.of(tx));
+    Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
     return new TransactionResponse(
         tx.getId(),
         tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
@@ -150,8 +153,8 @@ public class AdminController {
   @GetMapping("/accounts/{id}/statement.pdf")
   public org.springframework.http.ResponseEntity<byte[]> adminStatementPdf(
       @PathVariable UUID id,
-      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate from,
-      @RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE) java.time.LocalDate to) {
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+      @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
     StatementService.Statement statement = statementService.adminStatement(id, from, to);
     return pdf(statement);
   }

@@ -37,7 +37,6 @@ public class AuthService {
       throw new EmailTakenException(normalized);
     }
     User user = users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
-    // Every customer starts with one CHECKING account (Part 3 grows this).
     accounts.save(new Account(user.getId(), generateIban(), "CHECKING"));
     audits.save(new AuditLog(user.getId(), "USER_REGISTERED", "User", user.getId().toString()));
     return user;

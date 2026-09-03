@@ -13,7 +13,7 @@
 
   <groupId>com.bank</groupId>
   <artifactId>platform</artifactId>
-  <version>0.2.0</version>
+  <version>1.0.0</version>
   <name>platform</name>
   <description>Enterprise banking platform - backend (Part 2: database + auth)</description>
 

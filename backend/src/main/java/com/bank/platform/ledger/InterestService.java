@@ -13,6 +13,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -46,7 +47,7 @@ public class InterestService {
   }
 
   /** Runs at 03:00 on the first of every month. Also triggerable via the admin API for demos. */
-  @org.springframework.cache.annotation.CacheEvict(value = "summaries", allEntries = true)
+  @CacheEvict(value = "summaries", allEntries = true)
   @Scheduled(cron = "0 0 3 1 * *")
   @Transactional
   public Map<String, Integer> accrueMonthly() {

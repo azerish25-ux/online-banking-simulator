@@ -47,5 +47,5 @@ management:
 info:
   app:
     name: bank-platform
-    version: 0.2.0
-    part: "2-database-auth"
+    version: 1.0.0
+    part: "hardening"

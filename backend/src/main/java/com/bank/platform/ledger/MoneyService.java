@@ -14,6 +14,8 @@ import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -63,7 +65,7 @@ public class MoneyService {
   @Transactional
   public Account openAccount(String email, String type) {
     String clean = type == null ? "" : type.trim().toUpperCase();
-    if (!java.util.List.of("CHECKING", "SAVINGS", "LOAN").contains(clean)) {
+    if (!List.of("CHECKING", "SAVINGS", "LOAN").contains(clean)) {
       throw new TransferValidationException("Unknown account type: " + type);
     }
     User user = userOf(email);
@@ -87,7 +89,7 @@ public class MoneyService {
   }
 
   /** Simulated external rail (ATM/teller). Only the owning customer can fund their own account. */
-  @org.springframework.cache.annotation.CacheEvict(value = "summaries", allEntries = true)
+  @CacheEvict(value = "summaries", allEntries = true)
   @Transactional
   public Account deposit(String email, UUID accountId, BigDecimal amount) {
     requirePositive(amount);
@@ -115,7 +117,7 @@ public class MoneyService {
    * (deadlock-safe), debits then credits atomically, and returns the original
    * row when the caller's idempotency key is replayed.
    */
-  @org.springframework.cache.annotation.CacheEvict(value = "summaries", allEntries = true)
+  @CacheEvict(value = "summaries", allEntries = true)
   @Transactional
   public Transaction transfer(
       String email,
@@ -170,7 +172,7 @@ public class MoneyService {
     tx.setToAccountId(to.getId());
     tx.setAmount(scaled);
     tx.setCurrency(currency == null || currency.isBlank() ? "USD" : currency.trim().toUpperCase());
-    tx.setMemo(memo != null && memo.length() > 140 ? memo.substring(0, 140) : memo);
+    tx.setMemo(memo);
     tx.setIdempotencyKey(idempotencyKey != null && idempotencyKey.isBlank() ? null : idempotencyKey);
     tx.setFlagged(scaled.compareTo(reviewThreshold) >= 0);
     try {
@@ -194,7 +196,7 @@ public class MoneyService {
   }
 
   /** Monthly inflow/outflow (oldest first, zero-filled). Cached; evicted on any money mutation. */
-  @org.springframework.cache.annotation.Cacheable(value = "summaries", key = "#accountId.toString() + '-' + #months")
+  @Cacheable(value = "summaries", key = "#accountId.toString() + '-' + #months")
   @Transactional(readOnly = true)
   public java.util.List<com.bank.platform.ledger.TransferDtos.MonthSummary> summary(String email, UUID accountId, int months) {
     Account account = accountDetail(email, accountId);
