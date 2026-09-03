@@ -21,6 +21,29 @@ import org.springframework.web.bind.annotation.RestControllerAdvice;
 @RestControllerAdvice
 public class ApiExceptionHandler {
 
+  @ExceptionHandler(org.springframework.http.converter.HttpMessageNotReadableException.class)
+  public ResponseEntity<Map<String, Object>> unreadable(org.springframework.http.converter.HttpMessageNotReadableException ex) {
+    Throwable cause = ex.getMostSpecificCause();
+    return problem(HttpStatus.BAD_REQUEST, "Malformed Request",
+        cause == null ? "Malformed request" : cause.getMessage());
+  }
+
+  @ExceptionHandler(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException.class)
+  public ResponseEntity<Map<String, Object>> typeMismatch(org.springframework.web.method.annotation.MethodArgumentTypeMismatchException ex) {
+    return problem(HttpStatus.BAD_REQUEST, "Bad Request",
+        "Parameter \u0027" + ex.getName() + "\u0027 has an invalid value");
+  }
+
+  @ExceptionHandler(jakarta.validation.ConstraintViolationException.class)
+  public ResponseEntity<Map<String, Object>> constraint(jakarta.validation.ConstraintViolationException ex) {
+    return problem(HttpStatus.BAD_REQUEST, "Validation Failed", ex.getMessage());
+  }
+
+  @ExceptionHandler(org.springframework.web.servlet.resource.NoResourceFoundException.class)
+  public ResponseEntity<Map<String, Object>> noRoute(org.springframework.web.servlet.resource.NoResourceFoundException ex) {
+    return problem(HttpStatus.NOT_FOUND, "Not Found", "No such endpoint");
+  }
+
   @ExceptionHandler(IllegalArgumentException.class)
   public ResponseEntity<Map<String, Object>> badRequest(IllegalArgumentException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());

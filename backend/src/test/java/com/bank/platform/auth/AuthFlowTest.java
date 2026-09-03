@@ -73,6 +73,36 @@ class AuthFlowTest {
   }
 
   @Test
+  void malformedJsonIsRfc7807() throws Exception {
+    mvc.perform(post("/api/v1/auth/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{oops"))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").exists())
+        .andExpect(jsonPath("$.detail").exists());
+  }
+
+  @Test
+  void badUuidPathIsRfc7807() throws Exception {
+    String admin = loginAsAdmin();
+    mvc.perform(get("/api/v1/accounts/not-a-uuid").header("Authorization", "Bearer " + admin))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").exists())
+        .andExpect(jsonPath("$.detail").exists());
+  }
+
+  private String loginAsAdmin() throws Exception {
+    MvcResult result = mvc.perform(post("/api/v1/auth/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"email":"admin-test@bank.local","password":"admin-test-123"}"""))
+        .andExpect(status().isOk())
+        .andReturn();
+    return objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
+        .get("accessToken").asText();
+  }
+
+  @Test
   void registerValidationFails() throws Exception {
     mvc.perform(post("/api/v1/auth/register")
             .contentType(MediaType.APPLICATION_JSON)
