@@ -186,4 +186,42 @@ class MoneyFlowTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].flagged").value(true));
   }
+
+  @Test
+  void historyPagesNewestFirst() throws Exception {
+    String token = register("pages@example.com", "Pages User");
+    String accountId = accountId(token);
+    for (int i = 1; i <= 25; i++) {
+      mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
+              .header("Authorization", "Bearer " + token)
+              .contentType(MediaType.APPLICATION_JSON)
+              .content("""
+                  {"amount":"1.00"}"""))
+          .andExpect(status().isOk());
+    }
+    checkPage(token, accountId, 0, 10);
+    checkPage(token, accountId, 1, 10);
+    checkPage(token, accountId, 2, 5);
+  }
+
+  private void checkPage(String token, String accountId, int page, int size) throws Exception {
+    MvcResult result = mvc.perform(get("/api/v1/transactions")
+            .header("Authorization", "Bearer " + token)
+            .param("accountId", accountId)
+            .param("page", String.valueOf(page))
+            .param("size", String.valueOf(size)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.totalElements").value(25))
+        .andExpect(jsonPath("$.content.length()").value(size))
+        .andReturn();
+    JsonNode content = objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
+        .get("content");
+    org.junit.jupiter.api.Assertions.assertEquals(size, content.size());
+    String previous = "9999-99-99";
+    for (JsonNode row : content) {
+      String created = row.get("createdAt").asText();
+      org.junit.jupiter.api.Assertions.assertTrue(created.compareTo(previous) <= 0, "page must be newest-first");
+      previous = created;
+    }
+  }
 }

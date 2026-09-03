@@ -13,9 +13,6 @@ import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
-import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -79,14 +76,25 @@ public class TransferController {
       @RequestParam UUID accountId,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-      @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
+      @RequestParam(defaultValue = "0") int page,
+      @RequestParam(defaultValue = "20") int size) {
     // Ownership check first: throws 403/404 for foreign or missing accounts.
     money.accountDetail(authentication.getName(), accountId);
-    java.time.Instant fromInstant = from == null ? null : from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-    java.time.Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-    Page<Transaction> page = transactions.findAll(
-        TransactionSpecs.filters(accountId, null, null, fromInstant, toInstant), pageable);
-    return page.map(tx -> TransactionMapper.toResponse(tx, ibanMap(page.getContent())));
+    java.time.Instant fromInstant = from == null
+        ? java.time.Instant.EPOCH
+        : from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    java.time.Instant toInstant = to == null
+        ? java.time.Instant.now().plusSeconds(3600)
+        : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    int safeSize = Math.min(Math.max(size, 1), 100);
+    int safePage = Math.max(page, 0);
+    List<Transaction> rows = transactions.historyPage(
+        accountId, fromInstant, toInstant, safeSize, safePage * safeSize);
+    long total = transactions.historyCount(accountId, fromInstant, toInstant);
+    Map<UUID, String> ibans = ibanMap(rows);
+    List<TransactionResponse> mapped = rows.stream().map(tx -> TransactionMapper.toResponse(tx, ibans)).toList();
+    return new org.springframework.data.domain.PageImpl<>(mapped,
+        org.springframework.data.domain.PageRequest.of(safePage, safeSize), total);
   }
 
   @GetMapping("/accounts/{id}/summary")

@@ -18,6 +18,21 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID>,
   @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) and t.createdAt >= :from and t.createdAt < :to order by t.createdAt desc")
   java.util.List<Transaction> statementRows(UUID accountId, java.time.Instant from, java.time.Instant to);
 
+  @Query(value = "SELECT * FROM ("
+      + "SELECT t.* FROM transactions t WHERE t.from_account_id = :accountId "
+      + "UNION ALL "
+      + "SELECT t.* FROM transactions t WHERE t.to_account_id = :accountId"
+      + ") u WHERE u.created_at >= :from AND u.created_at < :to "
+      + "ORDER BY u.created_at DESC, u.id DESC LIMIT :limit OFFSET :offset",
+      nativeQuery = true)
+  java.util.List<Transaction> historyPage(UUID accountId, java.time.Instant from, java.time.Instant to, int limit, int offset);
+
+  @Query(value = "SELECT COUNT(*) FROM transactions t "
+      + "WHERE (t.from_account_id = :accountId OR t.to_account_id = :accountId) "
+      + "AND t.created_at >= :from AND t.created_at < :to",
+      nativeQuery = true)
+  long historyCount(UUID accountId, java.time.Instant from, java.time.Instant to);
+
   @Query("select t from Transaction t where t.createdAt >= :since order by t.createdAt asc")
   java.util.List<Transaction> findSince(java.time.Instant since);
 
