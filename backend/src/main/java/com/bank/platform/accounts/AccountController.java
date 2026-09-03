@@ -54,8 +54,8 @@ public class AccountController {
     return new AccountResponse(
         account.getId(),
         account.getIban(),
-        account.getType(),
+        account.getType().name(),
         account.getBalance().toPlainString(),
-        account.getStatus());
+        account.getStatus().name());
   }
 }

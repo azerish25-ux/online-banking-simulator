@@ -119,7 +119,7 @@ public class StatementService {
 
       String[] header = {
           "Northbank - Account statement",
-          "IBAN " + account.getIban() + "  ·  " + account.getType() + "  ·  " + account.getStatus(),
+          "IBAN " + account.getIban() + "  ·  " + account.getType().name() + "  ·  " + account.getStatus().name(),
           "Period " + statement.from().atZone(ZoneOffset.UTC).toLocalDate()
               + " to " + statement.to().atZone(ZoneOffset.UTC).toLocalDate(),
           "Opening " + opening.toPlainString() + " USD   ·   Closing " + closing.toPlainString() + " USD",

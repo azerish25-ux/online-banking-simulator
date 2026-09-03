@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -39,7 +41,8 @@ public class Card {
   private int expYear;
 
   @Column(nullable = false, length = 32)
-  private String status = "ACTIVE";
+  @Enumerated(EnumType.STRING)
+  private CardStatus status = CardStatus.ACTIVE;
 
   @Column(name = "updated_at")
   private Instant updatedAt;
@@ -74,8 +77,8 @@ public class Card {
   public String getLast4() { return last4; }
   public int getExpMonth() { return expMonth; }
   public int getExpYear() { return expYear; }
-  public String getStatus() { return status; }
+  public CardStatus getStatus() { return status; }
   public Instant getUpdatedAt() { return updatedAt; }
   public Instant getCreatedAt() { return createdAt; }
-  public void setStatus(String v) { status = v; }
+  public void setStatus(CardStatus v) { status = v; }
 }

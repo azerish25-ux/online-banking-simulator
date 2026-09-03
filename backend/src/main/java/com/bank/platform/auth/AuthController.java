@@ -52,7 +52,7 @@ public class AuthController {
   }
 
   private AuthResponse toAuthResponse(User user) {
-    String token = jwtService.generate(user.getEmail(), user.getRole());
+    String token = jwtService.generate(user.getEmail(), user.getRole().name());
     return new AuthResponse(token, "Bearer", jwtService.getAccessMinutes() * 60, UserResponse.from(user));
   }
 }

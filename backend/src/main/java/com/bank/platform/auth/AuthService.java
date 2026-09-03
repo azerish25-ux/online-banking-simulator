@@ -2,6 +2,7 @@ package com.bank.platform.auth;
 
 import com.bank.platform.accounts.Account;
 import com.bank.platform.accounts.AccountRepository;
+import com.bank.platform.accounts.AccountType;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import java.security.SecureRandom;
@@ -37,7 +38,7 @@ public class AuthService {
       throw new EmailTakenException(normalized);
     }
     User user = users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
-    accounts.save(new Account(user.getId(), generateIban(), "CHECKING"));
+    accounts.save(new Account(user.getId(), generateIban(), AccountType.CHECKING));
     audits.save(new AuditLog(user.getId(), "USER_REGISTERED", "User", user.getId().toString()));
     return user;
   }

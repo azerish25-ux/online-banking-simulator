@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
@@ -27,7 +29,8 @@ public class User {
   private String fullName;
 
   @Column(nullable = false, length = 32)
-  private String role = "CUSTOMER";
+  @Enumerated(EnumType.STRING)
+  private Role role = Role.CUSTOMER;
 
   @Column(name = "updated_at")
   private Instant updatedAt;
@@ -38,10 +41,10 @@ public class User {
   protected User() {}
 
   public User(String email, String passwordHash, String fullName) {
-    this(email, passwordHash, fullName, "CUSTOMER");
+    this(email, passwordHash, fullName, Role.CUSTOMER);
   }
 
-  public User(String email, String passwordHash, String fullName, String role) {
+  public User(String email, String passwordHash, String fullName, Role role) {
     this.email = email;
     this.passwordHash = passwordHash;
     this.fullName = fullName;
@@ -61,7 +64,7 @@ public class User {
   public String getEmail() { return email; }
   public String getPasswordHash() { return passwordHash; }
   public String getFullName() { return fullName; }
-  public String getRole() { return role; }
+  public Role getRole() { return role; }
   public Instant getUpdatedAt() { return updatedAt; }
   public Instant getCreatedAt() { return createdAt; }
 }

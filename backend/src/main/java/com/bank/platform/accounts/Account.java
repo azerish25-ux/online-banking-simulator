@@ -4,6 +4,8 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
@@ -25,13 +27,15 @@ public class Account {
   private String iban;
 
   @Column(nullable = false, length = 32)
-  private String type = "CHECKING";
+  @Enumerated(EnumType.STRING)
+  private AccountType type = AccountType.CHECKING;
 
   @Column(nullable = false, precision = 19, scale = 4)
   private BigDecimal balance = BigDecimal.ZERO;
 
   @Column(nullable = false, length = 32)
-  private String status = "ACTIVE";
+  @Enumerated(EnumType.STRING)
+  private AccountStatus status = AccountStatus.ACTIVE;
 
   @Column(name = "credit_limit", nullable = false, precision = 19, scale = 4)
   private BigDecimal creditLimit = BigDecimal.ZERO;
@@ -47,7 +51,7 @@ public class Account {
 
   protected Account() {}
 
-  public Account(UUID userId, String iban, String type) {
+  public Account(UUID userId, String iban, AccountType type) {
     this.userId = userId;
     this.iban = iban;
     this.type = type;
@@ -65,12 +69,12 @@ public class Account {
   public UUID getId() { return id; }
   public UUID getUserId() { return userId; }
   public String getIban() { return iban; }
-  public String getType() { return type; }
+  public AccountType getType() { return type; }
   public BigDecimal getBalance() { return balance; }
-  public String getStatus() { return status; }
+  public AccountStatus getStatus() { return status; }
   public Instant getUpdatedAt() { return updatedAt; }
   public void setBalance(BigDecimal v) { balance = v; }
-  public void setStatus(String v) { status = v; }
+  public void setStatus(AccountStatus v) { status = v; }
   public BigDecimal getCreditLimit() { return creditLimit; }
   public void setCreditLimit(BigDecimal v) { creditLimit = v; }
   public Instant getLastInterestAt() { return lastInterestAt; }

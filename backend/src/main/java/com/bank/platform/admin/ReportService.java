@@ -2,6 +2,7 @@ package com.bank.platform.admin;
 
 import com.bank.platform.ledger.Transaction;
 import com.bank.platform.ledger.TransactionRepository;
+import com.bank.platform.ledger.TxKind;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -44,11 +45,10 @@ public class ReportService {
       if (bucket == null) {
         continue;
       }
-      String memo = tx.getMemo() == null ? "" : tx.getMemo();
-      if (memo.startsWith("Simulated deposit")) {
+      if (tx.getKind() == TxKind.DEPOSIT) {
         bucket.deposits++;
         bucket.depositVolume = bucket.depositVolume.add(tx.getAmount());
-      } else if (memo.contains("interest")) {
+      } else if (tx.getKind() == TxKind.INTEREST) {
         bucket.interestEvents++;
         // Savings pay out (to-only rows); loans charge (from-only rows).
         bucket.interestNet = tx.getFromAccountId() == null

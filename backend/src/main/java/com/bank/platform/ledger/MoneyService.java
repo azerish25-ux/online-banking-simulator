@@ -3,6 +3,8 @@ package com.bank.platform.ledger;
 import com.bank.platform.accounts.Account;
 import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.accounts.AccountRepository;
+import com.bank.platform.accounts.AccountStatus;
+import com.bank.platform.accounts.AccountType;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.User;
@@ -65,12 +67,15 @@ public class MoneyService {
   @Transactional
   public Account openAccount(String email, String type) {
     String clean = type == null ? "" : type.trim().toUpperCase();
-    if (!List.of("CHECKING", "SAVINGS", "LOAN").contains(clean)) {
+    final AccountType accountType;
+    try {
+      accountType = AccountType.valueOf(clean);
+    } catch (IllegalArgumentException ex) {
       throw new TransferValidationException("Unknown account type: " + type);
     }
     User user = userOf(email);
-    Account account = new Account(user.getId(), generateIban(), clean);
-    if ("LOAN".equals(clean)) {
+    Account account = new Account(user.getId(), generateIban(), accountType);
+    if (accountType == AccountType.LOAN) {
       account.setCreditLimit(new BigDecimal("1000.00"));
     }
     accounts.save(account);
@@ -103,7 +108,7 @@ public class MoneyService {
     tx.setAmount(scaled(amount));
     tx.setCurrency("USD");
     tx.setMemo("Simulated deposit");
-    tx.setKind("DEPOSIT");
+    tx.setKind(TxKind.DEPOSIT);
     transactions.save(tx);
 
     User depositor = userOf(email);
@@ -159,7 +164,7 @@ public class MoneyService {
     assertActive(from);
     assertActive(to);
     BigDecimal scaled = scaled(amount);
-    BigDecimal floor = "LOAN".equals(from.getType()) ? from.getCreditLimit().negate() : BigDecimal.ZERO;
+    BigDecimal floor = from.getType() == AccountType.LOAN ? from.getCreditLimit().negate() : BigDecimal.ZERO;
     if (from.getBalance().subtract(scaled).compareTo(floor) < 0) {
       throw new InsufficientFundsException();
     }
@@ -173,7 +178,7 @@ public class MoneyService {
     tx.setToAccountId(to.getId());
     tx.setAmount(scaled);
     tx.setCurrency(currency == null || currency.isBlank() ? "USD" : currency.trim().toUpperCase());
-    tx.setKind("TRANSFER");
+    tx.setKind(TxKind.TRANSFER);
     tx.setMemo(memo);
     tx.setIdempotencyKey(idempotencyKey != null && idempotencyKey.isBlank() ? null : idempotencyKey);
     tx.setFlagged(scaled.compareTo(reviewThreshold) >= 0);
@@ -242,7 +247,7 @@ public class MoneyService {
   }
 
   private void assertActive(Account account) {
-    if (!"ACTIVE".equals(account.getStatus())) {
+    if (account.getStatus() != AccountStatus.ACTIVE) {
       throw new TransferValidationException("Account " + account.getIban() + " is not active");
     }
   }

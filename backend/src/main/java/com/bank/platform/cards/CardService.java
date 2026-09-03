@@ -3,6 +3,8 @@ package com.bank.platform.cards;
 import com.bank.platform.accounts.Account;
 import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.accounts.AccountRepository;
+import com.bank.platform.accounts.AccountStatus;
+import com.bank.platform.accounts.AccountType;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.User;
@@ -61,10 +63,10 @@ public class CardService {
   public IssuedCard issue(String email, UUID accountId) {
     User user = userOf(email);
     Account account = owned(email, accountId);
-    if (!"ACTIVE".equals(account.getStatus())) {
+    if (account.getStatus() != AccountStatus.ACTIVE) {
       throw new TransferValidationException("Account " + account.getIban() + " is not active");
     }
-    if ("LOAN".equals(account.getType())) {
+    if (account.getType() == AccountType.LOAN) {
       throw new TransferValidationException("Cards cannot be issued on loan accounts");
     }
     String pan = generatePan();
@@ -81,14 +83,14 @@ public class CardService {
   }
 
   @Transactional
-  public Card setStatus(String email, UUID cardId, String status) {
+  public Card setStatus(String email, UUID cardId, CardStatus status) {
     User user = userOf(email);
     Card card = cards.findByIdAndUserId(cardId, user.getId())
         .orElseThrow(() -> new CardNotFoundException(cardId));
     card.setStatus(status);
     cards.save(card);
     audits.save(new AuditLog(user.getId(),
-        "FROZEN".equals(status) ? "CARD_FROZEN" : "CARD_UNFROZEN", "Card", card.getId().toString()));
+        status == CardStatus.FROZEN ? "CARD_FROZEN" : "CARD_UNFROZEN", "Card", card.getId().toString()));
     return card;
   }
 

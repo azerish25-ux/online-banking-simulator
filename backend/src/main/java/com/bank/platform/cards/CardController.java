@@ -28,7 +28,7 @@ public class CardController {
   public record CardResponse(UUID id, String last4, int expMonth, int expYear, String status) {
     static CardResponse from(Card card) {
       return new CardResponse(
-          card.getId(), card.getLast4(), card.getExpMonth(), card.getExpYear(), card.getStatus());
+          card.getId(), card.getLast4(), card.getExpMonth(), card.getExpYear(), card.getStatus().name());
     }
   }
 
@@ -46,17 +46,17 @@ public class CardController {
     CardService.IssuedCard issued = service.issue(authentication.getName(), id);
     Card card = issued.card();
     return new IssuedCardResponse(
-        card.getId(), issued.pan(), issued.cvv(), card.getExpMonth(), card.getExpYear(), card.getStatus());
+        card.getId(), issued.pan(), issued.cvv(), card.getExpMonth(), card.getExpYear(), card.getStatus().name());
   }
 
   @PostMapping("/cards/{id}/freeze")
   public CardResponse freeze(Authentication authentication, @PathVariable UUID id) {
-    return CardResponse.from(service.setStatus(authentication.getName(), id, "FROZEN"));
+    return CardResponse.from(service.setStatus(authentication.getName(), id, CardStatus.FROZEN));
   }
 
   @PostMapping("/cards/{id}/unfreeze")
   public CardResponse unfreeze(Authentication authentication, @PathVariable UUID id) {
-    return CardResponse.from(service.setStatus(authentication.getName(), id, "ACTIVE"));
+    return CardResponse.from(service.setStatus(authentication.getName(), id, CardStatus.ACTIVE));
   }
 
   @ExceptionHandler(CardNotFoundException.class)

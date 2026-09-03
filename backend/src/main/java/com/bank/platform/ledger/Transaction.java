@@ -2,6 +2,8 @@ package com.bank.platform.ledger;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
@@ -33,10 +35,12 @@ public class Transaction {
   private String idempotencyKey;
 
   @Column(nullable = false, length = 32)
-  private String status = "POSTED";
+  @Enumerated(EnumType.STRING)
+  private TxStatus status = TxStatus.POSTED;
 
   @Column(nullable = false, length = 16)
-  private String kind = "TRANSFER";
+  @Enumerated(EnumType.STRING)
+  private TxKind kind = TxKind.TRANSFER;
 
   @Column(nullable = false)
   private boolean flagged;
@@ -64,9 +68,9 @@ public class Transaction {
   public BigDecimal getAmount() { return amount; }
   public String getCurrency() { return currency; }
   public String getIdempotencyKey() { return idempotencyKey; }
-  public String getStatus() { return status; }
-  public String getKind() { return kind; }
-  public void setKind(String v) { kind = v; }
+  public TxStatus getStatus() { return status; }
+  public TxKind getKind() { return kind; }
+  public void setKind(TxKind v) { kind = v; }
   public String getMemo() { return memo; }
   public Instant getCreatedAt() { return createdAt; }
 

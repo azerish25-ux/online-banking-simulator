@@ -3,11 +3,13 @@ package com.bank.platform.admin;
 import com.bank.platform.accounts.Account;
 import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.accounts.AccountRepository;
+import com.bank.platform.accounts.AccountStatus;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.ledger.Transaction;
 import com.bank.platform.ledger.TransactionNotFoundException;
 import com.bank.platform.ledger.TransactionRepository;
+import com.bank.platform.auth.Role;
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.notifications.NotificationService;
@@ -47,21 +49,21 @@ public class AdminService {
   }
 
   @Transactional
-  public Account setStatus(String adminEmail, UUID accountId, String status) {
+  public Account setStatus(String adminEmail, UUID accountId, AccountStatus status) {
     User admin = users.findByEmail(adminEmail)
         .orElseThrow(() -> new UsernameNotFoundException("Admin not found"));
-    if (!"ADMIN".equals(admin.getRole())) {
+    if (admin.getRole() != Role.ADMIN) {
       throw new org.springframework.security.access.AccessDeniedException("Admins only");
     }
     Account account = accounts.findById(accountId)
         .orElseThrow(() -> new AccountNotFoundException(accountId));
     account.setStatus(status);
     accounts.save(account);
-    String action = "FROZEN".equals(status) ? "ACCOUNT_FROZEN" : "ACCOUNT_UNFROZEN";
+    String action = status == AccountStatus.FROZEN ? "ACCOUNT_FROZEN" : "ACCOUNT_UNFROZEN";
     audits.save(new AuditLog(admin.getId(), action, "Account", account.getId().toString()));
     users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
-        action, "FROZEN".equals(status) ? "Account frozen" : "Account re-activated",
-        "Account " + account.getIban() + ("FROZEN".equals(status) ? " was frozen by operations." : " is active again.")));
+        action, status == AccountStatus.FROZEN ? "Account frozen" : "Account re-activated",
+        "Account " + account.getIban() + (status == AccountStatus.FROZEN ? " was frozen by operations." : " is active again.")));
     return account;
   }
 }

@@ -117,7 +117,7 @@ public class TransferController {
           .append(tx.getAmount().toPlainString()).append(',')
           .append(tx.getCurrency()).append(',')
           .append(cell(tx.getMemo() == null ? "" : tx.getMemo())).append(',')
-          .append(tx.getStatus()).append('\n');
+          .append(tx.getStatus().name()).append('\n');
     }
 
     String filename = "statement-" + account.getIban() + "-" + LocalDate.now() + ".csv";
@@ -171,7 +171,7 @@ public class TransferController {
         tx.getAmount().toPlainString(),
         tx.getCurrency(),
         tx.getMemo(),
-        tx.getStatus(),
+        tx.getStatus().name(),
         tx.getCreatedAt().toString(), tx.isFlagged());
   }
 
@@ -183,7 +183,7 @@ public class TransferController {
         tx.getAmount().toPlainString(),
         tx.getCurrency(),
         tx.getMemo(),
-        tx.getStatus(),
+        tx.getStatus().name(),
         tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
   }
 }

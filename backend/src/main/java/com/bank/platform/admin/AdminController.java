@@ -114,7 +114,7 @@ public class AdminController {
         tx.getAmount().toPlainString(),
         tx.getCurrency(),
         tx.getMemo(),
-        tx.getStatus(),
+        tx.getStatus().name(),
         tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed()));
   }
 
@@ -141,7 +141,7 @@ public class AdminController {
         tx.getId(),
         tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
         tx.getToAccountId() == null ? null : ibans.getOrDefault(tx.getToAccountId(), tx.getToAccountId().toString()),
-        tx.getAmount().toPlainString(), tx.getCurrency(), tx.getMemo(), tx.getStatus(),
+        tx.getAmount().toPlainString(), tx.getCurrency(), tx.getMemo(), tx.getStatus().name(),
         tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
   }
 
@@ -161,12 +161,12 @@ public class AdminController {
 
   @PostMapping("/accounts/{id}/freeze")
   public AccountResponse freeze(Authentication authentication, @PathVariable UUID id) {
-    return toDto(adminService.setStatus(authentication.getName(), id, "FROZEN"));
+    return toDto(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.FROZEN));
   }
 
   @PostMapping("/accounts/{id}/unfreeze")
   public AccountResponse unfreeze(Authentication authentication, @PathVariable UUID id) {
-    return toDto(adminService.setStatus(authentication.getName(), id, "ACTIVE"));
+    return toDto(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.ACTIVE));
   }
 
   private org.springframework.http.ResponseEntity<byte[]> pdf(StatementService.Statement statement) {
@@ -181,7 +181,7 @@ public class AdminController {
 
   private static AccountResponse toDto(Account account) {
     return new AccountResponse(
-        account.getId(), account.getIban(), account.getType(),
-        account.getBalance().toPlainString(), account.getStatus());
+        account.getId(), account.getIban(), account.getType().name(),
+        account.getBalance().toPlainString(), account.getStatus().name());
   }
 }

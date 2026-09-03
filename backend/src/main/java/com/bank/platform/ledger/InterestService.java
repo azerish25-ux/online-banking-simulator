@@ -1,6 +1,8 @@
 package com.bank.platform.ledger;
 
 import com.bank.platform.accounts.Account;
+import com.bank.platform.accounts.AccountStatus;
+import com.bank.platform.accounts.AccountType;
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
@@ -53,20 +55,20 @@ public class InterestService {
   public Map<String, Integer> accrueMonthly() {
     YearMonth month = YearMonth.now(ZoneOffset.UTC);
     List<Account> candidates = accounts.findAll().stream()
-        .filter(a -> "SAVINGS".equals(a.getType()) || "LOAN".equals(a.getType()))
-        .filter(a -> "ACTIVE".equals(a.getStatus()))
+        .filter(a -> a.getType() == AccountType.SAVINGS || a.getType() == AccountType.LOAN)
+        .filter(a -> a.getStatus() == AccountStatus.ACTIVE)
         .filter(a -> a.getLastInterestAt() == null
             || YearMonth.from(a.getLastInterestAt().atZone(ZoneOffset.UTC)).isBefore(month))
         .toList();
 
     int posted = 0;
     for (Account account : candidates) {
-      BigDecimal monthlyRate = "SAVINGS".equals(account.getType())
+      BigDecimal monthlyRate = account.getType() == AccountType.SAVINGS
           ? savingsAnnualRate.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_EVEN)
           : loanAnnualRate.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_EVEN);
       BigDecimal delta = account.getBalance().multiply(monthlyRate)
           .setScale(4, RoundingMode.HALF_EVEN);
-      if ("LOAN".equals(account.getType())) {
+      if (account.getType() == AccountType.LOAN) {
         // Loans only accrue while money is owed, and interest deepens the negative balance.
         if (account.getBalance().compareTo(BigDecimal.ZERO) >= 0) {
           continue;
@@ -79,7 +81,7 @@ public class InterestService {
       accounts.save(account);
 
       Transaction tx = new Transaction();
-      if ("SAVINGS".equals(account.getType())) {
+      if (account.getType() == AccountType.SAVINGS) {
         tx.setToAccountId(account.getId());
         tx.setMemo("Savings interest " + month);
       } else {
@@ -88,12 +90,12 @@ public class InterestService {
       }
       tx.setAmount(delta.abs());
       tx.setCurrency("USD");
-      tx.setKind("INTEREST");
+      tx.setKind(TxKind.INTEREST);
       transactions.save(tx);
       audits.save(new AuditLog(account.getUserId(), "INTEREST_POSTED", "Transaction", tx.getId().toString()));
       users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(
           owner.getId(), owner.getEmail(), "INTEREST_POSTED", "Monthly interest posted",
-          ("SAVINGS".equals(account.getType()) ? "Earned " : "Charged ")
+          (account.getType() == AccountType.SAVINGS ? "Earned " : "Charged ")
               + delta.abs().toPlainString() + " USD on account " + account.getIban() + "."));
       posted++;
     }
