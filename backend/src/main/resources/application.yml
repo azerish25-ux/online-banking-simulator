@@ -22,6 +22,14 @@ app:
   jwt:
     secret: ${JWT_SECRET:dev-only-change-me-0123456789abcdef-0123456789abcdef-0123456789abcdef}
     access-minutes: 15
+  admin:
+    email: ${APP_ADMIN_EMAIL:admin@bank.local}
+    password: ${APP_ADMIN_PASSWORD:change-me-admin-123}
+  auth:
+    rate-limit:
+      per-minute: ${AUTH_RATE_LIMIT:20}
+  cors:
+    allowed-origins: ${APP_CORS_ORIGINS:http://localhost:3000}
 management:
   endpoints:
     web:

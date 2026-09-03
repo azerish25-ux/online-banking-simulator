@@ -34,9 +34,14 @@ public class User {
   protected User() {}
 
   public User(String email, String passwordHash, String fullName) {
+    this(email, passwordHash, fullName, "CUSTOMER");
+  }
+
+  public User(String email, String passwordHash, String fullName, String role) {
     this.email = email;
     this.passwordHash = passwordHash;
     this.fullName = fullName;
+    this.role = role;
   }
 
   @PrePersist
@@ -52,3 +57,4 @@ public class User {
   public String getRole() { return role; }
   public Instant getCreatedAt() { return createdAt; }
 }
+

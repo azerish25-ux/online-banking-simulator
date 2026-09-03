@@ -1,4 +1,4 @@
-﻿import { Card, CardDescription, CardTitle } from "./card";
+import { Card, CardDescription, CardTitle } from "./card";
 
 export function EmptyState({ title, description }: { title: string; description?: string }) {
   return (

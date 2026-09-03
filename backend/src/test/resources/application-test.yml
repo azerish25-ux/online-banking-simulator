@@ -13,3 +13,9 @@ app:
   jwt:
     secret: test-only-secret-0123456789abcdef-0123456789abcdef-0123456789abcdef-00
     access-minutes: 15
+  admin:
+    email: admin-test@bank.local
+    password: admin-test-123
+  auth:
+    rate-limit:
+      per-minute: 1000

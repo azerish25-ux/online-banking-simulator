@@ -18,6 +18,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = React.useState<User | null>(null);
+  const navItems = user?.role === "ADMIN"
+    ? [...NAV.slice(0, 4), { href: "/admin", label: "Operations" }, ...NAV.slice(4)]
+    : NAV;
 
   React.useEffect(() => {
     api("/v1/auth/me").then(setUser).catch(() => {});
@@ -40,7 +43,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </p>
           <p className="muted mt-0.5 text-xs">Enterprise banking</p>
           <nav className="mt-6 flex flex-col gap-1">
-            {NAV.map((item) => (
+            {navItems.map((item) => (
               <Link
                 key={item.href}
                 href={item.href}
@@ -58,7 +61,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex min-w-0 flex-1 flex-col">
           <header className="flex items-center justify-between border-b border-line px-5 py-3">
             <nav className="flex gap-4 md:hidden" aria-label="Primary">
-              {NAV.map((item) => (
+              {navItems.map((item) => (
                 <Link
                   key={item.href}
                   href={item.href}

@@ -56,4 +56,5 @@ public class Account {
   public BigDecimal getBalance() { return balance; }
   public String getStatus() { return status; }
   public void setBalance(BigDecimal v) { balance = v; }
+  public void setStatus(String v) { status = v; }
 }

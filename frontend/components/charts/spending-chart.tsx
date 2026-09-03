@@ -1,4 +1,4 @@
-﻿import { usd } from "../../lib/format";
+import { usd } from "../../lib/format";
 
 export type MonthPoint = { month: string; inflow: string; outflow: string };
 
