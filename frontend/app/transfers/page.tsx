@@ -13,6 +13,7 @@ import { Field, Input } from "../../components/ui/input";
 import { useToast } from "../../components/feedback/toast";
 import { api } from "../../lib/api";
 import { usd } from "../../lib/format";
+import { Routes } from "../../lib/routes";
 import type { Account, Beneficiary } from "../../lib/api-types";
 
 
@@ -56,7 +57,7 @@ export default function TransfersPage() {
       <h1 className="text-2xl font-bold tracking-tight">Send money</h1>
       <p className="muted mt-1 text-sm">
         Debited and credited atomically. Retries with the same key never double-send.{" "}
-        <Link href="/dashboard" className="text-brand-300 hover:underline">Back to overview</Link>
+        <Link href={Routes.dashboard} className="text-brand-300 hover:underline">Back to overview</Link>
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -90,7 +91,7 @@ export default function TransfersPage() {
             <CardDescription>Tap to fill the recipient.</CardDescription>
             {beneficiaries.length === 0 ? (
               <p className="muted mt-3 text-sm">
-                None saved. <Link href="/beneficiaries" className="text-brand-300 hover:underline">Add one →</Link>
+                None saved. <Link href={Routes.beneficiaries} className="text-brand-300 hover:underline">Add one →</Link>
               </p>
             ) : (
               <ul className="mt-3 space-y-2">

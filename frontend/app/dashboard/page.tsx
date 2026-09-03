@@ -15,6 +15,7 @@ import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
 import { SpendingChart } from "../../components/charts/spending-chart";
 import { ApiError, api, type User } from "../../lib/api";
+import { Routes } from "../../lib/routes";
 import type { Account, MonthPoint, Tx } from "../../lib/api-types";
 import { fmtDate, usd } from "../../lib/format";
 
@@ -47,7 +48,7 @@ export default function DashboardPage() {
 
   React.useEffect(() => {
     load().catch((e) => {
-      if (e instanceof ApiError && e.status === 401) { router.push("/login"); return; }
+      if (e instanceof ApiError && e.status === 401) { router.push(Routes.login); return; }
       push(e instanceof Error ? e.message : "Failed to load dashboard", "error");
     });
   }, [load, push]);
@@ -98,7 +99,7 @@ export default function DashboardPage() {
           <Button variant="secondary" onClick={() => setDepositOpen(true)} disabled={!accounts?.length}>
             Simulate deposit
           </Button>
-          <Link href="/transfers">
+          <Link href={Routes.transfers}>
             <Button>Send money</Button>
           </Link>
         </div>
@@ -117,7 +118,7 @@ export default function DashboardPage() {
           {accounts.map((a) => (
             <Card key={a.id}>
               <div className="flex items-center justify-between">
-                <Link href={"/accounts/" + a.id}><CardTitle className="hover:underline">{a.type} →</CardTitle></Link>
+                <Link href={Routes.account(a.id)}><CardTitle className="hover:underline">{a.type} →</CardTitle></Link>
                 <Badge tone={a.status === "ACTIVE" ? "success" : "neutral"}>{a.status}</Badge>
               </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(a.balance)}</p>
@@ -130,7 +131,7 @@ export default function DashboardPage() {
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <CardTitle>Money flow · last 6 months</CardTitle>
-          <Link href="/activity" className="text-sm text-brand-300 hover:underline">Full activity</Link>
+          <Link href={Routes.activity} className="text-sm text-brand-300 hover:underline">Full activity</Link>
         </div>
         {summary == null ? (
           <Skeleton className="h-48" />
@@ -142,7 +143,7 @@ export default function DashboardPage() {
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <CardTitle>Recent activity</CardTitle>
-          <Link href="/transfers" className="text-sm text-brand-300 hover:underline">
+          <Link href={Routes.transfers} className="text-sm text-brand-300 hover:underline">
             New transfer
           </Link>
         </div>

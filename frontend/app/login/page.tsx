@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/button";
 import { Field, Input } from "../../components/ui/input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
+import { Routes } from "../../lib/routes";
 
 
 
@@ -23,7 +24,7 @@ export default function LoginPage() {
       const data = await api("/v1/auth/login", { method: "POST", body: JSON.stringify(values) });
       setToken(data.accessToken);
       push("Welcome back.", "success");
-      router.push("/dashboard");
+      router.push(Routes.dashboard);
     } catch (err) {
       push(err instanceof Error ? err.message : "Login failed", "error");
     }
@@ -33,7 +34,7 @@ export default function LoginPage() {
     <AuthShell
       title="Log in to Northbank"
       subtitle="Secure access to your accounts."
-      footer={<>No account? <Link className="text-brand-300" href="/register">Register</Link></>}
+      footer={<>No account? <Link className="text-brand-300" href={Routes.register}>Register</Link></>}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Field label="Email" error={formState.errors.email?.message}>

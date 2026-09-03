@@ -10,6 +10,7 @@ import { Button } from "../../components/ui/button";
 import { Field, Input } from "../../components/ui/input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
+import { Routes } from "../../lib/routes";
 
 
 
@@ -23,7 +24,7 @@ export default function RegisterPage() {
       const data = await api("/v1/auth/register", { method: "POST", body: JSON.stringify(values) });
       setToken(data.accessToken);
       push("Account created. A checking account is ready.", "success");
-      router.push("/dashboard");
+      router.push(Routes.dashboard);
     } catch (err) {
       push(err instanceof Error ? err.message : "Registration failed", "error");
     }
@@ -33,7 +34,7 @@ export default function RegisterPage() {
     <AuthShell
       title="Create your account"
       subtitle="A checking account is opened automatically."
-      footer={<>Have an account? <Link className="text-brand-300" href="/login">Log in</Link></>}
+      footer={<>Have an account? <Link className="text-brand-300" href={Routes.login}>Log in</Link></>}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Field label="Full name" error={formState.errors.fullName?.message}>

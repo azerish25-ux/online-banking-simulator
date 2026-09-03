@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { Routes } from "./lib/routes";
 
 function roleFromToken(token: string | undefined): string | null {
   if (!token) return null;
@@ -26,14 +27,14 @@ export function middleware(request: NextRequest) {
   // (no browser tokens at all) is the next step if threat posture demands it.
   // UX-only routing gate: the backend re-verifies the signature and role on every call.
   if (path.startsWith("/admin")) {
-    if (!token) return NextResponse.redirect(new URL("/login", request.url));
-    if (roleFromToken(token) !== "ADMIN") return NextResponse.redirect(new URL("/dashboard", request.url));
+    if (!token) return NextResponse.redirect(new URL(Routes.login, request.url));
+    if (roleFromToken(token) !== "ADMIN") return NextResponse.redirect(new URL(Routes.dashboard, request.url));
     return NextResponse.next();
   }
 
-  const guarded = ["/dashboard", "/transfers", "/activity", "/beneficiaries", "/accounts", "/notifications"];
+  const guarded = [Routes.dashboard, Routes.transfers, Routes.activity, Routes.beneficiaries, "/accounts", Routes.notifications];
   if (!token && guarded.some((p) => path.startsWith(p))) {
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL(Routes.login, request.url));
   }
   return NextResponse.next();
 }

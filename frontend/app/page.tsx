@@ -2,6 +2,7 @@ import Link from "next/link";
 import { Badge } from "../components/ui/badge";
 import { Button } from "../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../components/ui/card";
+import { Routes } from "../lib/routes";
 
 export default function Home() {
   return (
@@ -16,9 +17,9 @@ export default function Home() {
           with idempotency keys; every mutation leaves an audit trail.
         </p>
         <div className="mt-6 flex flex-wrap gap-2">
-          <Link href="/register"><Button size="lg">Create account</Button></Link>
-          <Link href="/login"><Button size="lg" variant="secondary">Log in</Button></Link>
-          <Link href="/design"><Button size="lg" variant="ghost">Design system</Button></Link>
+          <Link href={Routes.register}><Button size="lg">Create account</Button></Link>
+          <Link href={Routes.login}><Button size="lg" variant="secondary">Log in</Button></Link>
+          <Link href={Routes.design}><Button size="lg" variant="ghost">Design system</Button></Link>
         </div>
 
         <div className="mt-10 grid gap-4 md:grid-cols-3">
