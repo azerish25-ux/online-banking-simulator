@@ -42,7 +42,7 @@ public class SecurityConfig {
                 org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy.NO_REFERRER))
             .permissionsPolicy(permissions -> permissions.policy("camera=(), microphone=(), geolocation=()")))
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/api/health", "/api/v1/health", "/api/v1/auth/register", "/api/v1/auth/login", "/actuator/**")
+            .requestMatchers("/api/health", "/api/v1/health", "/api/v1/auth/register", "/api/v1/auth/login", "/actuator/health", "/actuator/info")
             .permitAll()
             .anyRequest()
             .authenticated())
@@ -61,7 +61,8 @@ public class SecurityConfig {
     CorsConfiguration config = new CorsConfiguration();
     config.setAllowedOrigins(allowedOrigins);
     config.setAllowedMethods(List.of("GET", "POST", "DELETE", "OPTIONS"));
-    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key"));
+    config.setAllowedHeaders(List.of("Authorization", "Content-Type", "Idempotency-Key", "X-Request-Id"));
+    config.setExposedHeaders(List.of("X-Request-Id", "Retry-After"));
     config.setMaxAge(3600L);
     UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
     source.registerCorsConfiguration("/api/**", config);

@@ -1,6 +1,7 @@
 package com.bank.platform.health;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.options;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -31,6 +32,16 @@ class HealthControllerTest {
     mvc.perform(get("/api/health").header("X-Request-Id", "demo-trace-1"))
         .andExpect(status().isOk())
         .andExpect(header().string("X-Request-Id", "demo-trace-1"));
+  }
+
+  @Test
+  void corsPreflightAllowsTraceHeader() throws Exception {
+    mvc.perform(options("/api/v1/auth/login")
+            .header("Origin", "http://localhost:3000")
+            .header("Access-Control-Request-Method", "POST")
+            .header("Access-Control-Request-Headers", "X-Request-Id"))
+        .andExpect(status().isOk())
+        .andExpect(header().string("Access-Control-Allow-Headers", org.hamcrest.Matchers.containsString("X-Request-Id")));
   }
 
   @Test
