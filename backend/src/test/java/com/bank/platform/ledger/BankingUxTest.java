@@ -140,6 +140,15 @@ class BankingUxTest {
         .get(0).get("iban").asText();
   }
 
+  private void deposit(String token, String accountId, String amount) throws Exception {
+    mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"amount":"%s"}""".formatted(amount)))
+        .andExpect(status().isOk());
+  }
+
   private String accountId(String token) throws Exception {
     MvcResult result = mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + token))
         .andExpect(status().isOk())
@@ -157,5 +166,33 @@ class BankingUxTest {
             .content("""
                 {"nickname":"Bogus","iban":"DE89370400440532013001"}"""))
         .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void summaryReflectsTransfersAfterCaching() throws Exception {
+    String alice = register("cache-a@example.com", "Cache Alice");
+    String bob = register("cache-b@example.com", "Cache Bob");
+    String aliceId = accountId(alice);
+    String bobIban = accountIban(bob);
+    deposit(alice, aliceId, "1000.00");
+    String before = summaryOutflow(alice, aliceId);
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + alice)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"toIban":"%s","amount":"50.00"}""".formatted(bobIban)))
+        .andExpect(status().isCreated());
+    String after = summaryOutflow(alice, aliceId);
+    org.junit.jupiter.api.Assertions.assertNotEquals(before, after);
+  }
+
+  private String summaryOutflow(String token, String accountId) throws Exception {
+    MvcResult result = mvc.perform(get("/api/v1/accounts/" + accountId + "/summary")
+            .header("Authorization", "Bearer " + token)
+            .param("months", "1"))
+        .andExpect(status().isOk())
+        .andReturn();
+    return objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
+        .get(0).get("outflow").asText();
   }
 }
