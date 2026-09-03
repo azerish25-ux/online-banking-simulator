@@ -12,6 +12,7 @@ import { TD, TH, THead, TRow, Table } from "../../../components/ui/table";
 import { useToast } from "../../../components/feedback/toast";
 import { api } from "../../../lib/api";
 import { fmtDate, usd } from "../../../lib/format";
+import { Routes } from "../../../lib/routes";
 import type { Account, CardItem, IssuedCard, Tx } from "../../../lib/api-types";
 
 
@@ -64,7 +65,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
 
   return (
     <AppShell>
-      <p className="text-sm"><Link href="/dashboard" className="text-brand-300 hover:underline">← Overview</Link></p>
+      <p className="text-sm"><Link href={Routes.dashboard} className="text-brand-300 hover:underline">← Overview</Link></p>
       {account == null ? (
         <div className="mt-3 space-y-2"><Skeleton className="h-24" /><Skeleton className="h-40" /></div>
       ) : (
