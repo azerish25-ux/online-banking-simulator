@@ -65,7 +65,8 @@ class OpsReviewTest {
             .param("flagged", "true")
             .param("reviewed", "false"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(0));
+        .andExpect(jsonPath("$.content.length()").value(1))
+        .andExpect(jsonPath("$.content[0].amount").value("20000.0000"));
     mvc.perform(get("/api/v1/admin/audit-logs").header("Authorization", "Bearer " + admin)
             .param("action", "TRANSACTION_REVIEWED"))
         .andExpect(status().isOk())
