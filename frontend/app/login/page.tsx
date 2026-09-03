@@ -1,48 +1,56 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AuthShell } from "../../components/layout/auth-shell";
+import { Button } from "../../components/ui/button";
+import { Field, Input } from "../../components/ui/input";
+import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
+
+const schema = z.object({
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(1, "Password is required")
+});
+
+type Form = z.infer<typeof schema>;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { push } = useToast();
+  const { register, handleSubmit, formState } = useForm<Form>({ resolver: zodResolver(schema) });
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  async function onSubmit(values: Form) {
     try {
-      const data = await api("/v1/auth/login", {
-        method: "POST",
-        body: JSON.stringify({ email, password })
-      });
+      const data = await api("/v1/auth/login", { method: "POST", body: JSON.stringify(values) });
       setToken(data.accessToken);
+      push("Welcome back.", "success");
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Login failed");
-    } finally {
-      setLoading(false);
+      push(err instanceof Error ? err.message : "Login failed", "error");
     }
   }
 
   return (
-    <main className="container">
-      <h1>Log in</h1>
-      <form onSubmit={onSubmit} className="card">
-        <label>Email<br /><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <br /><br />
-        <label>Password<br /><input type="password" required value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-        <br /><br />
-        <button type="submit" disabled={loading}>{loading ? "Logging in..." : "Log in"}</button>
-        {error && <p style={{ color: "#fca5a5" }}>{error}</p>}
+    <AuthShell
+      title="Log in to Northbank"
+      subtitle="Secure access to your accounts."
+      footer={<>No account? <Link className="text-brand-300" href="/register">Register</Link></>}
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <Field label="Email" error={formState.errors.email?.message}>
+          <Input type="email" autoComplete="email" placeholder="you@example.com" {...register("email")} />
+        </Field>
+        <Field label="Password" error={formState.errors.password?.message}>
+          <Input type="password" autoComplete="current-password" {...register("password")} />
+        </Field>
+        <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
+          {formState.isSubmitting ? "Logging in..." : "Log in"}
+        </Button>
       </form>
-      <p>No account? <Link href="/register">Register</Link></p>
-      <style jsx>{`input { width: 100%; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #2a4d85; background: #0a0f1e; color: #e8eef7; } button { padding: 8px 16px; border-radius: 6px; border: 1px solid #2a4d85; background: #12325b; color: #e8eef7; cursor: pointer; }`}</style>
-    </main>
+    </AuthShell>
   );
 }

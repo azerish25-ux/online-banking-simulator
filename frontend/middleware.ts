@@ -3,10 +3,11 @@ import type { NextRequest } from "next/server";
 
 export function middleware(request: NextRequest) {
   const token = request.cookies.get("bank_token")?.value;
-  if (!token && request.nextUrl.pathname.startsWith("/dashboard")) {
+  const guarded = ["/dashboard", "/transfers"];
+  if (!token && guarded.some((p) => request.nextUrl.pathname.startsWith(p))) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*"] };
+export const config = { matcher: ["/dashboard/:path*", "/transfers/:path*"] };

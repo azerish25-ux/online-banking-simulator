@@ -1,95 +1,147 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import * as React from "react";
 import Link from "next/link";
-import { api, clearToken, type User } from "../../lib/api";
+import { AppShell } from "../../components/layout/app-shell";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card, CardDescription, CardTitle } from "../../components/ui/card";
+import { EmptyState } from "../../components/ui/empty-state";
+import { Field, Input } from "../../components/ui/input";
+import { Modal } from "../../components/ui/modal";
+import { Skeleton } from "../../components/ui/skeleton";
+import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
+import { useToast } from "../../components/feedback/toast";
+import { api, type User } from "../../lib/api";
+import { fmtDate, usd } from "../../lib/format";
 
 type Account = { id: string; iban: string; type: string; balance: string; status: string };
 type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; status: string; createdAt: string };
 
 export default function DashboardPage() {
-  const router = useRouter();
-  const [user, setUser] = useState<User | null>(null);
-  const [accounts, setAccounts] = useState<Account[]>([]);
-  const [recent, setRecent] = useState<Tx[]>([]);
-  const [depositAmount, setDepositAmount] = useState("100.00");
-  const [error, setError] = useState<string | null>(null);
-  const [notice, setNotice] = useState<string | null>(null);
+  const { push } = useToast();
+  const [user, setUser] = React.useState<User | null>(null);
+  const [accounts, setAccounts] = React.useState<Account[] | null>(null);
+  const [recent, setRecent] = React.useState<Tx[]>([]);
+  const [depositOpen, setDepositOpen] = React.useState(false);
+  const [depositAmount, setDepositAmount] = React.useState("100.00");
+  const [depositing, setDepositing] = React.useState(false);
 
-  async function load() {
-    try {
-      const me = await api("/v1/auth/me");
-      setUser(me);
-      const accs: Account[] = await api("/v1/accounts");
-      setAccounts(accs);
-      if (accs.length > 0) {
-        const page = await api("/v1/transactions?accountId=" + accs[0].id + "&size=5");
-        setRecent(page.content ?? []);
-      }
-    } catch (e) {
-      setError(e instanceof Error ? e.message : "Failed to load dashboard");
+  const load = React.useCallback(async () => {
+    const me = await api("/v1/auth/me");
+    setUser(me);
+    const accs: Account[] = await api("/v1/accounts");
+    setAccounts(accs);
+    if (accs.length > 0) {
+      const page = await api("/v1/transactions?accountId=" + accs[0].id + "&size=5");
+      setRecent(page.content ?? []);
     }
-  }
+  }, []);
 
-  useEffect(() => { load(); }, []);
+  React.useEffect(() => {
+    load().catch((e) => push(e instanceof Error ? e.message : "Failed to load dashboard", "error"));
+  }, [load, push]);
 
   async function deposit() {
-    setError(null); setNotice(null);
+    if (accounts == null || accounts.length === 0) return;
+    setDepositing(true);
     try {
       await api("/v1/accounts/" + accounts[0].id + "/deposit", {
         method: "POST",
         body: JSON.stringify({ amount: depositAmount })
       });
-      setNotice("Deposited $" + depositAmount + " (simulated rail).");
+      push("Deposited " + usd(depositAmount) + " (simulated rail).", "success");
+      setDepositOpen(false);
       await load();
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Deposit failed");
+      push(e instanceof Error ? e.message : "Deposit failed", "error");
+    } finally {
+      setDepositing(false);
     }
   }
 
-  function logout() {
-    clearToken();
-    router.push("/login");
-  }
-
-  const total = accounts.reduce((sum, a) => sum + parseFloat(a.balance), 0);
+  const total = (accounts ?? []).reduce((sum, a) => sum + parseFloat(a.balance), 0);
 
   return (
-    <main className="container">
-      <h1>Dashboard</h1>
-      {user && <p>Welcome, <strong>{user.fullName}</strong> · <span className="badge">{user.role}</span></p>}
-      {notice && <div className="card"><p style={{ color: "#86efac" }}>{notice}</p></div>}
-      {error && <div className="card"><p style={{ color: "#fca5a5" }}>{error}</p></div>}
+    <AppShell>
+      <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+          <p className="muted text-sm">{user ? "Welcome back, " + user.fullName + "." : "Loading..."}</p>
+        </div>
+        <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setDepositOpen(true)} disabled={!accounts?.length}>
+            Simulate deposit
+          </Button>
+          <Link href="/transfers">
+            <Button>Send money</Button>
+          </Link>
+        </div>
+      </div>
 
-      <div className="card">
-        <h2>Total balance: ${total.toFixed(2)}</h2>
-        {accounts.map((a) => (
-          <p key={a.id}><code>{a.iban}</code> · {a.type} · <strong>${parseFloat(a.balance).toFixed(2)}</strong> · {a.status}</p>
-        ))}
-        {accounts.length > 0 && (
-          <p>
-            <input value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} style={{ width: 100 }} />{" "}
-            <button onClick={deposit}>Simulate deposit</button>
-          </p>
+      {accounts == null ? (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardDescription>Total balance</CardDescription>
+            <p className="mt-1 text-3xl font-bold tabular-nums">{usd(total)}</p>
+          </Card>
+          {accounts.map((a) => (
+            <Card key={a.id}>
+              <div className="flex items-center justify-between">
+                <CardTitle>{a.type}</CardTitle>
+                <Badge tone={a.status === "ACTIVE" ? "success" : "neutral"}>{a.status}</Badge>
+              </div>
+              <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(a.balance)}</p>
+              <p className="mono muted mt-2">{a.iban}</p>
+            </Card>
+          ))}
+        </div>
+      )}
+
+      <Card className="mt-4">
+        <div className="mb-3 flex items-center justify-between">
+          <CardTitle>Recent activity</CardTitle>
+          <Link href="/transfers" className="text-sm text-brand-300 hover:underline">
+            New transfer
+          </Link>
+        </div>
+        {recent.length === 0 ? (
+          <EmptyState title="No transactions yet" description="Send your first transfer to see it here." />
+        ) : (
+          <Table>
+            <THead>
+              <TRow>
+                <TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH className="text-right">Amount</TH>
+              </TRow>
+            </THead>
+            <tbody>
+              {recent.map((t) => (
+                <TRow key={t.id}>
+                  <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
+                  <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEPOSIT"}</TD>
+                  <TD className="mono">{t.toIban ? "..." + t.toIban.slice(-6) : "-"}</TD>
+                  <TD className="max-w-40 truncate">{t.memo ?? "-"}</TD>
+                  <TD className="text-right font-semibold tabular-nums">{usd(t.amount)}</TD>
+                </TRow>
+              ))}
+            </tbody>
+          </Table>
         )}
-        <p><Link href="/transfers">Send money →</Link></p>
-      </div>
+      </Card>
 
-      <div className="card">
-        <h2>Recent activity</h2>
-        {recent.length === 0 && <p style={{ opacity: 0.7 }}>No transactions yet.</p>}
-        {recent.map((t) => (
-          <p key={t.id}>
-            {t.fromIban ? <code>{t.fromIban.slice(-6)}</code> : "DEPOSIT"} → {t.toIban ? <code>{t.toIban.slice(-6)}</code> : "?"} ·{" "}
-            <strong>${parseFloat(t.amount).toFixed(2)}</strong> {t.currency}
-            {t.memo ? " · " + t.memo : ""}
-          </p>
-        ))}
-      </div>
-
-      <p><button onClick={logout}>Log out</button></p>
-      <style jsx>{`input { padding: 6px; border-radius: 6px; border: 1px solid #2a4d85; background: #0a0f1e; color: #e8eef7; } button { padding: 6px 12px; border-radius: 6px; border: 1px solid #2a4d85; background: #12325b; color: #e8eef7; cursor: pointer; }`}</style>
-    </main>
+      <Modal open={depositOpen} onClose={() => setDepositOpen(false)} title="Simulate deposit">
+        <Field label="Amount (USD)" hint="Demo rail: funds appear instantly.">
+          <Input value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} inputMode="decimal" />
+        </Field>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setDepositOpen(false)}>Cancel</Button>
+          <Button onClick={deposit} disabled={depositing}>{depositing ? "Depositing..." : "Deposit"}</Button>
+        </div>
+      </Modal>
+    </AppShell>
   );
 }

@@ -1,8 +1,33 @@
-:root { color-scheme: light; }
-* { box-sizing: border-box; }
-body { margin: 0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; background: #0b1220; color: #e8eef7; }
-a { color: #7dd3fc; }
-.container { max-width: 960px; margin: 0 auto; padding: 48px 24px; }
-.card { background: #111c33; border: 1px solid #24365c; border-radius: 12px; padding: 20px; margin-top: 16px; }
-.badge { display: inline-block; padding: 4px 10px; border-radius: 999px; background: #12325b; border: 1px solid #2a4d85; font-size: 12px; }
-code { background: #0a0f1e; padding: 2px 6px; border-radius: 6px; }
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+  --bg: #0b1220;
+  --panel: #111c33;
+  --line: #24365c;
+  --text: #e8eef7;
+  --muted: #93a4c4;
+  --brand: #38bdf8;
+  --mint: #86efac;
+  --rose: #fca5a5;
+}
+
+html, body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection { background: rgba(56, 189, 248, 0.35); }
+
+@layer components {
+  .panel { @apply rounded-xl border bg-ink-800 shadow-card; border-color: var(--line); }
+  .muted { color: var(--muted); }
+  .mono { @apply font-mono text-[13px]; }
+}

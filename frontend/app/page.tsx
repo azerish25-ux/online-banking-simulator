@@ -1,45 +1,45 @@
-"use client";
-
-import { useEffect, useState } from "react";
 import Link from "next/link";
-
-type Health = { status: string; service?: string; version?: string };
+import { Badge } from "../components/ui/badge";
+import { Button } from "../components/ui/button";
+import { Card, CardDescription, CardTitle } from "../components/ui/card";
 
 export default function Home() {
-  const [backend, setBackend] = useState<Health | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    fetch("/backend/health")
-      .then(async (r) => {
-        if (!r.ok) throw new Error(`HTTP ${r.status}`);
-        setBackend(await r.json());
-      })
-      .catch((e) => setError(e.message));
-  }, []);
-
   return (
-    <main className="container">
-      <span className="badge">Part 2 - Database + Auth</span>
-      <h1>Enterprise Banking Platform</h1>
-      <p>
-        <Link href="/register">Create account</Link> · <Link href="/login">Log in</Link> · <Link href="/dashboard">Dashboard</Link>
-      </p>
+    <div className="min-h-screen bg-ink-900">
+      <div className="mx-auto max-w-5xl px-5 py-16">
+        <Badge tone="info">Part 4 - Design system</Badge>
+        <h1 className="mt-4 max-w-2xl text-4xl font-bold tracking-tight md:text-5xl">
+          Northbank<span className="text-brand-400">.</span> Enterprise banking, built in the open.
+        </h1>
+        <p className="muted mt-4 max-w-xl">
+          Next.js + TypeScript up front, Spring Boot + PostgreSQL behind. Transfers settle atomically
+          with idempotency keys; every mutation leaves an audit trail.
+        </p>
+        <div className="mt-6 flex flex-wrap gap-2">
+          <Link href="/register"><Button size="lg">Create account</Button></Link>
+          <Link href="/login"><Button size="lg" variant="secondary">Log in</Button></Link>
+          <Link href="/design"><Button size="lg" variant="ghost">Design system</Button></Link>
+        </div>
 
-      <div className="card">
-        <h2>System status</h2>
-        <p>Frontend: <strong>UP</strong> (you are reading this page)</p>
-        {backend && <p>Backend: <strong>{backend.status}</strong> · {backend.service} {backend.version}</p>}
-        {error && <p>Backend: <strong>not reachable yet</strong> ({error}) - start it with <code>.\mvnw.cmd spring-boot:run</code> from the backend folder</p>}
-      </div>
+        <div className="mt-10 grid gap-4 md:grid-cols-3">
+          <Card>
+            <CardTitle>Atomic transfers</CardTitle>
+            <CardDescription>Pessimistic locking in ID order. No deadlocks, no partial debits.</CardDescription>
+          </Card>
+          <Card>
+            <CardTitle>Idempotent API</CardTitle>
+            <CardDescription>Retry safely - the same key always returns the original transfer.</CardDescription>
+          </Card>
+          <Card>
+            <CardTitle>Audit everything</CardTitle>
+            <CardDescription>Registrations, deposits and transfers each write an audit row.</CardDescription>
+          </Card>
+        </div>
 
-      <div className="card">
-        <h2>What is next (Part 3)</h2>
-        <ul>
-          <li>Account balances + transfer API with idempotency keys</li>
-          <li>Transaction history + dashboard money movement</li>
-        </ul>
+        <p className="muted mt-8 text-sm">
+          Backend health: <code className="mono">GET /api/health</code> · Local demo: <code className="mono">.\start-all.ps1</code> then <code className="mono">.\seed-demo.ps1</code>
+        </p>
       </div>
-    </main>
+    </div>
   );
 }

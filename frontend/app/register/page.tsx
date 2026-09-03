@@ -1,51 +1,60 @@
 "use client";
 
-import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AuthShell } from "../../components/layout/auth-shell";
+import { Button } from "../../components/ui/button";
+import { Field, Input } from "../../components/ui/input";
+import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
+
+const schema = z.object({
+  fullName: z.string().min(2, "Enter your full name"),
+  email: z.string().email("Enter a valid email"),
+  password: z.string().min(8, "Minimum 8 characters")
+});
+
+type Form = z.infer<typeof schema>;
 
 export default function RegisterPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { push } = useToast();
+  const { register, handleSubmit, formState } = useForm<Form>({ resolver: zodResolver(schema) });
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null);
-    setLoading(true);
+  async function onSubmit(values: Form) {
     try {
-      const data = await api("/v1/auth/register", {
-        method: "POST",
-        body: JSON.stringify({ email, password, fullName })
-      });
+      const data = await api("/v1/auth/register", { method: "POST", body: JSON.stringify(values) });
       setToken(data.accessToken);
+      push("Account created. A checking account is ready.", "success");
       router.push("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Registration failed");
-    } finally {
-      setLoading(false);
+      push(err instanceof Error ? err.message : "Registration failed", "error");
     }
   }
 
   return (
-    <main className="container">
-      <h1>Create account</h1>
-      <form onSubmit={onSubmit} className="card">
-        <label>Full name<br /><input required value={fullName} onChange={(e) => setFullName(e.target.value)} /></label>
-        <br /><br />
-        <label>Email<br /><input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></label>
-        <br /><br />
-        <label>Password (min 8 chars)<br /><input type="password" required minLength={8} value={password} onChange={(e) => setPassword(e.target.value)} /></label>
-        <br /><br />
-        <button type="submit" disabled={loading}>{loading ? "Creating..." : "Register"}</button>
-        {error && <p style={{ color: "#fca5a5" }}>{error}</p>}
+    <AuthShell
+      title="Create your account"
+      subtitle="A checking account is opened automatically."
+      footer={<>Have an account? <Link className="text-brand-300" href="/login">Log in</Link></>}
+    >
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        <Field label="Full name" error={formState.errors.fullName?.message}>
+          <Input autoComplete="name" placeholder="Ada Lovelace" {...register("fullName")} />
+        </Field>
+        <Field label="Email" error={formState.errors.email?.message}>
+          <Input type="email" autoComplete="email" placeholder="you@example.com" {...register("email")} />
+        </Field>
+        <Field label="Password" error={formState.errors.password?.message} hint="Minimum 8 characters.">
+          <Input type="password" autoComplete="new-password" {...register("password")} />
+        </Field>
+        <Button type="submit" className="w-full" disabled={formState.isSubmitting}>
+          {formState.isSubmitting ? "Creating..." : "Create account"}
+        </Button>
       </form>
-      <p>Have an account? <Link href="/login">Log in</Link></p>
-      <style jsx>{`input { width: 100%; padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #2a4d85; background: #0a0f1e; color: #e8eef7; } button { padding: 8px 16px; border-radius: 6px; border: 1px solid #2a4d85; background: #12325b; color: #e8eef7; cursor: pointer; }`}</style>
-    </main>
+    </AuthShell>
   );
 }

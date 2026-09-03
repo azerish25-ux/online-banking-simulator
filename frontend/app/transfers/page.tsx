@@ -1,50 +1,87 @@
 "use client";
 
-import { useState } from "react";
+import * as React from "react";
+
 import Link from "next/link";
+import { useForm } from "react-hook-form";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { AppShell } from "../../components/layout/app-shell";
+import { Badge } from "../../components/ui/badge";
+import { Button } from "../../components/ui/button";
+import { Card, CardDescription, CardTitle } from "../../components/ui/card";
+import { Field, Input } from "../../components/ui/input";
+import { useToast } from "../../components/feedback/toast";
 import { api } from "../../lib/api";
+import { usd } from "../../lib/format";
+
+const schema = z.object({
+  toIban: z.string().trim().min(8, "Enter the full recipient IBAN").max(34),
+  amount: z.string().regex(/^\d+(\.\d{1,4})?$/, "Positive amount, up to 4 decimals"),
+  memo: z.string().max(140, "Max 140 characters").optional()
+});
+
+type Form = z.infer<typeof schema>;
 
 export default function TransfersPage() {
-  const [toIban, setToIban] = useState("");
-  const [amount, setAmount] = useState("10.00");
-  const [memo, setMemo] = useState("");
-  const [result, setResult] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
+  const { push } = useToast();
+  const { register, handleSubmit, reset, formState } = useForm<Form>({ resolver: zodResolver(schema) });
+  const [receipt, setReceipt] = React.useState<{ id: string; toIban: string; amount: string } | null>(null);
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
-    setError(null); setResult(null); setLoading(true);
+  async function onSubmit(values: Form) {
+    setReceipt(null);
     try {
       const data = await api("/v1/transfers", {
         method: "POST",
         headers: { "Idempotency-Key": crypto.randomUUID() },
-        body: JSON.stringify({ toIban, amount, memo: memo || undefined })
+        body: JSON.stringify({ toIban: values.toIban, amount: values.amount, memo: values.memo || undefined })
       });
-      setResult("Sent $" + data.amount + " to " + data.toIban + " (id " + String(data.id).slice(0, 8) + "...).");
+      setReceipt({ id: data.id, toIban: data.toIban, amount: data.amount });
+      push("Transfer posted.", "success");
+      reset({ toIban: "", amount: "", memo: "" });
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Transfer failed");
-    } finally {
-      setLoading(false);
+      push(err instanceof Error ? err.message : "Transfer failed", "error");
     }
   }
 
   return (
-    <main className="container">
-      <h1>Send money</h1>
-      <form onSubmit={onSubmit} className="card">
-        <label>Recipient IBAN<br /><input required value={toIban} onChange={(e) => setToIban(e.target.value)} placeholder="DE..." style={{ width: "100%" }} /></label>
-        <br /><br />
-        <label>Amount (USD)<br /><input required value={amount} onChange={(e) => setAmount(e.target.value)} /></label>
-        <br /><br />
-        <label>Memo (optional)<br /><input value={memo} onChange={(e) => setMemo(e.target.value)} maxLength={140} style={{ width: "100%" }} /></label>
-        <br /><br />
-        <button type="submit" disabled={loading}>{loading ? "Sending..." : "Send"}</button>
-        {result && <p style={{ color: "#86efac" }}>{result}</p>}
-        {error && <p style={{ color: "#fca5a5" }}>{error}</p>}
-      </form>
-      <p><Link href="/dashboard">← Back to dashboard</Link></p>
-      <style jsx>{`input { padding: 8px; margin-top: 4px; border-radius: 6px; border: 1px solid #2a4d85; background: #0a0f1e; color: #e8eef7; } button { padding: 8px 16px; border-radius: 6px; border: 1px solid #2a4d85; background: #12325b; color: #e8eef7; cursor: pointer; }`}</style>
-    </main>
+    <AppShell>
+      <h1 className="text-2xl font-bold tracking-tight">Send money</h1>
+      <p className="muted mt-1 text-sm">
+        Debited and credited atomically. Retries with the same key never double-send.{" "}
+        <Link href="/dashboard" className="text-brand-300 hover:underline">Back to overview</Link>
+      </p>
+
+      <Card className="mt-4 max-w-xl">
+        <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
+          <Field label="Recipient IBAN" error={formState.errors.toIban?.message}>
+            <Input placeholder="DE..." autoComplete="off" {...register("toIban")} />
+          </Field>
+          <Field label="Amount (USD)" error={formState.errors.amount?.message}>
+            <Input placeholder="10.00" inputMode="decimal" {...register("amount")} />
+          </Field>
+          <Field label="Memo (optional)" error={formState.errors.memo?.message}>
+            <Input placeholder="Rent, dinner..." maxLength={140} {...register("memo")} />
+          </Field>
+          <Button type="submit" disabled={formState.isSubmitting}>
+            {formState.isSubmitting ? "Sending..." : "Send transfer"}
+          </Button>
+        </form>
+      </Card>
+
+      {receipt && (
+        <Card className="mt-4 max-w-xl border-emerald-800">
+          <div className="flex items-center gap-2">
+            <CardTitle>Transfer posted</CardTitle>
+            <Badge tone="success">POSTED</Badge>
+          </div>
+          <CardDescription>
+            {usd(receipt.amount)} → <span className="mono">{receipt.toIban}</span>
+          </CardDescription>
+          <p className="mono muted mt-2 text-xs">id {receipt.id}</p>
+        </Card>
+      )}
+    </AppShell>
   );
 }
+
