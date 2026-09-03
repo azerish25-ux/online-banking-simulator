@@ -78,7 +78,9 @@ public class MoneyService {
       account.setCreditLimit(new BigDecimal("1000.00"));
     }
     accounts.save(account);
-    audits.save(new AuditLog(user.getId(), "ACCOUNT_OPENED", "Account", account.getId().toString()));
+    AuditLog opened = new AuditLog(user.getId(), "ACCOUNT_OPENED", "Account", account.getId().toString());
+    opened.setMetadata(AuditLog.metadata("iban", account.getIban(), "type", account.getType().name()));
+    audits.save(opened);
     notifications.notify(user.getId(), user.getEmail(), "ACCOUNT_OPENED", "Account opened",
         clean.charAt(0) + clean.substring(1).toLowerCase() + " account " + account.getIban() + " is ready.");
     return account;
@@ -103,7 +105,9 @@ public class MoneyService {
     transactions.save(tx);
 
     User depositor = userOf(email);
-    audits.save(new AuditLog(depositor.getId(), "DEPOSIT_POSTED", "Transaction", tx.getId().toString()));
+    AuditLog deposited = new AuditLog(depositor.getId(), "DEPOSIT_POSTED", "Transaction", tx.getId().toString());
+    deposited.setMetadata(AuditLog.metadata("amount", scaled(amount).toPlainString(), "to", account.getIban()));
+    audits.save(deposited);
     notifications.notify(depositor.getId(), depositor.getEmail(), "DEPOSIT_POSTED", "Deposit received",
         "Deposited " + scaled(amount).toPlainString() + " USD to " + account.getIban() + ".");
     return account;
@@ -184,7 +188,9 @@ public class MoneyService {
       return transactions.findByIdempotencyKey(idempotencyKey).orElseThrow(() -> concurrentReplay);
     }
 
-    audits.save(new AuditLog(sender.getId(), "TRANSFER_POSTED", "Transaction", tx.getId().toString()));
+    AuditLog posted = new AuditLog(sender.getId(), "TRANSFER_POSTED", "Transaction", tx.getId().toString());
+    posted.setMetadata(AuditLog.metadata("amount", scaled.toPlainString(), "from", from.getIban(), "to", to.getIban()));
+    audits.save(posted);
     notifications.notify(sender.getId(), sender.getEmail(), "TRANSFER_SENT", "Money sent",
         "Sent " + scaled.toPlainString() + " USD to " + to.getIban() + ".");
     users.findById(to.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),

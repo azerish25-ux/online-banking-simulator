@@ -38,7 +38,9 @@ public class AuthService {
     }
     User user = users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
     accounts.save(new Account(user.getId(), Iban.uniqueOrThrow(accounts::existsByIban, 5), AccountType.CHECKING));
-    audits.save(new AuditLog(user.getId(), "USER_REGISTERED", "User", user.getId().toString()));
+    AuditLog registered = new AuditLog(user.getId(), "USER_REGISTERED", "User", user.getId().toString());
+    registered.setMetadata(AuditLog.metadata("email", user.getEmail()));
+    audits.save(registered);
     return user;
   }
 

@@ -44,7 +44,9 @@ public class AdminService {
         .orElseThrow(() -> new TransactionNotFoundException(transactionId));
     tx.setReviewed(true);
     transactions.save(tx);
-    audits.save(new AuditLog(admin.getId(), "TRANSACTION_REVIEWED", "Transaction", tx.getId().toString()));
+    AuditLog reviewed = new AuditLog(admin.getId(), "TRANSACTION_REVIEWED", "Transaction", tx.getId().toString());
+    reviewed.setMetadata(AuditLog.metadata("transaction", tx.getId().toString()));
+    audits.save(reviewed);
     return tx;
   }
 
@@ -60,7 +62,9 @@ public class AdminService {
     account.setStatus(status);
     accounts.save(account);
     String action = status == AccountStatus.FROZEN ? "ACCOUNT_FROZEN" : "ACCOUNT_UNFROZEN";
-    audits.save(new AuditLog(admin.getId(), action, "Account", account.getId().toString()));
+    AuditLog statusChange = new AuditLog(admin.getId(), action, "Account", account.getId().toString());
+    statusChange.setMetadata(AuditLog.metadata("iban", account.getIban(), "status", status.name()));
+    audits.save(statusChange);
     users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
         action, status == AccountStatus.FROZEN ? "Account frozen" : "Account re-activated",
         "Account " + account.getIban() + (status == AccountStatus.FROZEN ? " was frozen by operations." : " is active again.")));

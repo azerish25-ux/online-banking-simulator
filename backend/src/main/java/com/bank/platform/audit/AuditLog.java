@@ -56,5 +56,16 @@ public class AuditLog {
   public String getEntity() { return entity; }
   public String getEntityId() { return entityId; }
   public String getMetadata() { return metadata; }
+  public void setMetadata(String v) { metadata = v; }
+
+  /** Minimal JSON object builder for audit context. Values must not contain double quotes. */
+  public static String metadata(String... pairs) {
+    StringBuilder sb = new StringBuilder("{");
+    for (int i = 0; i + 1 < pairs.length; i += 2) {
+      if (i > 0) sb.append(',');
+      sb.append('"').append(pairs[i]).append("\":\"").append(pairs[i + 1]).append('"');
+    }
+    return sb.append('}').toString();
+  }
   public Instant getCreatedAt() { return createdAt; }
 }

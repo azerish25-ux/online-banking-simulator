@@ -75,7 +75,9 @@ public class CardService {
     Card card = cards.save(new Card(
         user.getId(), account.getId(), pan.substring(12), sha256(pan), sha256(cvv),
         exp.getMonthValue(), exp.getYear()));
-    audits.save(new AuditLog(user.getId(), "CARD_ISSUED", "Card", card.getId().toString()));
+    AuditLog issued = new AuditLog(user.getId(), "CARD_ISSUED", "Card", card.getId().toString());
+    issued.setMetadata(AuditLog.metadata("last4", card.getLast4(), "account", account.getIban()));
+    audits.save(issued);
     notifications.notify(user.getId(), user.getEmail(), "CARD_ISSUED",
         "Virtual card issued",
         "Card ending " + card.getLast4() + " is ready on account " + account.getIban() + ".");
@@ -89,8 +91,10 @@ public class CardService {
         .orElseThrow(() -> new CardNotFoundException(cardId));
     card.setStatus(status);
     cards.save(card);
-    audits.save(new AuditLog(user.getId(),
-        status == CardStatus.FROZEN ? "CARD_FROZEN" : "CARD_UNFROZEN", "Card", card.getId().toString()));
+    AuditLog cardStatus = new AuditLog(user.getId(),
+        status == CardStatus.FROZEN ? "CARD_FROZEN" : "CARD_UNFROZEN", "Card", card.getId().toString());
+    cardStatus.setMetadata(AuditLog.metadata("last4", card.getLast4()));
+    audits.save(cardStatus);
     return card;
   }
 

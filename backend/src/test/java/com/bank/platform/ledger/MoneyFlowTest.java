@@ -3,9 +3,11 @@ package com.bank.platform.ledger;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
+import com.bank.platform.audit.AuditLogRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -25,6 +27,7 @@ class MoneyFlowTest {
 
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper objectMapper;
+  @Autowired AuditLogRepository auditLogs;
 
   @Test
   void depositTransferIdempotencyAndHistory() throws Exception {
@@ -131,5 +134,33 @@ class MoneyFlowTest {
         .andReturn();
     return objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
         .get(0).get("id").asText();
+  }
+
+  @Test
+  void transferAuditCarriesAmountAndIbans() throws Exception {
+    String aliceToken = register("meta-alice@example.com", "Meta Alice");
+    String bobToken = register("meta-bob@example.com", "Meta Bob");
+    String aliceId = accountId(aliceToken);
+    String bobIban = accountIban(bobToken);
+
+    mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
+            .header("Authorization", "Bearer " + aliceToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"amount":"500.00"}"""))
+        .andExpect(status().isOk());
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + aliceToken)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"toIban":"%s","amount":"120.00"}""".formatted(bobIban)))
+        .andExpect(status().isCreated());
+
+    var posted = auditLogs.findAll().stream()
+        .filter(a -> "TRANSFER_POSTED".equals(a.getAction()))
+        .toList();
+    assertTrue(posted.size() == 1);
+    assertTrue(posted.get(0).getMetadata().contains("120.0000"));
+    assertTrue(posted.get(0).getMetadata().contains(bobIban));
   }
 }
