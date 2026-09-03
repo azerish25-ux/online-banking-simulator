@@ -1,0 +1,2 @@
+ALTER TABLE IF EXISTS transactions ALTER COLUMN currency TYPE VARCHAR(3);
+

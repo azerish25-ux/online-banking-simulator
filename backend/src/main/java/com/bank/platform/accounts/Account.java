@@ -55,4 +55,5 @@ public class Account {
   public String getType() { return type; }
   public BigDecimal getBalance() { return balance; }
   public String getStatus() { return status; }
+  public void setBalance(BigDecimal v) { balance = v; }
 }
