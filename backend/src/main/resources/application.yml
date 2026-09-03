@@ -28,6 +28,7 @@ app:
   auth:
     rate-limit:
       per-minute: ${AUTH_RATE_LIMIT:20}
+    refresh-days: ${AUTH_REFRESH_DAYS:7}
   interest:
     savings-annual-rate: ${SAVINGS_RATE:0.04}
     loan-annual-rate: ${LOAN_RATE:0.12}

@@ -110,4 +110,44 @@ class AuthFlowTest {
                 {"email":"not-an-email","password":"short","fullName":""}"""))
         .andExpect(status().isBadRequest());
   }
+
+  @Test
+  void refreshRotatesAndLogoutRevokes() throws Exception {
+    MvcResult reg = mvc.perform(post("/api/v1/auth/register")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"email":"ref@example.com","password":"secret123","fullName":"Ref User"}"""))
+        .andExpect(status().isCreated())
+        .andReturn();
+    String refresh1 = reg.getResponse().getCookie("refresh_token").getValue();
+
+    MvcResult ref = mvc.perform(post("/api/v1/auth/refresh")
+            .cookie(new jakarta.servlet.http.Cookie("refresh_token", refresh1)))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.accessToken").isNotEmpty())
+        .andReturn();
+    String refresh2 = ref.getResponse().getCookie("refresh_token").getValue();
+    org.junit.jupiter.api.Assertions.assertNotEquals(refresh1, refresh2);
+
+    mvc.perform(post("/api/v1/auth/refresh")
+            .cookie(new jakarta.servlet.http.Cookie("refresh_token", refresh1)))
+        .andExpect(status().isUnauthorized());
+    mvc.perform(post("/api/v1/auth/refresh")
+            .cookie(new jakarta.servlet.http.Cookie("refresh_token", refresh2)))
+        .andExpect(status().isUnauthorized());
+
+    MvcResult login = mvc.perform(post("/api/v1/auth/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"email":"ref@example.com","password":"secret123"}"""))
+        .andExpect(status().isOk())
+        .andReturn();
+    String refresh3 = login.getResponse().getCookie("refresh_token").getValue();
+    mvc.perform(post("/api/v1/auth/logout")
+            .cookie(new jakarta.servlet.http.Cookie("refresh_token", refresh3)))
+        .andExpect(status().isNoContent());
+    mvc.perform(post("/api/v1/auth/refresh")
+            .cookie(new jakarta.servlet.http.Cookie("refresh_token", refresh3)))
+        .andExpect(status().isUnauthorized());
+  }
 }
