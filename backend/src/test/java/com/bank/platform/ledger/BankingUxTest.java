@@ -147,4 +147,15 @@ class BankingUxTest {
     return objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
         .get(0).get("id").asText();
   }
+
+  @Test
+  void beneficiaryWithBadCheckDigitsIsRejected() throws Exception {
+    String token = register("ux3@example.com", "Ux Three");
+    mvc.perform(post("/api/v1/beneficiaries")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"nickname":"Bogus","iban":"DE89370400440532013001"}"""))
+        .andExpect(status().isBadRequest());
+  }
 }

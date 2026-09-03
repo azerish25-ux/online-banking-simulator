@@ -33,6 +33,7 @@ public class MoneyService {
   private final AuditLogRepository audits;
   private final NotificationService notifications;
   private final BigDecimal reviewThreshold;
+  private final BigDecimal depositMax;
 
   public MoneyService(
       UserRepository users,
@@ -40,13 +41,15 @@ public class MoneyService {
       TransactionRepository transactions,
       AuditLogRepository audits,
       NotificationService notifications,
-      @Value("${app.review.large-transfer-threshold:10000}") BigDecimal reviewThreshold) {
+      @Value("${app.review.large-transfer-threshold:10000}") BigDecimal reviewThreshold,
+      @Value("${app.deposit.max-amount:100000}") BigDecimal depositMax) {
     this.users = users;
     this.accounts = accounts;
     this.transactions = transactions;
     this.audits = audits;
     this.notifications = notifications;
     this.reviewThreshold = reviewThreshold;
+    this.depositMax = depositMax;
   }
 
   @Transactional(readOnly = true)
@@ -90,6 +93,9 @@ public class MoneyService {
   @CacheEvict(value = "summaries", allEntries = true)
   @Transactional
   public Account deposit(String email, UUID accountId, BigDecimal amount) {
+    if (amount.compareTo(depositMax) > 0) {
+      throw new TransferValidationException("Deposit exceeds the per-transaction limit");
+    }
     requirePositive(amount);
     Account account = lockOwned(email, accountId);
     assertActive(account);
@@ -102,6 +108,7 @@ public class MoneyService {
     tx.setCurrency("USD");
     tx.setMemo("Simulated deposit");
     tx.setKind(TxKind.DEPOSIT);
+    tx.setFlagged(scaled(amount).compareTo(reviewThreshold) >= 0);
     transactions.save(tx);
 
     User depositor = userOf(email);

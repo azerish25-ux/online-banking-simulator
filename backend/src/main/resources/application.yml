@@ -29,6 +29,9 @@ app:
     rate-limit:
       per-minute: ${AUTH_RATE_LIMIT:20}
     refresh-days: ${AUTH_REFRESH_DAYS:7}
+  trust-proxy-headers: ${TRUST_PROXY_HEADERS:false}
+  deposit:
+    max-amount: ${DEPOSIT_MAX:100000}
   interest:
     savings-annual-rate: ${SAVINGS_RATE:0.04}
     loan-annual-rate: ${LOAN_RATE:0.12}

@@ -163,4 +163,27 @@ class MoneyFlowTest {
     assertTrue(posted.get(0).getMetadata().contains("120.0000"));
     assertTrue(posted.get(0).getMetadata().contains(bobIban));
   }
+
+  @Test
+  void depositsAreCappedAndLargeOnesFlagged() throws Exception {
+    String token = register("cap@example.com", "Cap User");
+    String accountId = accountId(token);
+    mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"amount":"100000.01"}"""))
+        .andExpect(status().isBadRequest());
+    mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"amount":"15000.00"}"""))
+        .andExpect(status().isOk());
+    mvc.perform(get("/api/v1/transactions")
+            .header("Authorization", "Bearer " + token)
+            .param("accountId", accountId))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].flagged").value(true));
+  }
 }

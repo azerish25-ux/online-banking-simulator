@@ -19,17 +19,28 @@ class RateLimitTest {
 
   @Autowired MockMvc mvc;
 
+
+
   @Test
-  void sixthLoginAttemptInAMinuteIsRejected() throws Exception {
+  void authBudgetIsSharedAndSpoofProof() throws Exception {
     String body = """
         {"email":"nobody@example.com","password":"wrong"}""";
-    for (int i = 0; i < 5; i++) {
+    // Four plain attempts burn most of the per-minute budget.
+    for (int i = 0; i < 4; i++) {
       mvc.perform(post("/api/v1/auth/login")
               .contentType(MediaType.APPLICATION_JSON)
               .content(body))
           .andExpect(status().isUnauthorized());
     }
+    // A spoofed header does not open a fresh bucket (proxy headers untrusted).
     mvc.perform(post("/api/v1/auth/login")
+            .header("X-Forwarded-For", "1.2.3.4")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+        .andExpect(status().isUnauthorized());
+    // A differently-spoofed header still shares the one exhausted budget.
+    mvc.perform(post("/api/v1/auth/login")
+            .header("X-Forwarded-For", "9.9.9.9")
             .contentType(MediaType.APPLICATION_JSON)
             .content(body))
         .andExpect(status().isTooManyRequests())

@@ -24,13 +24,16 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class RateLimitFilter extends OncePerRequestFilter {
 
   private final int perMinute;
+  private final boolean trustProxyHeaders;
   private final ObjectMapper objectMapper;
   private final ConcurrentHashMap<String, Bucket> buckets = new ConcurrentHashMap<>();
 
   public RateLimitFilter(
-      @Value("${app.auth.rate-limit.per-minute:20}") int perMinute, ObjectMapper objectMapper) {
+      @Value("${app.auth.rate-limit.per-minute:20}") int perMinute,
+      @Value("${app.trust-proxy-headers:false}") boolean trustProxyHeaders, ObjectMapper objectMapper) {
     this.perMinute = perMinute;
     this.objectMapper = objectMapper;
+    this.trustProxyHeaders = trustProxyHeaders;
   }
 
   @Override
@@ -61,6 +64,10 @@ public class RateLimitFilter extends OncePerRequestFilter {
   }
 
   private String clientIp(HttpServletRequest request) {
+    // Spoofable by any client: only honor it behind a trusted proxy.
+    if (!trustProxyHeaders) {
+      return request.getRemoteAddr();
+    }
     String forwarded = request.getHeader("X-Forwarded-For");
     if (forwarded != null && !forwarded.isBlank()) {
       return forwarded.split(",")[0].trim();
