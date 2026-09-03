@@ -3,6 +3,25 @@ server:
 spring:
   application:
     name: bank-platform
+  datasource:
+    url: ${PG_URL:jdbc:postgresql://localhost:5432/bankdb}
+    username: ${PG_USER:bankapp}
+    password: ${PG_PASSWORD:bankapp_secret_change_me}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        format_sql: true
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+app:
+  jwt:
+    secret: ${JWT_SECRET:dev-only-change-me-0123456789abcdef-0123456789abcdef-0123456789abcdef}
+    access-minutes: 15
 management:
   endpoints:
     web:
@@ -14,5 +33,5 @@ management:
 info:
   app:
     name: bank-platform
-    version: 0.1.0
-    part: "1-foundation"
+    version: 0.2.0
+    part: "2-database-auth"

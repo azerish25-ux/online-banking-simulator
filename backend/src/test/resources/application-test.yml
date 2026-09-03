@@ -1,0 +1,15 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:banktest;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;CASE_INSENSITIVE_IDENTIFIERS=TRUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  jpa:
+    hibernate:
+      ddl-auto: validate
+  flyway:
+    enabled: true
+app:
+  jwt:
+    secret: test-only-secret-0123456789abcdef-0123456789abcdef-0123456789abcdef-00
+    access-minutes: 15
