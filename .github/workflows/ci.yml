@@ -46,3 +46,33 @@ jobs:
       - uses: actions/checkout@v4
       - run: docker compose build
       - run: docker compose config --quiet
+
+  contract:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bankdb
+          POSTGRES_USER: bankapp
+          POSTGRES_PASSWORD: ci-secret
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U bankapp" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - working-directory: backend
+        run: ./mvnw -B -DskipTests package
+      - working-directory: backend
+        run: PG_PASSWORD=ci-secret JWT_SECRET=ci-jwt-secret-0123456789abcdef-0123456789abcdef java -jar target/platform-*.jar & echo $! > app.pid
+      - run: for i in $(seq 1 36); do curl -sf http://localhost:8080/api/health && break || sleep 5; done
+      - working-directory: backend
+        run: curl -sf http://localhost:8080/v3/api-docs -o ../frontend/openapi.json
+      - working-directory: backend
+        run: kill $(cat app.pid)
+        if: always()
+      - run: git diff --exit-code -- frontend/openapi.json
