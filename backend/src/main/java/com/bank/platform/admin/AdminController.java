@@ -36,18 +36,21 @@ public class AdminController {
   private final TransactionRepository transactions;
   private final AuditLogRepository audits;
   private final AdminService adminService;
+  private final com.bank.platform.ledger.InterestService interestService;
 
   public AdminController(
       UserRepository users,
       AccountRepository accounts,
       TransactionRepository transactions,
       AuditLogRepository audits,
-      AdminService adminService) {
+      AdminService adminService,
+      com.bank.platform.ledger.InterestService interestService) {
     this.users = users;
     this.accounts = accounts;
     this.transactions = transactions;
     this.audits = audits;
     this.adminService = adminService;
+    this.interestService = interestService;
   }
 
   public record AuditResponse(
@@ -104,6 +107,11 @@ public class AdminController {
       return audits.findByAction(action.trim().toUpperCase(), pageable).map(AuditResponse::from);
     }
     return audits.findAll(pageable).map(AuditResponse::from);
+  }
+
+  @PostMapping("/interest/run")
+  public java.util.Map<String, Integer> runInterest() {
+    return interestService.accrueMonthly();
   }
 
   @PostMapping("/accounts/{id}/freeze")

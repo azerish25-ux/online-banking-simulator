@@ -28,6 +28,9 @@ app:
   auth:
     rate-limit:
       per-minute: ${AUTH_RATE_LIMIT:20}
+  interest:
+    savings-annual-rate: ${SAVINGS_RATE:0.04}
+    loan-annual-rate: ${LOAN_RATE:0.12}
   cors:
     allowed-origins: ${APP_CORS_ORIGINS:http://localhost:3000}
 management:

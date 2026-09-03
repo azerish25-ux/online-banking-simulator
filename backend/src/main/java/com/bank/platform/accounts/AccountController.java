@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -28,6 +29,14 @@ public class AccountController {
   @GetMapping
   public List<AccountResponse> mine(Authentication authentication) {
     return money.myAccounts(authentication.getName()).stream().map(AccountController::toDto).toList();
+  }
+
+  public record OpenAccountRequest(@jakarta.validation.constraints.NotBlank String type) {}
+
+  @PostMapping
+  @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+  public AccountResponse open(Authentication authentication, @Valid @RequestBody OpenAccountRequest request) {
+    return toDto(money.openAccount(authentication.getName(), request.type()));
   }
 
   @GetMapping("/{id}")

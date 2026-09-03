@@ -32,6 +32,12 @@ public class Account {
   @Column(nullable = false, length = 32)
   private String status = "ACTIVE";
 
+  @Column(name = "credit_limit", nullable = false, precision = 19, scale = 4)
+  private BigDecimal creditLimit = BigDecimal.ZERO;
+
+  @Column(name = "last_interest_at")
+  private Instant lastInterestAt;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -57,4 +63,8 @@ public class Account {
   public String getStatus() { return status; }
   public void setBalance(BigDecimal v) { balance = v; }
   public void setStatus(String v) { status = v; }
+  public BigDecimal getCreditLimit() { return creditLimit; }
+  public void setCreditLimit(BigDecimal v) { creditLimit = v; }
+  public Instant getLastInterestAt() { return lastInterestAt; }
+  public void setLastInterestAt(Instant v) { lastInterestAt = v; }
 }

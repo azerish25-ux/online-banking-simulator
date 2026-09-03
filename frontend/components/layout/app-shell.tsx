@@ -11,6 +11,7 @@ const NAV = [
   { href: "/transfers", label: "Transfers" },
   { href: "/activity", label: "Activity" },
   { href: "/beneficiaries", label: "Beneficiaries" },
+  { href: "/notifications", label: "Notifications" },
   { href: "/design", label: "Design system" }
 ];
 
@@ -18,13 +19,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [user, setUser] = React.useState<User | null>(null);
+  const [unread, setUnread] = React.useState(0);
   const navItems = user?.role === "ADMIN"
     ? [...NAV.slice(0, 4), { href: "/admin", label: "Operations" }, ...NAV.slice(4)]
     : NAV;
 
   React.useEffect(() => {
     api("/v1/auth/me").then(setUser).catch(() => {});
-  }, []);
+    api("/v1/notifications/unread-count").then((r) => setUnread(r.unread ?? 0)).catch(() => {});
+  }, [pathname]);
 
   function logout() {
     clearToken();
@@ -80,6 +83,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 "..."
               )}
             </div>
+            <Link href="/notifications" aria-label={"Notifications" + (unread > 0 ? ", " + unread + " unread" : "")} className="relative rounded-lg border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700">
+              🔔{unread > 0 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-brand-500 px-1.5 text-[11px] font-bold text-white">{unread}</span>}
+            </Link>
             <button
               onClick={logout}
               className="rounded-lg border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700"

@@ -26,6 +26,9 @@ export default function DashboardPage() {
   const [recent, setRecent] = React.useState<Tx[]>([]);
   const [summary, setSummary] = React.useState<MonthPoint[] | null>(null);
   const [depositOpen, setDepositOpen] = React.useState(false);
+  const [openOpen, setOpenOpen] = React.useState(false);
+  const [newType, setNewType] = React.useState("SAVINGS");
+  const [creating, setCreating] = React.useState(false);
   const [depositAmount, setDepositAmount] = React.useState("100.00");
   const [depositing, setDepositing] = React.useState(false);
 
@@ -63,6 +66,20 @@ export default function DashboardPage() {
     }
   }
 
+  async function openAccount() {
+    setCreating(true);
+    try {
+      await api("/v1/accounts", { method: "POST", body: JSON.stringify({ type: newType }) });
+      push("Account opened.", "success");
+      setOpenOpen(false);
+      await load();
+    } catch (e) {
+      push(e instanceof Error ? e.message : "Could not open account", "error");
+    } finally {
+      setCreating(false);
+    }
+  }
+
   const total = (accounts ?? []).reduce((sum, a) => sum + parseFloat(a.balance), 0);
 
   return (
@@ -73,6 +90,7 @@ export default function DashboardPage() {
           <p className="muted text-sm">{user ? "Welcome back, " + user.fullName + "." : "Loading..."}</p>
         </div>
         <div className="flex gap-2">
+          <Button variant="secondary" onClick={() => setOpenOpen(true)}>Open account</Button>
           <Button variant="secondary" onClick={() => setDepositOpen(true)} disabled={!accounts?.length}>
             Simulate deposit
           </Button>
@@ -95,7 +113,7 @@ export default function DashboardPage() {
           {accounts.map((a) => (
             <Card key={a.id}>
               <div className="flex items-center justify-between">
-                <CardTitle>{a.type}</CardTitle>
+                <Link href={"/accounts/" + a.id}><CardTitle className="hover:underline">{a.type} →</CardTitle></Link>
                 <Badge tone={a.status === "ACTIVE" ? "success" : "neutral"}>{a.status}</Badge>
               </div>
               <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(a.balance)}</p>
@@ -147,6 +165,20 @@ export default function DashboardPage() {
           </Table>
         )}
       </Card>
+
+      <Modal open={openOpen} onClose={() => setOpenOpen(false)} title="Open account">
+        <Field label="Account type">
+          <select aria-label="Account type" value={newType} onChange={(e) => setNewType(e.target.value)} className="h-10 w-full rounded-lg border border-line bg-ink-950 px-3 text-sm">
+            <option value="CHECKING">Checking - everyday money</option>
+            <option value="SAVINGS">Savings - earns monthly interest</option>
+            <option value="LOAN">Loan - borrow up to $1,000</option>
+          </select>
+        </Field>
+        <div className="mt-4 flex justify-end gap-2">
+          <Button variant="secondary" onClick={() => setOpenOpen(false)}>Cancel</Button>
+          <Button onClick={openAccount} disabled={creating}>{creating ? "Opening..." : "Open"}</Button>
+        </div>
+      </Modal>
 
       <Modal open={depositOpen} onClose={() => setDepositOpen(false)} title="Simulate deposit">
         <Field label="Amount (USD)" hint="Demo rail: funds appear instantly.">

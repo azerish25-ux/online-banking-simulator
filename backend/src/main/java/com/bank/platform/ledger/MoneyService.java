@@ -7,8 +7,10 @@ import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
+import com.bank.platform.notifications.NotificationService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -24,16 +26,20 @@ public class MoneyService {
   private final AccountRepository accounts;
   private final TransactionRepository transactions;
   private final AuditLogRepository audits;
+  private final NotificationService notifications;
+  private final SecureRandom random = new SecureRandom();
 
   public MoneyService(
       UserRepository users,
       AccountRepository accounts,
       TransactionRepository transactions,
-      AuditLogRepository audits) {
+      AuditLogRepository audits,
+      NotificationService notifications) {
     this.users = users;
     this.accounts = accounts;
     this.transactions = transactions;
     this.audits = audits;
+    this.notifications = notifications;
   }
 
   @Transactional(readOnly = true)
@@ -48,6 +54,32 @@ public class MoneyService {
       throw new AccessDeniedException("Not your account");
     }
     return account;
+  }
+
+  @Transactional
+  public Account openAccount(String email, String type) {
+    String clean = type == null ? "" : type.trim().toUpperCase();
+    if (!java.util.List.of("CHECKING", "SAVINGS", "LOAN").contains(clean)) {
+      throw new TransferValidationException("Unknown account type: " + type);
+    }
+    User user = userOf(email);
+    Account account = new Account(user.getId(), generateIban(), clean);
+    if ("LOAN".equals(clean)) {
+      account.setCreditLimit(new BigDecimal("1000.00"));
+    }
+    accounts.save(account);
+    audits.save(new AuditLog(user.getId(), "ACCOUNT_OPENED", "Account", account.getId().toString()));
+    notifications.notify(user.getId(), user.getEmail(), "ACCOUNT_OPENED", "Account opened",
+        clean.charAt(0) + clean.substring(1).toLowerCase() + " account " + account.getIban() + " is ready.");
+    return account;
+  }
+
+  private String generateIban() {
+    StringBuilder sb = new StringBuilder("DE");
+    for (int i = 0; i < 20; i++) {
+      sb.append(random.nextInt(10));
+    }
+    return sb.toString();
   }
 
   /** Simulated external rail (ATM/teller). Only the owning customer can fund their own account. */
@@ -66,7 +98,10 @@ public class MoneyService {
     tx.setMemo("Simulated deposit");
     transactions.save(tx);
 
-    audits.save(new AuditLog(userOf(email).getId(), "DEPOSIT_POSTED", "Transaction", tx.getId().toString()));
+    User depositor = userOf(email);
+    audits.save(new AuditLog(depositor.getId(), "DEPOSIT_POSTED", "Transaction", tx.getId().toString()));
+    notifications.notify(depositor.getId(), depositor.getEmail(), "DEPOSIT_POSTED", "Deposit received",
+        "Deposited " + scaled(amount).toPlainString() + " USD to " + account.getIban() + ".");
     return account;
   }
 
@@ -115,7 +150,8 @@ public class MoneyService {
     assertActive(from);
     assertActive(to);
     BigDecimal scaled = scaled(amount);
-    if (from.getBalance().compareTo(scaled) < 0) {
+    BigDecimal floor = "LOAN".equals(from.getType()) ? from.getCreditLimit().negate() : BigDecimal.ZERO;
+    if (from.getBalance().subtract(scaled).compareTo(floor) < 0) {
       throw new InsufficientFundsException();
     }
     from.setBalance(from.getBalance().subtract(scaled));
@@ -134,10 +170,19 @@ public class MoneyService {
       transactions.saveAndFlush(tx);
     } catch (DataIntegrityViolationException concurrentReplay) {
       // Lost a race with an identical key: return the winner's row.
+      // Without a key there is nothing to deduplicate on: surface the real failure.
+      if (idempotencyKey == null || idempotencyKey.isBlank()) {
+        throw concurrentReplay;
+      }
       return transactions.findByIdempotencyKey(idempotencyKey).orElseThrow(() -> concurrentReplay);
     }
 
     audits.save(new AuditLog(sender.getId(), "TRANSFER_POSTED", "Transaction", tx.getId().toString()));
+    notifications.notify(sender.getId(), sender.getEmail(), "TRANSFER_SENT", "Money sent",
+        "Sent " + scaled.toPlainString() + " USD to " + to.getIban() + ".");
+    users.findById(to.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
+        "TRANSFER_RECEIVED", "Money received",
+        "Received " + scaled.toPlainString() + " USD from " + from.getIban() + "."));
     return tx;
   }
 

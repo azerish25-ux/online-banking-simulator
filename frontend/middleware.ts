@@ -25,11 +25,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const guarded = ["/dashboard", "/transfers", "/activity", "/beneficiaries"];
+  const guarded = ["/dashboard", "/transfers", "/activity", "/beneficiaries", "/accounts", "/notifications"];
   if (!token && guarded.some((p) => path.startsWith(p))) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/transfers/:path*", "/activity/:path*", "/beneficiaries/:path*", "/admin/:path*"] };
+export const config = { matcher: ["/dashboard/:path*", "/transfers/:path*", "/activity/:path*", "/beneficiaries/:path*", "/accounts/:path*", "/notifications/:path*", "/admin/:path*"] };

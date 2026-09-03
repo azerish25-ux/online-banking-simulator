@@ -7,6 +7,7 @@ import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
+import com.bank.platform.notifications.NotificationService;
 import java.util.UUID;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
@@ -18,11 +19,14 @@ public class AdminService {
   private final UserRepository users;
   private final AccountRepository accounts;
   private final AuditLogRepository audits;
+  private final NotificationService notifications;
 
-  public AdminService(UserRepository users, AccountRepository accounts, AuditLogRepository audits) {
+  public AdminService(UserRepository users, AccountRepository accounts, AuditLogRepository audits,
+      NotificationService notifications) {
     this.users = users;
     this.accounts = accounts;
     this.audits = audits;
+    this.notifications = notifications;
   }
 
   @Transactional
@@ -36,9 +40,11 @@ public class AdminService {
         .orElseThrow(() -> new AccountNotFoundException(accountId));
     account.setStatus(status);
     accounts.save(account);
-    audits.save(new AuditLog(
-        admin.getId(), "FROZEN".equals(status) ? "ACCOUNT_FROZEN" : "ACCOUNT_UNFROZEN",
-        "Account", account.getId().toString()));
+    String action = "FROZEN".equals(status) ? "ACCOUNT_FROZEN" : "ACCOUNT_UNFROZEN";
+    audits.save(new AuditLog(admin.getId(), action, "Account", account.getId().toString()));
+    users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
+        action, "FROZEN".equals(status) ? "Account frozen" : "Account re-activated",
+        "Account " + account.getIban() + ("FROZEN".equals(status) ? " was frozen by operations." : " is active again.")));
     return account;
   }
 }
