@@ -36,12 +36,33 @@ public class JwtService {
   }
 
   public String extractEmail(String token) {
+
     return Jwts.parser()
         .verifyWith(key)
         .build()
         .parseSignedClaims(token)
         .getPayload()
         .getSubject();
+  }
+  /** Short-lived login-challenge token. Verified by purpose, never accepted as auth. */
+  public String generateMfa(String email) {
+    Instant now = Instant.now();
+    return Jwts.builder()
+        .subject(email)
+        .id(UUID.randomUUID().toString())
+        .claim("purpose", "mfa")
+        .issuedAt(Date.from(now))
+        .expiration(Date.from(now.plusSeconds(5 * 60)))
+        .signWith(key)
+        .compact();
+  }
+
+  public String requireMfaSubject(String token) {
+    var claims = Jwts.parser().verifyWith(key).build().parseSignedClaims(token).getPayload();
+    if (!"mfa".equals(claims.get("purpose", String.class))) {
+      throw new io.jsonwebtoken.JwtException("Not an MFA token");
+    }
+    return claims.getSubject();
   }
 
   public long getAccessMinutes() {

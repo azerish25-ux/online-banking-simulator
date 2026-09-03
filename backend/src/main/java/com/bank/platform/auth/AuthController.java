@@ -5,10 +5,13 @@ import com.bank.platform.auth.AuthDtos.LoginRequest;
 import com.bank.platform.auth.AuthDtos.RegisterRequest;
 import com.bank.platform.auth.AuthDtos.UserResponse;
 import com.bank.platform.security.JwtService;
+import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -27,18 +30,26 @@ public class AuthController {
   private final AuthService authService;
   private final JwtService jwtService;
   private final RefreshService refreshService;
+  private final TotpService totpService;
   private final UserRepository users;
 
   public AuthController(
       AuthService authService,
       JwtService jwtService,
       RefreshService refreshService,
+      TotpService totpService,
       UserRepository users) {
     this.authService = authService;
     this.jwtService = jwtService;
     this.refreshService = refreshService;
+    this.totpService = totpService;
     this.users = users;
   }
+
+  public record MfaRequiredResponse(String mfaToken, String message) {}
+  public record MfaVerifyRequest(@NotBlank String mfaToken, @NotBlank String code) {}
+  public record TotpCodeRequest(@NotBlank String code) {}
+  public record TotpSetupResponse(String secret, String qrDataUri) {}
 
   @PostMapping("/register")
   @ResponseStatus(HttpStatus.CREATED)
@@ -49,10 +60,65 @@ public class AuthController {
   }
 
   @PostMapping("/login")
-  public AuthResponse login(
+  public ResponseEntity<?> login(
       @Valid @RequestBody LoginRequest request, HttpServletResponse response) {
     User user = authService.login(request.email(), request.password());
+    if (user.isTotpEnabled()) {
+      return ResponseEntity.status(HttpStatus.ACCEPTED)
+          .body(new MfaRequiredResponse(jwtService.generateMfa(user.getEmail()), "MFA_REQUIRED"));
+    }
+    return ResponseEntity.ok(withRefresh(user, response));
+  }
+
+  @PostMapping("/mfa/verify")
+  public AuthResponse mfaVerify(
+      @Valid @RequestBody MfaVerifyRequest request, HttpServletResponse response) {
+    String email;
+    try {
+      email = jwtService.requireMfaSubject(request.mfaToken());
+    } catch (JwtException ex) {
+      throw new BadCredentialsException("Invalid MFA token");
+    }
+    User user = users.findByEmail(email)
+        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    if (!user.isTotpEnabled() || !totpService.verify(user.getTotpSecret(), request.code())) {
+      throw new BadCredentialsException("Invalid code");
+    }
     return withRefresh(user, response);
+  }
+
+  @PostMapping("/totp/setup")
+  public TotpSetupResponse totpSetup(Authentication authentication) {
+    User user = userOf(authentication.getName());
+    String secret = totpService.newSecret();
+    user.setTotpSecret(secret);
+    users.save(user);
+    return new TotpSetupResponse(secret, totpService.qrDataUri(totpService.otpauthUri(user.getEmail(), secret)));
+  }
+
+  @PostMapping("/totp/enable")
+  public UserResponse totpEnable(
+      Authentication authentication, @Valid @RequestBody TotpCodeRequest request) {
+    User user = userOf(authentication.getName());
+    if (user.getTotpSecret() == null || !totpService.verify(user.getTotpSecret(), request.code())) {
+      throw new BadCredentialsException("Invalid code");
+    }
+    user.setTotpEnabled(true);
+    users.save(user);
+    return UserResponse.from(user);
+  }
+
+  @PostMapping("/totp/disable")
+  public UserResponse totpDisable(
+      Authentication authentication, @Valid @RequestBody TotpCodeRequest request) {
+    User user = userOf(authentication.getName());
+    if (!user.isTotpEnabled() || !totpService.verify(user.getTotpSecret(), request.code())) {
+      throw new BadCredentialsException("Invalid code");
+    }
+    user.setTotpEnabled(false);
+    user.setTotpSecret(null);
+    users.save(user);
+    return UserResponse.from(user);
   }
 
   @PostMapping("/refresh")
@@ -79,9 +145,11 @@ public class AuthController {
 
   @GetMapping("/me")
   public UserResponse me(Authentication authentication) {
-    return users
-        .findByEmail(authentication.getName())
-        .map(UserResponse::from)
+    return UserResponse.from(userOf(authentication.getName()));
+  }
+
+  private User userOf(String email) {
+    return users.findByEmail(email)
         .orElseThrow(() -> new UsernameNotFoundException("User not found"));
   }
 
