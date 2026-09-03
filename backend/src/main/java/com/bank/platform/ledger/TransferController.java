@@ -1,21 +1,30 @@
 package com.bank.platform.ledger;
 
-import com.bank.platform.accounts.AccountController;
 import com.bank.platform.accounts.AccountRepository;
+import com.bank.platform.ledger.TransferDtos.MonthSummary;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
 import com.bank.platform.ledger.TransferDtos.TransferRequest;
 import com.bank.platform.ledger.TransferDtos.TransferResponse;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.time.LocalDate;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
@@ -44,11 +53,12 @@ public class TransferController {
       Authentication authentication,
       @Valid @RequestBody TransferRequest request,
       @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-    // Default source: the customer's first account (explicit fromAccountId arrives in Part 5).
-    UUID fromId = money.myAccounts(authentication.getName()).stream()
-        .findFirst()
-        .orElseThrow(() -> new IllegalArgumentException("No source account found"))
-        .getId();
+    UUID fromId = request.fromAccountId() != null
+        ? request.fromAccountId()
+        : money.myAccounts(authentication.getName()).stream()
+            .findFirst()
+            .orElseThrow(() -> new IllegalArgumentException("No source account found"))
+            .getId();
     Transaction tx = money.transfer(
         authentication.getName(),
         fromId,
@@ -64,23 +74,66 @@ public class TransferController {
   public Page<TransactionResponse> history(
       Authentication authentication,
       @RequestParam UUID accountId,
-      @PageableDefault(size = 20, sort = "createdAt", direction = org.springframework.data.domain.Sort.Direction.DESC) Pageable pageable) {
+      @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     // Ownership check first: throws 403/404 for foreign or missing accounts.
     money.accountDetail(authentication.getName(), accountId);
     Page<Transaction> page = transactions.findByAccountId(accountId, pageable);
-    java.util.Set<UUID> ids = page.getContent().stream()
+    return page.map(tx -> toDto(tx, ibanMap(page.getContent())));
+  }
+
+  @GetMapping("/accounts/{id}/summary")
+  public List<MonthSummary> summary(
+      Authentication authentication,
+      @PathVariable UUID id,
+      @RequestParam(defaultValue = "6") int months) {
+    return money.summary(authentication.getName(), id, months);
+  }
+
+  @GetMapping("/accounts/{id}/statement.csv")
+  public ResponseEntity<String> statement(Authentication authentication, @PathVariable UUID id) {
+    var account = money.accountDetail(authentication.getName(), id);
+    List<Transaction> rows = transactions
+        .findByAccountId(id, PageRequest.of(0, 5000, Sort.by(Sort.Direction.DESC, "createdAt")))
+        .getContent();
+    Map<UUID, String> ibans = ibanMap(rows);
+
+    StringBuilder csv = new StringBuilder("id,created_at,from_iban,to_iban,amount,currency,memo,status\n");
+    for (Transaction tx : rows) {
+      csv.append(tx.getId()).append(',')
+          .append(tx.getCreatedAt()).append(',')
+          .append(cell(tx.getFromAccountId() == null ? "" : ibans.getOrDefault(tx.getFromAccountId(), ""))).append(',')
+          .append(cell(tx.getToAccountId() == null ? "" : ibans.getOrDefault(tx.getToAccountId(), ""))).append(',')
+          .append(tx.getAmount().toPlainString()).append(',')
+          .append(tx.getCurrency()).append(',')
+          .append(cell(tx.getMemo() == null ? "" : tx.getMemo())).append(',')
+          .append(tx.getStatus()).append('\n');
+    }
+
+    String filename = "statement-" + account.getIban() + "-" + LocalDate.now() + ".csv";
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(filename).build().toString())
+        .contentType(MediaType.parseMediaType("text/csv"))
+        .body(csv.toString());
+  }
+
+  private Map<UUID, String> ibanMap(List<Transaction> rows) {
+    java.util.Set<UUID> ids = rows.stream()
         .flatMap(tx -> java.util.stream.Stream.of(tx.getFromAccountId(), tx.getToAccountId()))
-        .filter(id -> id != null)
+        .filter(value -> value != null)
         .collect(Collectors.toSet());
-    Map<UUID, String> ibans = accounts.findAllById(ids).stream()
+    return accounts.findAllById(ids).stream()
         .collect(Collectors.toMap(a -> a.getId(), a -> a.getIban()));
-    return page.map(tx -> toDto(tx, ibans));
+  }
+
+  private String cell(String value) {
+    return '"' + value.replace("\"", "\"\"") + '"';
   }
 
   private TransferResponse toDto(Transaction tx) {
     Map<UUID, String> ibans = accounts.findAllById(
             java.util.stream.Stream.of(tx.getFromAccountId(), tx.getToAccountId())
-                .filter(id -> id != null)
+                .filter(value -> value != null)
                 .toList())
         .stream()
         .collect(Collectors.toMap(a -> a.getId(), a -> a.getIban()));

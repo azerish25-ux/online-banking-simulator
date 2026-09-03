@@ -1,6 +1,8 @@
 package com.bank.platform.common;
 
 import com.bank.platform.accounts.AccountNotFoundException;
+import com.bank.platform.beneficiaries.BeneficiaryExistsException;
+import com.bank.platform.beneficiaries.BeneficiaryNotFoundException;
 import com.bank.platform.auth.EmailTakenException;
 import com.bank.platform.ledger.InsufficientFundsException;
 import com.bank.platform.ledger.TransferValidationException;
@@ -41,6 +43,16 @@ public class ApiExceptionHandler {
     return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
   }
 
+  @ExceptionHandler(BeneficiaryExistsException.class)
+  public ResponseEntity<Map<String, Object>> beneficiaryConflict(BeneficiaryExistsException ex) {
+    return problem(HttpStatus.CONFLICT, "Beneficiary Exists", ex.getMessage());
+  }
+
+  @ExceptionHandler(BeneficiaryNotFoundException.class)
+  public ResponseEntity<Map<String, Object>> beneficiaryNotFound(BeneficiaryNotFoundException ex) {
+    return problem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
+  }
+
   @ExceptionHandler(AccountNotFoundException.class)
   public ResponseEntity<Map<String, Object>> notFound(AccountNotFoundException ex) {
     return problem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
@@ -70,3 +82,4 @@ public class ApiExceptionHandler {
         "timestamp", Instant.now().toString()));
   }
 }
+

@@ -141,6 +141,36 @@ public class MoneyService {
     return tx;
   }
 
+  /** Monthly inflow/outflow for the last N months (oldest first), zero-filled. */
+  @Transactional(readOnly = true)
+  public java.util.List<com.bank.platform.ledger.TransferDtos.MonthSummary> summary(String email, UUID accountId, int months) {
+    Account account = accountDetail(email, accountId);
+    int window = Math.min(Math.max(months, 1), 24);
+    java.time.YearMonth current = java.time.YearMonth.now(java.time.ZoneOffset.UTC);
+    java.time.Instant since = current.minusMonths(window - 1).atDay(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    java.util.Map<java.time.YearMonth, BigDecimal[]> buckets = new java.util.LinkedHashMap<>();
+    for (int i = window - 1; i >= 0; i--) {
+      buckets.put(current.minusMonths(i), new BigDecimal[] {BigDecimal.ZERO, BigDecimal.ZERO});
+    }
+    for (Transaction tx : transactions.findByAccountSince(accountId, since)) {
+      java.time.YearMonth key = java.time.YearMonth.from(tx.getCreatedAt().atZone(java.time.ZoneOffset.UTC));
+      BigDecimal[] slot = buckets.get(key);
+      if (slot == null) {
+        continue;
+      }
+      if (accountId.equals(tx.getToAccountId())) {
+        slot[0] = slot[0].add(tx.getAmount());
+      }
+      if (accountId.equals(tx.getFromAccountId())) {
+        slot[1] = slot[1].add(tx.getAmount());
+      }
+    }
+    return buckets.entrySet().stream()
+        .map(e -> new com.bank.platform.ledger.TransferDtos.MonthSummary(
+            e.getKey().toString(), e.getValue()[0].toPlainString(), e.getValue()[1].toPlainString()))
+        .toList();
+  }
+
   private User userOf(String email) {
     return users.findByEmail(email).orElseThrow(() -> new UsernameNotFoundException("User not found"));
   }
@@ -170,3 +200,4 @@ public class MoneyService {
     return amount.setScale(4, RoundingMode.HALF_EVEN);
   }
 }
+

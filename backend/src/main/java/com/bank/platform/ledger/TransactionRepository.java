@@ -11,6 +11,10 @@ public interface TransactionRepository extends JpaRepository<Transaction, UUID> 
 
   Optional<Transaction> findByIdempotencyKey(String idempotencyKey);
 
+
+  @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) and t.createdAt >= :since order by t.createdAt asc")
+  java.util.List<Transaction> findByAccountSince(UUID accountId, java.time.Instant since);
   @Query("select t from Transaction t where t.fromAccountId = :accountId or t.toAccountId = :accountId")
   Page<Transaction> findByAccountId(UUID accountId, Pageable pageable);
 }
+

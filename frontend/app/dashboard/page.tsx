@@ -12,6 +12,7 @@ import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useToast } from "../../components/feedback/toast";
+import { SpendingChart, type MonthPoint } from "../../components/charts/spending-chart";
 import { api, type User } from "../../lib/api";
 import { fmtDate, usd } from "../../lib/format";
 
@@ -23,6 +24,7 @@ export default function DashboardPage() {
   const [user, setUser] = React.useState<User | null>(null);
   const [accounts, setAccounts] = React.useState<Account[] | null>(null);
   const [recent, setRecent] = React.useState<Tx[]>([]);
+  const [summary, setSummary] = React.useState<MonthPoint[] | null>(null);
   const [depositOpen, setDepositOpen] = React.useState(false);
   const [depositAmount, setDepositAmount] = React.useState("100.00");
   const [depositing, setDepositing] = React.useState(false);
@@ -35,6 +37,7 @@ export default function DashboardPage() {
     if (accs.length > 0) {
       const page = await api("/v1/transactions?accountId=" + accs[0].id + "&size=5");
       setRecent(page.content ?? []);
+        setSummary(await api("/v1/accounts/" + accs[0].id + "/summary?months=6"));
     }
   }, []);
 
@@ -101,6 +104,18 @@ export default function DashboardPage() {
           ))}
         </div>
       )}
+
+      <Card className="mt-4">
+        <div className="mb-3 flex items-center justify-between">
+          <CardTitle>Money flow · last 6 months</CardTitle>
+          <Link href="/activity" className="text-sm text-brand-300 hover:underline">Full activity</Link>
+        </div>
+        {summary == null ? (
+          <Skeleton className="h-48" />
+        ) : (
+          <SpendingChart data={summary} />
+        )}
+      </Card>
 
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">

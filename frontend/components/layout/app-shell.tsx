@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -9,6 +9,8 @@ import { cn } from "../../lib/cn";
 const NAV = [
   { href: "/dashboard", label: "Overview" },
   { href: "/transfers", label: "Transfers" },
+  { href: "/activity", label: "Activity" },
+  { href: "/beneficiaries", label: "Beneficiaries" },
   { href: "/design", label: "Design system" }
 ];
 
