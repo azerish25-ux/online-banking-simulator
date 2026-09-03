@@ -26,3 +26,5 @@ postgres-data/
 # Maven wrapper distribution (downloaded on first run)
 backend/.mvn/wrapper/apache-maven-*/
 backend/.mvn/wrapper/maven.zip
+frontend/test-results/
+frontend/playwright-report/
