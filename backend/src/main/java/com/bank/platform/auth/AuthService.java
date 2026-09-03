@@ -3,9 +3,9 @@ package com.bank.platform.auth;
 import com.bank.platform.accounts.Account;
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.accounts.AccountType;
+import com.bank.platform.accounts.Iban;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
-import java.security.SecureRandom;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -18,7 +18,6 @@ public class AuthService {
   private final AccountRepository accounts;
   private final AuditLogRepository audits;
   private final PasswordEncoder passwords;
-  private final SecureRandom random = new SecureRandom();
 
   public AuthService(
       UserRepository users,
@@ -38,7 +37,7 @@ public class AuthService {
       throw new EmailTakenException(normalized);
     }
     User user = users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
-    accounts.save(new Account(user.getId(), generateIban(), AccountType.CHECKING));
+    accounts.save(new Account(user.getId(), Iban.uniqueOrThrow(accounts::existsByIban, 5), AccountType.CHECKING));
     audits.save(new AuditLog(user.getId(), "USER_REGISTERED", "User", user.getId().toString()));
     return user;
   }
@@ -54,11 +53,4 @@ public class AuthService {
     return user;
   }
 
-  private String generateIban() {
-    StringBuilder sb = new StringBuilder("DE");
-    for (int i = 0; i < 20; i++) {
-      sb.append(random.nextInt(10));
-    }
-    return sb.toString();
-  }
 }

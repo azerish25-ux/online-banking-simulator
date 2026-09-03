@@ -5,6 +5,7 @@ import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.accounts.AccountStatus;
 import com.bank.platform.accounts.AccountType;
+import com.bank.platform.accounts.Iban;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.User;
@@ -12,7 +13,6 @@ import com.bank.platform.auth.UserRepository;
 import com.bank.platform.notifications.NotificationService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
-import java.security.SecureRandom;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -33,7 +33,6 @@ public class MoneyService {
   private final AuditLogRepository audits;
   private final NotificationService notifications;
   private final BigDecimal reviewThreshold;
-  private final SecureRandom random = new SecureRandom();
 
   public MoneyService(
       UserRepository users,
@@ -74,7 +73,7 @@ public class MoneyService {
       throw new TransferValidationException("Unknown account type: " + type);
     }
     User user = userOf(email);
-    Account account = new Account(user.getId(), generateIban(), accountType);
+    Account account = new Account(user.getId(), Iban.uniqueOrThrow(accounts::existsByIban, 5), accountType);
     if (accountType == AccountType.LOAN) {
       account.setCreditLimit(new BigDecimal("1000.00"));
     }
@@ -83,14 +82,6 @@ public class MoneyService {
     notifications.notify(user.getId(), user.getEmail(), "ACCOUNT_OPENED", "Account opened",
         clean.charAt(0) + clean.substring(1).toLowerCase() + " account " + account.getIban() + " is ready.");
     return account;
-  }
-
-  private String generateIban() {
-    StringBuilder sb = new StringBuilder("DE");
-    for (int i = 0; i < 20; i++) {
-      sb.append(random.nextInt(10));
-    }
-    return sb.toString();
   }
 
   /** Simulated external rail (ATM/teller). Only the owning customer can fund their own account. */

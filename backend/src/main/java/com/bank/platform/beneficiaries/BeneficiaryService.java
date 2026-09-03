@@ -1,5 +1,7 @@
 package com.bank.platform.beneficiaries;
 
+import com.bank.platform.accounts.Iban;
+
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
 import java.util.List;
@@ -33,8 +35,8 @@ public class BeneficiaryService {
     if (cleanName.isEmpty()) {
       throw new IllegalArgumentException("Nickname is required");
     }
-    if (!cleanIban.matches("[A-Z]{2}[0-9A-Z]{11,32}")) {
-      throw new IllegalArgumentException("IBAN looks invalid");
+    if (!Iban.isValid(cleanIban)) {
+      throw new IllegalArgumentException("IBAN failed mod-97 validation");
     }
     if (beneficiaries.existsByUserIdAndIban(user.getId(), cleanIban)) {
       throw new BeneficiaryExistsException(cleanIban);
