@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import * as React from "react";
 import Link from "next/link";
@@ -12,18 +12,15 @@ import { TD, TH, THead, TRow, Table } from "../../../components/ui/table";
 import { useToast } from "../../../components/feedback/toast";
 import { api } from "../../../lib/api";
 import { fmtDate, usd } from "../../../lib/format";
+import type { Account, CardItem, IssuedCard, Tx } from "../../../lib/api-types";
 
-type Account = { id: string; iban: string; type: string; balance: string; status: string };
-type Tx = { id: string; fromIban: string | null; toIban: string | null; amount: string; currency: string; memo: string | null; createdAt: string };
-type CardItem = { id: string; last4: string; expMonth: number; expYear: number; status: string };
-type Issued = { id: string; pan: string; cvv: string; expMonth: number; expYear: number };
 
 export default function AccountDetailPage({ params }: { params: { id: string } }) {
   const { push } = useToast();
   const [account, setAccount] = React.useState<Account | null>(null);
   const [recent, setRecent] = React.useState<Tx[]>([]);
   const [cards, setCards] = React.useState<CardItem[]>([]);
-  const [issued, setIssued] = React.useState<Issued | null>(null);
+  const [issued, setIssued] = React.useState<IssuedCard | null>(null);
   const [issuing, setIssuing] = React.useState(false);
 
   const load = React.useCallback(async () => {
@@ -43,7 +40,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
     setIssuing(true);
     setIssued(null);
     try {
-      const data: Issued = await api("/v1/accounts/" + params.id + "/cards", { method: "POST" });
+      const data: IssuedCard = await api("/v1/accounts/" + params.id + "/cards", { method: "POST" });
       setIssued(data);
       push("Virtual card issued. Copy it now - it is never shown again.", "success");
       setCards(await api("/v1/accounts/" + params.id + "/cards"));
