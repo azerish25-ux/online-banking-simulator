@@ -85,7 +85,7 @@ public class AdminController {
 
   @GetMapping("/users/{id}/accounts")
   public java.util.List<AccountResponse> userAccounts(@PathVariable UUID id) {
-    return accounts.findByUserIdOrderByCreatedAtAsc(id).stream().map(AdminController::toDto).toList();
+    return accounts.findByUserIdOrderByCreatedAtAsc(id).stream().map(com.bank.platform.accounts.AccountMapper::toResponse).toList();
   }
 
   @GetMapping("/transactions")
@@ -107,15 +107,7 @@ public class AdminController {
         .collect(Collectors.toSet());
     Map<UUID, String> ibans = accounts.findAllById(ids).stream()
         .collect(Collectors.toMap(Account::getId, Account::getIban));
-    return page.map(tx -> new TransactionResponse(
-        tx.getId(),
-        tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
-        tx.getToAccountId() == null ? null : ibans.getOrDefault(tx.getToAccountId(), tx.getToAccountId().toString()),
-        tx.getAmount().toPlainString(),
-        tx.getCurrency(),
-        tx.getMemo(),
-        tx.getStatus().name(),
-        tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed()));
+    return page.map(tx -> com.bank.platform.ledger.TransactionMapper.toResponse(tx, ibans));
   }
 
   @GetMapping("/audit-logs")
@@ -137,12 +129,7 @@ public class AdminController {
   public TransactionResponse review(Authentication authentication, @PathVariable UUID id) {
     com.bank.platform.ledger.Transaction tx = adminService.reviewTransaction(authentication.getName(), id);
     Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
-    return new TransactionResponse(
-        tx.getId(),
-        tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
-        tx.getToAccountId() == null ? null : ibans.getOrDefault(tx.getToAccountId(), tx.getToAccountId().toString()),
-        tx.getAmount().toPlainString(), tx.getCurrency(), tx.getMemo(), tx.getStatus().name(),
-        tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
+    return com.bank.platform.ledger.TransactionMapper.toResponse(tx, ibans);
   }
 
   @GetMapping("/reports/daily-totals")
@@ -161,12 +148,12 @@ public class AdminController {
 
   @PostMapping("/accounts/{id}/freeze")
   public AccountResponse freeze(Authentication authentication, @PathVariable UUID id) {
-    return toDto(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.FROZEN));
+    return com.bank.platform.accounts.AccountMapper.toResponse(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.FROZEN));
   }
 
   @PostMapping("/accounts/{id}/unfreeze")
   public AccountResponse unfreeze(Authentication authentication, @PathVariable UUID id) {
-    return toDto(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.ACTIVE));
+    return com.bank.platform.accounts.AccountMapper.toResponse(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.ACTIVE));
   }
 
   private org.springframework.http.ResponseEntity<byte[]> pdf(StatementService.Statement statement) {
@@ -179,9 +166,4 @@ public class AdminController {
         .body(pdf);
   }
 
-  private static AccountResponse toDto(Account account) {
-    return new AccountResponse(
-        account.getId(), account.getIban(), account.getType().name(),
-        account.getBalance().toPlainString(), account.getStatus().name());
-  }
 }

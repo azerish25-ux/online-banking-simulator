@@ -28,7 +28,7 @@ public class AccountController {
 
   @GetMapping
   public List<AccountResponse> mine(Authentication authentication) {
-    return money.myAccounts(authentication.getName()).stream().map(AccountController::toDto).toList();
+    return money.myAccounts(authentication.getName()).stream().map(AccountMapper::toResponse).toList();
   }
 
   public record OpenAccountRequest(@jakarta.validation.constraints.NotBlank String type) {}
@@ -36,26 +36,18 @@ public class AccountController {
   @PostMapping
   @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
   public AccountResponse open(Authentication authentication, @Valid @RequestBody OpenAccountRequest request) {
-    return toDto(money.openAccount(authentication.getName(), request.type()));
+    return AccountMapper.toResponse(money.openAccount(authentication.getName(), request.type()));
   }
 
   @GetMapping("/{id}")
   public AccountResponse detail(Authentication authentication, @PathVariable UUID id) {
-    return toDto(money.accountDetail(authentication.getName(), id));
+    return AccountMapper.toResponse(money.accountDetail(authentication.getName(), id));
   }
 
   @PostMapping("/{id}/deposit")
   public AccountResponse deposit(
       Authentication authentication, @PathVariable UUID id, @Valid @RequestBody DepositRequest request) {
-    return toDto(money.deposit(authentication.getName(), id, new BigDecimal(request.amount())));
+    return AccountMapper.toResponse(money.deposit(authentication.getName(), id, new BigDecimal(request.amount())));
   }
 
-  static AccountResponse toDto(Account account) {
-    return new AccountResponse(
-        account.getId(),
-        account.getIban(),
-        account.getType().name(),
-        account.getBalance().toPlainString(),
-        account.getStatus().name());
-  }
 }

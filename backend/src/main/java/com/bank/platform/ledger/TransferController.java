@@ -70,7 +70,7 @@ public class TransferController {
         request.currency(),
         request.memo(),
         idempotencyKey);
-    return toDto(tx);
+    return TransactionMapper.toTransferResponse(tx, statements.ibanMap(List.of(tx)));
   }
 
   @GetMapping("/transactions")
@@ -86,7 +86,7 @@ public class TransferController {
     java.time.Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
     Page<Transaction> page = transactions.findAll(
         TransactionSpecs.filters(accountId, null, null, fromInstant, toInstant), pageable);
-    return page.map(tx -> toDto(tx, ibanMap(page.getContent())));
+    return page.map(tx -> TransactionMapper.toResponse(tx, ibanMap(page.getContent())));
   }
 
   @GetMapping("/accounts/{id}/summary")
@@ -155,35 +155,5 @@ public class TransferController {
 
   private String cell(String value) {
     return '"' + value.replace("\"", "\"\"") + '"';
-  }
-
-  private TransferResponse toDto(Transaction tx) {
-    Map<UUID, String> ibans = accounts.findAllById(
-            java.util.stream.Stream.of(tx.getFromAccountId(), tx.getToAccountId())
-                .filter(value -> value != null)
-                .toList())
-        .stream()
-        .collect(Collectors.toMap(a -> a.getId(), a -> a.getIban()));
-    return new TransferResponse(
-        tx.getId(),
-        tx.getFromAccountId() == null ? null : ibans.get(tx.getFromAccountId()),
-        tx.getToAccountId() == null ? null : ibans.get(tx.getToAccountId()),
-        tx.getAmount().toPlainString(),
-        tx.getCurrency(),
-        tx.getMemo(),
-        tx.getStatus().name(),
-        tx.getCreatedAt().toString(), tx.isFlagged());
-  }
-
-  private TransactionResponse toDto(Transaction tx, Map<UUID, String> ibans) {
-    return new TransactionResponse(
-        tx.getId(),
-        tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
-        tx.getToAccountId() == null ? null : ibans.getOrDefault(tx.getToAccountId(), tx.getToAccountId().toString()),
-        tx.getAmount().toPlainString(),
-        tx.getCurrency(),
-        tx.getMemo(),
-        tx.getStatus().name(),
-        tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
   }
 }
