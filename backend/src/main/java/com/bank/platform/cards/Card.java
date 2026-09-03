@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -40,6 +41,9 @@ public class Card {
   @Column(nullable = false, length = 32)
   private String status = "ACTIVE";
 
+  @Column(name = "updated_at")
+  private Instant updatedAt;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -55,6 +59,9 @@ public class Card {
     this.expYear = expYear;
   }
 
+  @PreUpdate
+  void touch() { updatedAt = Instant.now(); }
+
   @PrePersist
   void prePersist() {
     if (id == null) id = UUID.randomUUID();
@@ -68,6 +75,7 @@ public class Card {
   public int getExpMonth() { return expMonth; }
   public int getExpYear() { return expYear; }
   public String getStatus() { return status; }
+  public Instant getUpdatedAt() { return updatedAt; }
   public Instant getCreatedAt() { return createdAt; }
   public void setStatus(String v) { status = v; }
 }

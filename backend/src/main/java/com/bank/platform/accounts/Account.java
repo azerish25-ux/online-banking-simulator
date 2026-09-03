@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.math.BigDecimal;
 import java.time.Instant;
@@ -38,6 +39,9 @@ public class Account {
   @Column(name = "last_interest_at")
   private Instant lastInterestAt;
 
+  @Column(name = "updated_at")
+  private Instant updatedAt;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -48,6 +52,9 @@ public class Account {
     this.iban = iban;
     this.type = type;
   }
+
+  @PreUpdate
+  void touch() { updatedAt = Instant.now(); }
 
   @PrePersist
   void prePersist() {
@@ -61,6 +68,7 @@ public class Account {
   public String getType() { return type; }
   public BigDecimal getBalance() { return balance; }
   public String getStatus() { return status; }
+  public Instant getUpdatedAt() { return updatedAt; }
   public void setBalance(BigDecimal v) { balance = v; }
   public void setStatus(String v) { status = v; }
   public BigDecimal getCreditLimit() { return creditLimit; }

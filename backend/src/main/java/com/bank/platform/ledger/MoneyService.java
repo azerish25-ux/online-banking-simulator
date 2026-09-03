@@ -103,6 +103,7 @@ public class MoneyService {
     tx.setAmount(scaled(amount));
     tx.setCurrency("USD");
     tx.setMemo("Simulated deposit");
+    tx.setKind("DEPOSIT");
     transactions.save(tx);
 
     User depositor = userOf(email);
@@ -172,6 +173,7 @@ public class MoneyService {
     tx.setToAccountId(to.getId());
     tx.setAmount(scaled);
     tx.setCurrency(currency == null || currency.isBlank() ? "USD" : currency.trim().toUpperCase());
+    tx.setKind("TRANSFER");
     tx.setMemo(memo);
     tx.setIdempotencyKey(idempotencyKey != null && idempotencyKey.isBlank() ? null : idempotencyKey);
     tx.setFlagged(scaled.compareTo(reviewThreshold) >= 0);

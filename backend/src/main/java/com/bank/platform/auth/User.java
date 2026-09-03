@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
+import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
@@ -28,6 +29,9 @@ public class User {
   @Column(nullable = false, length = 32)
   private String role = "CUSTOMER";
 
+  @Column(name = "updated_at")
+  private Instant updatedAt;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -44,6 +48,9 @@ public class User {
     this.role = role;
   }
 
+  @PreUpdate
+  void touch() { updatedAt = Instant.now(); }
+
   @PrePersist
   void prePersist() {
     if (id == null) id = UUID.randomUUID();
@@ -55,6 +62,7 @@ public class User {
   public String getPasswordHash() { return passwordHash; }
   public String getFullName() { return fullName; }
   public String getRole() { return role; }
+  public Instant getUpdatedAt() { return updatedAt; }
   public Instant getCreatedAt() { return createdAt; }
 }
 

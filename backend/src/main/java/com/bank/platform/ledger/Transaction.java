@@ -35,6 +35,9 @@ public class Transaction {
   @Column(nullable = false, length = 32)
   private String status = "POSTED";
 
+  @Column(nullable = false, length = 16)
+  private String kind = "TRANSFER";
+
   @Column(nullable = false)
   private boolean flagged;
 
@@ -62,6 +65,8 @@ public class Transaction {
   public String getCurrency() { return currency; }
   public String getIdempotencyKey() { return idempotencyKey; }
   public String getStatus() { return status; }
+  public String getKind() { return kind; }
+  public void setKind(String v) { kind = v; }
   public String getMemo() { return memo; }
   public Instant getCreatedAt() { return createdAt; }
 

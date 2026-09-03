@@ -88,6 +88,7 @@ public class InterestService {
       }
       tx.setAmount(delta.abs());
       tx.setCurrency("USD");
+      tx.setKind("INTEREST");
       transactions.save(tx);
       audits.save(new AuditLog(account.getUserId(), "INTEREST_POSTED", "Transaction", tx.getId().toString()));
       users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(
