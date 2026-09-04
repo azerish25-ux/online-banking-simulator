@@ -39,7 +39,10 @@ public class JwtAuthFilter extends OncePerRequestFilter {
               List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));
           SecurityContextHolder.getContext().setAuthentication(auth);
         });
-      } catch (JwtException ex) {
+      } catch (JwtException | IllegalArgumentException ex) {
+        // Malformed input must answer 401 through the security chain, never
+        // escape the filter as a 500: jjwt raises IllegalArgumentException
+        // (not JwtException) for empty or structurally broken tokens.
         SecurityContextHolder.clearContext();
       }
     }

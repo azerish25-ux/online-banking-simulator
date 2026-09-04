@@ -7,6 +7,7 @@ import com.bank.platform.accounts.Iban;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import org.springframework.security.authentication.BadCredentialsException;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,16 +19,22 @@ public class AuthService {
   private final AccountRepository accounts;
   private final AuditLogRepository audits;
   private final PasswordEncoder passwords;
+  private final TotpService totp;
+  private final RefreshTokenRepository refreshTokens;
 
   public AuthService(
       UserRepository users,
       AccountRepository accounts,
       AuditLogRepository audits,
-      PasswordEncoder passwords) {
+      PasswordEncoder passwords,
+      TotpService totp,
+      RefreshTokenRepository refreshTokens) {
     this.users = users;
     this.accounts = accounts;
     this.audits = audits;
     this.passwords = passwords;
+    this.totp = totp;
+    this.refreshTokens = refreshTokens;
   }
 
   @Transactional
@@ -56,4 +63,59 @@ public class AuthService {
     return user;
   }
 
+  /**
+   * Rotates the TOTP secret. Audited; if 2FA was already active, changing the
+   * secret also revokes every refresh token so the account re-authenticates
+   * with the new factor rather than sailing on old sessions.
+   */
+  @Transactional
+  public String startTotpSetup(String email) {
+    User user = userOf(email);
+    String secret = totp.newSecret();
+    user.setTotpSecret(secret);
+    users.save(user);
+    audits.save(metadataAudit(user, "TOTP_SETUP"));
+    if (user.isTotpEnabled()) {
+      refreshTokens.revokeAllByUserId(user.getId());
+    }
+    return secret;
+  }
+
+  @Transactional
+  public User enableTotp(String email, String code) {
+    User user = userOf(email);
+    if (user.getTotpSecret() == null || !totp.verify(user.getTotpSecret(), code)) {
+      throw new BadCredentialsException("Invalid code");
+    }
+    user.setTotpEnabled(true);
+    users.save(user);
+    audits.save(metadataAudit(user, "TOTP_ENABLED"));
+    refreshTokens.revokeAllByUserId(user.getId());
+    return user;
+  }
+
+  @Transactional
+  public User disableTotp(String email, String code) {
+    User user = userOf(email);
+    if (!user.isTotpEnabled() || user.getTotpSecret() == null || !totp.verify(user.getTotpSecret(), code)) {
+      throw new BadCredentialsException("Invalid code");
+    }
+    user.setTotpEnabled(false);
+    user.setTotpSecret(null);
+    users.save(user);
+    audits.save(metadataAudit(user, "TOTP_DISABLED"));
+    refreshTokens.revokeAllByUserId(user.getId());
+    return user;
+  }
+
+  private AuditLog metadataAudit(User user, String action) {
+    AuditLog log = new AuditLog(user.getId(), action, "User", user.getId().toString());
+    log.setMetadata(AuditLog.metadata("email", user.getEmail()));
+    return log;
+  }
+
+  private User userOf(String email) {
+    return users.findByEmail(email)
+        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+  }
 }

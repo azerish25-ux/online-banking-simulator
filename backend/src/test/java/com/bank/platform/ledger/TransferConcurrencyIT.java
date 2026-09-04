@@ -45,6 +45,8 @@ class TransferConcurrencyIT {
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper objectMapper;
   @Autowired AccountRepository accounts;
+  @Autowired com.bank.platform.ledger.InterestService interestService;
+  @Autowired com.bank.platform.ledger.TransactionRepository transactions;
 
   ApiTestClient client;
 
@@ -133,6 +135,58 @@ class TransferConcurrencyIT {
     BigDecimal aliceFinal = accounts.findById(UUID.fromString(aliceId)).orElseThrow().getBalance();
     assertEquals(new BigDecimal("460.0000"), aliceFinal,
         "N replays of one key must move money exactly once");
+  }
+
+  /**
+   * Two overlapping accrual runs (the scheduler at 03:00 colliding with an
+   * admin trigger, or two instances) must post interest exactly once per
+   * account-month - never twice. The candidate rows are locked FOR UPDATE and
+   * re-checked, so the loser of the race skips what the winner already accrued.
+   * Against real PostgreSQL this is the authoritative proof; on H2 the timing
+   * is best-effort, which is why CI runs this file on the Postgres service.
+   */
+  @Test
+  void parallelAccrualPostsInterestExactlyOnce() throws Exception {
+    String alice = client.register("cc-int@example.com", "CC Interest");
+    String savingsId = openAccount(alice, "SAVINGS");
+    client.deposit(alice, savingsId, "1200.00");
+
+    int n = 2;
+    ExecutorService pool = Executors.newFixedThreadPool(n);
+    java.util.concurrent.CountDownLatch start = new java.util.concurrent.CountDownLatch(1);
+    List<Future<Integer>> jobs = new ArrayList<>();
+    for (int i = 0; i < n; i++) {
+      jobs.add(pool.submit((Callable<Integer>) () -> {
+        start.await(10, TimeUnit.SECONDS);
+        return interestService.accrueMonthly().get("accrued");
+      }));
+    }
+    start.countDown();
+    pool.shutdown();
+    assertTrue(pool.awaitTermination(60, TimeUnit.SECONDS), "accrual runs must resolve, not deadlock");
+
+    int totalAccrued = 0;
+    for (Future<Integer> job : jobs) {
+      totalAccrued += job.get();
+    }
+    assertEquals(1, totalAccrued, "two overlapping runs must accrue the account once, not twice");
+    long interestRows = transactions.findByAccountSince(UUID.fromString(savingsId), java.time.Instant.EPOCH)
+        .stream()
+        .filter(tx -> tx.getKind() == com.bank.platform.ledger.TxKind.INTEREST)
+        .count();
+    assertEquals(1L, interestRows, "exactly one INTEREST transaction may exist for the account");
+  }
+
+  private String openAccount(String token, String type) throws Exception {
+    var result = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+            .post("/api/v1/accounts")
+            .header("Authorization", "Bearer " + token)
+            .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+            .content("{\"type\":\"%s\"}".formatted(type)))
+        .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated())
+        .andReturn();
+    return objectMapper.readValue(result.getResponse().getContentAsString(), com.fasterxml.jackson.databind.JsonNode.class)
+        .get("id").asText();
   }
 
   private void mvcPerformTransfer(String token, String toIban, String amount, String key) throws Exception {

@@ -32,11 +32,11 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  const guarded = [Routes.dashboard, Routes.transfers, Routes.activity, Routes.beneficiaries, "/accounts", Routes.notifications];
+  const guarded = [Routes.dashboard, Routes.transfers, Routes.activity, Routes.beneficiaries, "/accounts", Routes.notifications, Routes.settings];
   if (!token && guarded.some((p) => path.startsWith(p))) {
     return NextResponse.redirect(new URL(Routes.login, request.url));
   }
   return NextResponse.next();
 }
 
-export const config = { matcher: ["/dashboard/:path*", "/transfers/:path*", "/activity/:path*", "/beneficiaries/:path*", "/accounts/:path*", "/notifications/:path*", "/admin/:path*"] };
+export const config = { matcher: ["/dashboard/:path*", "/transfers/:path*", "/activity/:path*", "/beneficiaries/:path*", "/accounts/:path*", "/notifications/:path*", "/settings/:path*", "/admin/:path*"] };

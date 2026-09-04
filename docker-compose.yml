@@ -28,8 +28,14 @@ services:
       PG_PASSWORD: ${PG_PASSWORD:-bankapp_secret_change_me}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-0123456789abcdef-0123456789abcdef}
       APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-change-me-admin-123}
-    ports:
-      - "8080:8080"
+      # Auth rate-limit buckets must key on the real client IP, not the proxy's
+      # own address. This is safe ONLY because the API is reachable exclusively
+      # through the Next.js rewrite proxy (no backend host port is published)
+      # and Next stamps X-Forwarded-For from the socket peer, replacing any
+      # client-supplied value (vercel/next.js#57397). If an upstream proxy or
+      # load balancer is ever added in front of Next, revisit this flag: the
+      # added hop must sanitize X-Forwarded-For before it reaches the backend.
+      TRUST_PROXY_HEADERS: "true"
     depends_on:
       db:
         condition: service_healthy

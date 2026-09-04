@@ -19,7 +19,6 @@ import java.time.LocalDate;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -106,7 +105,7 @@ public class CardService {
     User user = userOf(email);
     Account account = accounts.findById(accountId).orElseThrow(() -> new AccountNotFoundException(accountId));
     if (!account.getUserId().equals(user.getId())) {
-      throw new AccessDeniedException("Not your account");
+      throw new AccountNotFoundException(accountId);
     }
     return account;
   }

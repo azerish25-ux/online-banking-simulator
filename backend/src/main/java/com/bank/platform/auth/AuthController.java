@@ -8,7 +8,6 @@ import com.bank.platform.security.JwtService;
 import io.jsonwebtoken.JwtException;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.HttpHeaders;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -50,11 +49,6 @@ public class AuthController {
     this.cookieSecure = cookieSecure;
   }
 
-  public record MfaRequiredResponse(String mfaToken, String message) {}
-  public record MfaVerifyRequest(@NotBlank String mfaToken, @NotBlank String code) {}
-  public record TotpCodeRequest(@NotBlank String code) {}
-  public record TotpSetupResponse(String secret, String qrDataUri) {}
-
   @PostMapping("/register")
   @ResponseStatus(HttpStatus.CREATED)
   public AuthResponse register(
@@ -69,14 +63,14 @@ public class AuthController {
     User user = authService.login(request.email(), request.password());
     if (user.isTotpEnabled()) {
       return ResponseEntity.status(HttpStatus.ACCEPTED)
-          .body(new MfaRequiredResponse(jwtService.generateMfa(user.getEmail()), "MFA_REQUIRED"));
+          .body(new AuthDtos.MfaRequiredResponse(jwtService.generateMfa(user.getEmail()), "MFA_REQUIRED"));
     }
     return ResponseEntity.ok(withRefresh(user, response));
   }
 
   @PostMapping("/mfa/verify")
   public AuthResponse mfaVerify(
-      @Valid @RequestBody MfaVerifyRequest request, HttpServletResponse response) {
+      @Valid @RequestBody AuthDtos.MfaVerifyRequest request, HttpServletResponse response) {
     String email;
     try {
       email = jwtService.requireMfaSubject(request.mfaToken());
@@ -92,37 +86,22 @@ public class AuthController {
   }
 
   @PostMapping("/totp/setup")
-  public TotpSetupResponse totpSetup(Authentication authentication) {
-    User user = userOf(authentication.getName());
-    String secret = totpService.newSecret();
-    user.setTotpSecret(secret);
-    users.save(user);
-    return new TotpSetupResponse(secret, totpService.qrDataUri(totpService.otpauthUri(user.getEmail(), secret)));
+  public AuthDtos.TotpSetupResponse totpSetup(Authentication authentication) {
+    String email = authentication.getName();
+    String secret = authService.startTotpSetup(email);
+    return new AuthDtos.TotpSetupResponse(secret, totpService.qrDataUri(totpService.otpauthUri(email, secret)));
   }
 
   @PostMapping("/totp/enable")
   public UserResponse totpEnable(
-      Authentication authentication, @Valid @RequestBody TotpCodeRequest request) {
-    User user = userOf(authentication.getName());
-    if (user.getTotpSecret() == null || !totpService.verify(user.getTotpSecret(), request.code())) {
-      throw new BadCredentialsException("Invalid code");
-    }
-    user.setTotpEnabled(true);
-    users.save(user);
-    return UserResponse.from(user);
+      Authentication authentication, @Valid @RequestBody AuthDtos.TotpCodeRequest request) {
+    return UserResponse.from(authService.enableTotp(authentication.getName(), request.code()));
   }
 
   @PostMapping("/totp/disable")
   public UserResponse totpDisable(
-      Authentication authentication, @Valid @RequestBody TotpCodeRequest request) {
-    User user = userOf(authentication.getName());
-    if (!user.isTotpEnabled() || !totpService.verify(user.getTotpSecret(), request.code())) {
-      throw new BadCredentialsException("Invalid code");
-    }
-    user.setTotpEnabled(false);
-    user.setTotpSecret(null);
-    users.save(user);
-    return UserResponse.from(user);
+      Authentication authentication, @Valid @RequestBody AuthDtos.TotpCodeRequest request) {
+    return UserResponse.from(authService.disableTotp(authentication.getName(), request.code()));
   }
 
   @PostMapping("/refresh")
@@ -167,12 +146,19 @@ public class AuthController {
   private AuthResponse toAuthResponse(RefreshService.TokenPair pair) {
     User user = pair.user();
     return new AuthResponse(pair.accessToken(), "Bearer",
-        jwtService.getAccessMinutes() * 60, UserResponse.from(user));
+        jwtService.getAccessSeconds(), UserResponse.from(user));
   }
 
+  /**
+   * The browser never calls the backend directly: every request goes through
+   * the Next.js rewrite proxy at /backend/*, so the cookie must be scoped to
+   * the path the browser actually requests. Scoping it to /api/v1/auth (the
+   * backend's own route) would mean the cookie never leaves the browser and
+   * every session would die at access-token expiry.
+   */
   private String refreshCookie(String value, long maxAge) {
     String cookie = RefreshService.COOKIE + "=" + value
-        + "; Path=/api/v1/auth; Max-Age=" + maxAge + "; HttpOnly; SameSite=Lax";
+        + "; Path=/backend/v1/auth; Max-Age=" + maxAge + "; HttpOnly; SameSite=Lax";
     return cookieSecure ? cookie + "; Secure" : cookie;
   }
 }

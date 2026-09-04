@@ -1,6 +1,6 @@
 package com.bank.platform.cards;
 
-import java.time.Instant;
+import com.bank.platform.common.ApiExceptionHandler;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -61,11 +61,6 @@ public class CardController {
 
   @ExceptionHandler(CardNotFoundException.class)
   public ResponseEntity<Map<String, Object>> notFound(CardNotFoundException ex) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-        "type", "https://bank.local/problems/404",
-        "title", "Not Found",
-        "status", 404,
-        "detail", ex.getMessage(),
-        "timestamp", Instant.now().toString()));
+    return ApiExceptionHandler.response(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 }

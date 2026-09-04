@@ -25,6 +25,10 @@ app:
   jwt:
     secret: ${JWT_SECRET:dev-only-change-me-0123456789abcdef-0123456789abcdef-0123456789abcdef}
     access-minutes: 15
+    # E2E-only override (defaults 0 = off): when > 0 it wins over
+    # access-minutes so the browser suite can prove silent refresh across a
+    # real expiry in seconds instead of waiting 15 minutes.
+    access-seconds: ${APP_JWT_ACCESS_SECONDS:0}
   admin:
     email: ${APP_ADMIN_EMAIL:admin@bank.local}
     password: ${APP_ADMIN_PASSWORD:change-me-admin-123}
@@ -55,6 +59,5 @@ management:
       show-details: always
 info:
   app:
-    name: bank-platform
-    version: 1.0.0
-    part: "hardening"
+    name: Online Banking Simulator
+    version: 1.2.0

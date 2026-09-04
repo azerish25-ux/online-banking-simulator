@@ -157,8 +157,12 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - working-directory: backend
         run: ./mvnw -B -DskipTests package
+      # APP_JWT_ACCESS_SECONDS=3 shrinks access tokens to seconds so the whole
+      # browser suite runs past real expiries: every spec's authed calls must
+      # silently refresh + retry (session.spec.ts waits out the TTL on purpose;
+      # the other specs would fail outright if silent refresh were broken).
       - working-directory: backend
-        run: PG_PASSWORD=ci-secret JWT_SECRET=ci-jwt-secret-0123456789abcdef-0123456789abcdef java -jar target/platform-*.jar & echo $! > app.pid
+        run: PG_PASSWORD=ci-secret JWT_SECRET=ci-jwt-secret-0123456789abcdef-0123456789abcdef APP_JWT_ACCESS_SECONDS=3 java -jar target/platform-*.jar & echo $! > app.pid
       - run: for i in $(seq 1 36); do curl -sf http://localhost:8080/api/health && break || sleep 5; done
       # Seed the two demo users the a11y specs log in with (idempotent on re-run).
       - run: |
@@ -174,7 +178,7 @@ jobs:
       - working-directory: frontend
         run: npx playwright install chromium
       - working-directory: frontend
-        run: npx playwright test
+        run: E2E_ACCESS_TTL_SECONDS=3 npx playwright test
       - name: Stop backend
         working-directory: backend
         run: kill $(cat app.pid)
