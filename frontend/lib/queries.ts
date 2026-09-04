@@ -7,11 +7,14 @@ import {
   type UseMutationResult,
   type UseQueryResult
 } from "@tanstack/react-query";
+import * as React from "react";
 import { ApiError, api } from "./api";
 import type {
   Account,
+  Audit,
   Beneficiary,
   CardItem,
+  DayTotal,
   IssuedCard,
   MonthPoint,
   NotificationItem,
@@ -37,14 +40,14 @@ export const queryKeys = {
     ["transactions", accountId, page, from ?? "", to ?? ""] as const,
   summary: (accountId: string, months: number) => ["summary", accountId, months] as const,
   beneficiaries: ["beneficiaries"] as const,
-  notifications: ["notifications"] as const,
+  notifications: (page: number) => ["notifications", page] as const,
   unreadCount: ["notifications", "unread"] as const,
   cards: (accountId: string) => ["cards", accountId] as const,
   admin: {
-    users: (q: string) => ["admin", "users", q] as const,
+    users: (q: string, page: number) => ["admin", "users", q, page] as const,
     transactions: ["admin", "transactions"] as const,
     reviewQueue: ["admin", "review-queue"] as const,
-    audits: (action: string) => ["admin", "audits", action] as const,
+    audits: (action: string, page: number) => ["admin", "audits", action, page] as const,
     dailyTotals: ["admin", "daily-totals"] as const,
     userAccounts: (userId: string) => ["admin", "user-accounts", userId] as const
   }
@@ -100,13 +103,10 @@ export function useBeneficiaries(): UseQueryResult<Beneficiary[], ApiError> {
   });
 }
 
-export function useNotifications(): UseQueryResult<NotificationItem[], ApiError> {
+export function useNotifications(page = 0): UseQueryResult<Page<NotificationItem>, ApiError> {
   return useQuery({
-    queryKey: queryKeys.notifications,
-    queryFn: async () => {
-      const page = await api<Page<NotificationItem>>("/v1/notifications?size=30");
-      return page.content ?? [];
-    }
+    queryKey: queryKeys.notifications(page),
+    queryFn: () => api<Page<NotificationItem>>("/v1/notifications?page=" + page + "&size=10")
   });
 }
 
@@ -116,7 +116,11 @@ export function useUnreadCount(): UseQueryResult<number, ApiError> {
     queryFn: async () => {
       const r = await api<{ unread?: number }>("/v1/notifications/unread-count");
       return r.unread ?? 0;
-    }
+    },
+    // Incoming money, interest and card events arrive server-side, so this
+    // client cannot know to invalidate them. A light poll keeps the badge
+    // honest without churning the bigger queries.
+    refetchInterval: 30_000
   });
 }
 
@@ -150,6 +154,8 @@ export function useDeposit(): UseMutationResult<Account, ApiError, { accountId: 
       void qc.invalidateQueries({ queryKey: ["transactions"] });
       void qc.invalidateQueries({ queryKey: ["summary"] });
       void qc.invalidateQueries({ queryKey: ["public-stats"] });
+      // A deposit posts a DEPOSIT_POSTED notification for this user.
+      void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
     }
   });
 }
@@ -161,28 +167,52 @@ export interface TransferInput {
   memo?: string;
 }
 
-/** Transfer → refresh accounts, history, summary, notifications, hero. */
-export function useTransfer(): UseMutationResult<
-  { id: string; toIban: string; amount: string; flagged?: boolean },
-  ApiError,
-  TransferInput
-> {
+/**
+ * Transfer → refresh accounts, history, summary, notifications, hero.
+ *
+ * Idempotency-key lifecycle: one key per *logical send intent*. The key is
+ * minted on the first attempt and reused across retries (network failures,
+ * 5xx) so a retry can never double-post - the server returns the original
+ * row. The key is dropped after success, after a definitive client error
+ * (4xx - retrying would repeat a rejected transfer), or when the user edits
+ * the form (a new intent needs a new key).
+ */
+export type TransferMutation = UseMutationResult<Tx, ApiError, TransferInput> & {
+  resetIdempotencyKey: () => void;
+};
+
+export function useTransfer(): TransferMutation {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input) =>
-      api("/v1/transfers", {
+  const keyRef = React.useRef<string | null>(null);
+  const resetIdempotencyKey = React.useCallback(() => {
+    keyRef.current = null;
+  }, []);
+  const mutation = useMutation<Tx, ApiError, TransferInput>({
+    mutationFn: (input) => {
+      const key = keyRef.current ?? (keyRef.current = crypto.randomUUID());
+      return api<Tx>("/v1/transfers", {
         method: "POST",
-        headers: { "Idempotency-Key": crypto.randomUUID() },
+        headers: { "Idempotency-Key": key },
         body: JSON.stringify({ ...input, memo: input.memo || undefined })
-      }),
+      });
+    },
     onSuccess: () => {
+      keyRef.current = null;
       void qc.invalidateQueries({ queryKey: queryKeys.accounts });
       void qc.invalidateQueries({ queryKey: ["transactions"] });
       void qc.invalidateQueries({ queryKey: ["summary"] });
       void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
       void qc.invalidateQueries({ queryKey: ["public-stats"] });
+    },
+    onError: (err) => {
+      if (err instanceof ApiError && err.status < 500) {
+        // Definitive rejection (validation, funds, conflict): a retry with
+        // the same key would only fail again - start a fresh intent.
+        keyRef.current = null;
+      }
     }
   });
+  return Object.assign(mutation, { resetIdempotencyKey });
 }
 
 export function useOpenAccount(): UseMutationResult<Account, ApiError, string> {
@@ -190,7 +220,11 @@ export function useOpenAccount(): UseMutationResult<Account, ApiError, string> {
   return useMutation({
     mutationFn: (type) =>
       api<Account>("/v1/accounts", { method: "POST", body: JSON.stringify({ type }) }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.accounts })
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      // Opening an account posts an ACCOUNT_OPENED notification.
+      void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
+    }
   });
 }
 
@@ -215,12 +249,25 @@ export function useRemoveBeneficiary(): UseMutationResult<void, ApiError, string
   });
 }
 
-export function useMarkNotificationRead(): UseMutationResult<void, ApiError, string> {
+export function useMarkNotificationRead(): UseMutationResult<NotificationItem, ApiError, string> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id) => api<void>("/v1/notifications/" + id + "/read", { method: "POST" }),
+    mutationFn: (id) =>
+      api<NotificationItem>("/v1/notifications/" + id + "/read", { method: "POST" }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.notifications });
+      void qc.invalidateQueries({ queryKey: ["notifications"] });
+      void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
+    }
+  });
+}
+
+/** Bulk mark-read - one server round trip, not one per unread notification. */
+export function useMarkAllRead(): UseMutationResult<{ marked?: number }, ApiError, void> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => api<{ marked?: number }>("/v1/notifications/read-all", { method: "POST" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["notifications"] });
       void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
     }
   });
@@ -235,7 +282,11 @@ export function useIssueCard(): UseMutationResult<
   return useMutation({
     mutationFn: (accountId) =>
       api<IssuedCard>("/v1/accounts/" + accountId + "/cards", { method: "POST" }),
-    onSuccess: (_data, accountId) => void qc.invalidateQueries({ queryKey: queryKeys.cards(accountId) })
+    onSuccess: (_data, accountId) => {
+      void qc.invalidateQueries({ queryKey: queryKeys.cards(accountId) });
+      // Issuing a card posts a CARD_ISSUED notification.
+      void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
+    }
   });
 }
 
@@ -256,12 +307,39 @@ export function useSetCardStatus(): UseMutationResult<
   });
 }
 
+// ---- security (TOTP) ----
+
+export function useTotpSetup(): UseMutationResult<{ secret: string; qrDataUri: string }, ApiError, void> {
+  return useMutation({
+    mutationFn: () => api<{ secret: string; qrDataUri: string }>("/v1/auth/totp/setup", { method: "POST" })
+  });
+}
+
+export function useTotpEnable(): UseMutationResult<User, ApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code) =>
+      api<User>("/v1/auth/totp/enable", { method: "POST", body: JSON.stringify({ code }) }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.me })
+  });
+}
+
+export function useTotpDisable(): UseMutationResult<User, ApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (code) =>
+      api<User>("/v1/auth/totp/disable", { method: "POST", body: JSON.stringify({ code }) }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: queryKeys.me })
+  });
+}
+
 // ---- admin ----
 
-export function useAdminUsers(q: string): UseQueryResult<Page<User>, ApiError> {
+export function useAdminUsers(q: string, page = 0): UseQueryResult<Page<User>, ApiError> {
   return useQuery({
-    queryKey: queryKeys.admin.users(q),
-    queryFn: () => api<Page<User>>("/v1/admin/users?q=" + encodeURIComponent(q) + "&size=20")
+    queryKey: queryKeys.admin.users(q, page),
+    queryFn: () =>
+      api<Page<User>>("/v1/admin/users?q=" + encodeURIComponent(q) + "&size=5&page=" + page)
   });
 }
 
@@ -285,20 +363,20 @@ export function useAdminTransactions(): UseQueryResult<Tx[], ApiError> {
   });
 }
 
-export function useAdminAudits(action: string): UseQueryResult<Page<import("./api-types").Audit>, ApiError> {
+export function useAdminAudits(action: string, page = 0): UseQueryResult<Page<Audit>, ApiError> {
   return useQuery({
-    queryKey: queryKeys.admin.audits(action),
+    queryKey: queryKeys.admin.audits(action, page),
     queryFn: () =>
-      api<Page<import("./api-types").Audit>>(
-        "/v1/admin/audit-logs?size=15" + (action ? "&action=" + encodeURIComponent(action) : "")
+      api<Page<Audit>>(
+        "/v1/admin/audit-logs?size=10&page=" + page + (action ? "&action=" + encodeURIComponent(action) : "")
       )
   });
 }
 
-export function useAdminDailyTotals(): UseQueryResult<import("./api-types").DayTotal[], ApiError> {
+export function useAdminDailyTotals(): UseQueryResult<DayTotal[], ApiError> {
   return useQuery({
     queryKey: queryKeys.admin.dailyTotals,
-    queryFn: () => api<import("./api-types").DayTotal[]>("/v1/admin/reports/daily-totals?days=14")
+    queryFn: () => api<DayTotal[]>("/v1/admin/reports/daily-totals?days=14")
   });
 }
 
@@ -314,6 +392,18 @@ export function useReviewTransaction(): UseMutationResult<Tx, ApiError, string> 
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id) => api<Tx>("/v1/admin/transactions/" + id + "/review", { method: "POST" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: queryKeys.admin.reviewQueue });
+      void qc.invalidateQueries({ queryKey: ["transactions"] });
+    }
+  });
+}
+
+/** Declines a HELD transfer; nothing has moved, so no money ever leaves the sender. */
+export function useDeclineTransaction(): UseMutationResult<Tx, ApiError, string> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id) => api<Tx>("/v1/admin/transactions/" + id + "/decline", { method: "POST" }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: queryKeys.admin.reviewQueue });
       void qc.invalidateQueries({ queryKey: ["transactions"] });

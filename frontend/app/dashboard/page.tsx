@@ -12,6 +12,7 @@ import { Field, Input } from "../../components/ui/input";
 import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
+import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { useToast } from "../../components/feedback/toast";
 import { SpendingChart } from "../../components/charts/spending-chart";
 import { Routes } from "../../lib/routes";
@@ -23,7 +24,8 @@ import {
   useSummary,
   useTransactions
 } from "../../lib/queries";
-import { fmtDate, usd } from "../../lib/format";
+import { fmtDate, signedUsd, usd, usdFromCents, decimalToCents } from "../../lib/format";
+import { depositSchema } from "../../lib/validation";
 
 export default function DashboardPage() {
   const { push } = useToast();
@@ -43,6 +45,7 @@ export default function DashboardPage() {
   const [openOpen, setOpenOpen] = React.useState(false);
   const [newType, setNewType] = React.useState("SAVINGS");
   const [depositAmount, setDepositAmount] = React.useState("100.00");
+  const [depositError, setDepositError] = React.useState<string | undefined>(undefined);
 
   // Errors surface through toasts once per failed mutation, not on every render.
   React.useEffect(() => {
@@ -50,13 +53,16 @@ export default function DashboardPage() {
     if (openAccount.isError) push(openAccount.error.message, "error");
   }, [deposit.isError, deposit.error, openAccount.isError, openAccount.error, push]);
 
+  // The amount the successful deposit actually used lives in a ref, so the
+  // effect fires exactly once per success without stale-closure suppression.
+  const lastDepositAmount = React.useRef("0");
   React.useEffect(() => {
     if (deposit.isSuccess) {
-      push("Deposited " + usd(depositAmount) + " (simulated rail).", "success");
+      push("Deposited " + usd(lastDepositAmount.current) + " (simulated rail).", "success");
       setDepositOpen(false);
+      setDepositError(undefined);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deposit.isSuccess]);
+  }, [deposit.isSuccess, push]);
 
   React.useEffect(() => {
     if (openAccount.isSuccess) {
@@ -69,19 +75,27 @@ export default function DashboardPage() {
   const accs = accounts.data;
   const primaryAccount = accs?.[0];
 
-  async function submitDeposit() {
+  function submitDeposit() {
     if (!primaryAccount) return;
+    const parsed = depositSchema.safeParse({ amount: depositAmount });
+    if (!parsed.success) {
+      setDepositError(parsed.error.issues[0]?.message ?? "Enter a valid amount");
+      return;
+    }
+    setDepositError(undefined);
+    lastDepositAmount.current = depositAmount;
     deposit.mutate({ accountId: primaryAccount.id, amount: depositAmount });
   }
 
-  async function submitOpenAccount() {
+  function submitOpenAccount() {
     openAccount.mutate(newType);
   }
 
-  // Total is computed on the decimal strings via usd() - no float slips in.
-  const totalCents = (accs ?? [])
-    .map((a) => usd(a.balance).replace(/[$,]/g, ""))
-    .reduce<number | null>((sum, n) => (sum === null ? parseFloat(n) : sum + parseFloat(n)), null);
+  // Exact total: integer-cents arithmetic over the server's decimal strings -
+  // no float ever sums the ledger. A loan's negative balance counts as debt,
+  // so the card reads as a net figure across all accounts.
+  const totalCents = (accs ?? []).reduce((sum, a) => sum + decimalToCents(a.balance), 0n);
+  const hasLoan = (accs ?? []).some((a) => a.type === "LOAN");
 
   return (
     <AppShell>
@@ -108,19 +122,35 @@ export default function DashboardPage() {
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
-            <CardDescription>Total balance</CardDescription>
-            <p className="mt-1 text-3xl font-bold tabular-nums">{usd(totalCents ?? 0)}</p>
+            <CardDescription>{hasLoan ? "Net position across accounts" : "Total across accounts"}</CardDescription>
+            <p className="mt-1 text-3xl font-bold tabular-nums">{usdFromCents(totalCents)}</p>
           </Card>
-          {accs.map((a) => (
-            <Card key={a.id}>
-              <div className="flex items-center justify-between">
-                <Link href={Routes.account(a.id)}><CardTitle className="hover:underline">{a.type} <ArrowRight size={14} aria-hidden="true" className="inline" /></CardTitle></Link>
-                <Badge tone={a.status === "ACTIVE" ? "success" : "neutral"}>{a.status}</Badge>
-              </div>
-              <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(a.balance)}</p>
-              <p className="mono muted mt-2">{a.iban}</p>
-            </Card>
-          ))}
+          {accs.map((a) => {
+            // A drawn loan (negative balance) is debt, so its card must not
+            // read as a drained balance: show the magnitude in the danger tone
+            // under an explicit "Outstanding loan" label. Undrawn/positive
+            // loans keep the plain balance treatment.
+            const isOutstandingLoan = a.type === "LOAN" && decimalToCents(a.balance) < 0n;
+            return (
+              <Card key={a.id}>
+                <div className="flex items-center justify-between">
+                  <Link href={Routes.account(a.id)}><CardTitle className="hover:underline">{a.type} <ArrowRight size={14} aria-hidden="true" className="inline" /></CardTitle></Link>
+                  <Badge tone={a.status === "ACTIVE" ? "success" : "neutral"}>{a.status}</Badge>
+                </div>
+                {isOutstandingLoan ? (
+                  <>
+                    <p className="caps muted mt-2 text-xs">Outstanding loan - amount you owe</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums text-rose">{usdFromCents(-decimalToCents(a.balance))}</p>
+                  </>
+                ) : (
+                  <>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums">{usd(a.balance)}</p>
+                    <p className="mono muted mt-2">{a.iban}</p>
+                  </>
+                )}
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -149,7 +179,7 @@ export default function DashboardPage() {
           <Table>
             <THead>
               <TRow>
-                <TH>When</TH><TH>From</TH><TH>To</TH><TH className="text-right">Amount</TH><TH>Status</TH>
+                <TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH>
               </TRow>
             </THead>
             <tbody>
@@ -159,8 +189,8 @@ export default function DashboardPage() {
                   <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEPOSIT"}</TD>
                   <TD className="mono">{t.toIban ? "..." + t.toIban.slice(-6) : "-"}</TD>
                   <TD className="max-w-40 truncate">{t.memo ?? "-"}</TD>
-                  <TD className="text-right font-semibold tabular-nums">{usd(t.amount)}</TD>
-                  <TD>{t.flagged ? <Badge tone="warning">FLAGGED</Badge> : <Badge tone="success">POSTED</Badge>}</TD>
+                  <TD><TxStatusBadge status={t.status} /></TD>
+                  <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, primaryAccount?.iban ?? "")}</TD>
                 </TRow>
               ))}
             </tbody>
@@ -169,31 +199,42 @@ export default function DashboardPage() {
       </Card>
 
       <Modal open={openOpen} onClose={() => setOpenOpen(false)} title="Open account">
-        <Field label="Account type">
-          <select aria-label="Account type" value={newType} onChange={(e) => setNewType(e.target.value)} className="h-10 w-full rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none">
-            <option value="CHECKING">Checking - everyday money</option>
-            <option value="SAVINGS">Savings - earns monthly interest</option>
-            <option value="LOAN">Loan - borrow up to $1,000</option>
-          </select>
-        </Field>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setOpenOpen(false)}>Cancel</Button>
-          <Button onClick={submitOpenAccount} disabled={openAccount.isPending}>
-            {openAccount.isPending ? "Opening..." : "Open"}
-          </Button>
-        </div>
+        <form onSubmit={(e) => { e.preventDefault(); submitOpenAccount(); }} className="space-y-4">
+          <Field label="Account type">
+            <select aria-label="Account type" value={newType} onChange={(e) => setNewType(e.target.value)} className="h-10 w-full rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none">
+              <option value="CHECKING">Checking - everyday money</option>
+              <option value="SAVINGS">Savings - earns monthly interest</option>
+              <option value="LOAN">Loan - borrow up to $1,000</option>
+            </select>
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setOpenOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={openAccount.isPending}>
+              {openAccount.isPending ? "Opening..." : "Open"}
+            </Button>
+          </div>
+        </form>
       </Modal>
 
       <Modal open={depositOpen} onClose={() => setDepositOpen(false)} title="Simulate deposit">
-        <Field label="Amount (USD)" hint="Demo rail: funds appear instantly.">
-          <Input value={depositAmount} onChange={(e) => setDepositAmount(e.target.value)} inputMode="decimal" />
-        </Field>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setDepositOpen(false)}>Cancel</Button>
-          <Button onClick={submitDeposit} disabled={deposit.isPending}>
-            {deposit.isPending ? "Depositing..." : "Deposit"}
-          </Button>
-        </div>
+        <form onSubmit={(e) => { e.preventDefault(); submitDeposit(); }} className="space-y-4">
+          <Field label="Amount (USD)" hint="Demo rail: funds appear instantly." error={depositError}>
+            <Input
+              value={depositAmount}
+              onChange={(e) => {
+                setDepositAmount(e.target.value);
+                setDepositError(undefined);
+              }}
+              inputMode="decimal"
+            />
+          </Field>
+          <div className="flex justify-end gap-2">
+            <Button type="button" variant="secondary" onClick={() => setDepositOpen(false)}>Cancel</Button>
+            <Button type="submit" disabled={deposit.isPending}>
+              {deposit.isPending ? "Depositing..." : "Deposit"}
+            </Button>
+          </div>
+        </form>
       </Modal>
     </AppShell>
   );

@@ -3,25 +3,27 @@
 import { ArrowLeft, ArrowRight } from "lucide-react";
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field, Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
+import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { useToast } from "../../components/feedback/toast";
-import { api, getToken } from "../../lib/api";
 import { useAccounts, useTransactions } from "../../lib/queries";
 import { statementUrl } from "../../lib/statements";
-import { fmtDate, usd } from "../../lib/format";
+import { downloadAuthed } from "../../lib/download";
+import { fmtDate, signedUsd } from "../../lib/format";
 
 const SIZE = 10;
 
 export default function ActivityPage() {
   const { push } = useToast();
   const accounts = useAccounts();
-  const accountId = accounts.data?.[0]?.id ?? "";
+  // The selector is real state: choosing an account drives history + exports.
+  const [selectedId, setSelectedId] = React.useState("");
+  const accountId = selectedId || accounts.data?.[0]?.id || "";
   const [from, setFrom] = React.useState("");
   const [to, setTo] = React.useState("");
   const [applied, setApplied] = React.useState({ from: "", to: "" });
@@ -29,19 +31,15 @@ export default function ActivityPage() {
 
   const page = useTransactions(accountId, index, SIZE, applied.from, applied.to);
 
+  function selectAccount(id: string) {
+    setSelectedId(id);
+    setIndex(0);
+  }
+
   async function download(kind: "csv" | "pdf") {
+    if (!accountId) return;
     try {
-      const res = await fetch(statementUrl(accountId, kind, applied), {
-        headers: { Authorization: "Bearer " + (getToken() ?? "") }
-      });
-      if (!res.ok) throw new Error("Export failed: " + res.status);
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = "statement." + kind;
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadAuthed(statementUrl(accountId, kind, applied), "statement." + kind);
       push("Statement downloaded.", "success");
     } catch (e) {
       push(e instanceof Error ? e.message : "Export failed", "error");
@@ -60,6 +58,9 @@ export default function ActivityPage() {
 
   const rows = page.data?.content ?? [];
   const totalPages = page.data?.totalPages ?? 1;
+  // Ledger direction needs the viewed account's IBAN: inbound rows are
+  // credits, outbound rows are debits, regardless of who else is in the row.
+  const viewedAccount = (accounts.data ?? []).find((a) => a.id === accountId);
 
   return (
     <AppShell>
@@ -72,9 +73,10 @@ export default function ActivityPage() {
           <select
             aria-label="Account"
             value={accountId}
-            onChange={() => setIndex(0)}
+            onChange={(e) => selectAccount(e.target.value)}
             className="h-10 rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none"
           >
+            {(accounts.data ?? []).length === 0 && <option value="">No accounts</option>}
             {(accounts.data ?? []).map((a) => (
               <option key={a.id} value={a.id}>{a.type} ...{a.iban.slice(-6)}</option>
             ))}
@@ -115,8 +117,8 @@ export default function ActivityPage() {
                     <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEPOSIT"}</TD>
                     <TD className="mono">{t.toIban ? "..." + t.toIban.slice(-6) : "-"}</TD>
                     <TD className="max-w-48 truncate">{t.memo ?? "-"}</TD>
-                    <TD>{t.flagged ? <Badge tone="danger">FLAGGED</Badge> : <span className="muted text-xs">posted</span>}</TD>
-                    <TD className="text-right font-semibold tabular-nums">{usd(t.amount)}</TD>
+                    <TD><TxStatusBadge status={t.status} /></TD>
+                    <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, viewedAccount?.iban ?? "")}</TD>
                   </TRow>
                 ))}
               </tbody>
