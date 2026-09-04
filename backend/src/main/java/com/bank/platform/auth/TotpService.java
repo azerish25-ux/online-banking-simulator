@@ -1,5 +1,6 @@
 package com.bank.platform.auth;
 
+import com.bank.platform.common.Brand;
 import com.google.zxing.BarcodeFormat;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.qrcode.QRCodeWriter;
@@ -11,6 +12,8 @@ import dev.samstevens.totp.secret.SecretGenerator;
 import dev.samstevens.totp.time.SystemTimeProvider;
 import dev.samstevens.totp.time.TimeProvider;
 import java.io.ByteArrayOutputStream;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 import org.springframework.stereotype.Service;
 
@@ -48,7 +51,15 @@ public class TotpService {
   }
 
   public String otpauthUri(String email, String secret) {
-    return "otpauth://totp/Northbank:" + email + "?secret=" + secret + "&issuer=Northbank&digits=6&period=30";
+    String issuer = Brand.NAME;
+    // Label and issuer are percent-encoded: the brand name contains spaces and
+    // must not corrupt the URI for authenticator apps.
+    return "otpauth://totp/" + enc(issuer + ":" + email)
+        + "?secret=" + secret + "&issuer=" + enc(issuer) + "&digits=6&period=30";
+  }
+
+  private static String enc(String value) {
+    return URLEncoder.encode(value, StandardCharsets.UTF_8).replace("+", "%20");
   }
 
   public String qrDataUri(String otpauthUri) {
