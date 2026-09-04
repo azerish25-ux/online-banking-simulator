@@ -22,7 +22,13 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
   @Query("select a from Account a where a.id = :id")
   Optional<Account> findByIdForUpdate(UUID id);
 
-  /** Interest candidates: the types that accrue, still active, not yet accrued this month. */
+  /**
+   * Interest candidates: the types that accrue, still active, not yet accrued
+   * this month. Rows are locked (FOR UPDATE) so two overlapping accrual runs
+   * cannot both read the same snapshot: the second run blocks, then re-checks
+   * the WHERE clause on the first run's committed rows and skips them.
+   */
+  @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("""
       select a from Account a
       where a.type in :types

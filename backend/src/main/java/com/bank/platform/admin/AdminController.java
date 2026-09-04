@@ -1,26 +1,36 @@
 package com.bank.platform.admin;
 
-import com.bank.platform.accounts.Account;
-import com.bank.platform.accounts.AccountNotFoundException;
+import com.bank.platform.accounts.AccountMapper;
 import com.bank.platform.accounts.AccountRepository;
+import com.bank.platform.accounts.AccountResponse;
+import com.bank.platform.accounts.AccountStatus;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.AuthDtos.UserResponse;
 import com.bank.platform.auth.UserRepository;
-import com.bank.platform.ledger.TransactionRepository;
-import com.bank.platform.ledger.TransferDtos.AccountResponse;
+import com.bank.platform.ledger.InterestService;
 import com.bank.platform.ledger.StatementService;
+import com.bank.platform.ledger.Transaction;
+import com.bank.platform.ledger.TransactionMapper;
+import com.bank.platform.ledger.TransactionRepository;
+import com.bank.platform.ledger.TransactionSpecs;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.web.PageableDefault;
 import org.springframework.format.annotation.DateTimeFormat;
-import org.springframework.data.domain.Sort;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -40,9 +50,9 @@ public class AdminController {
   private final TransactionRepository transactions;
   private final AuditLogRepository audits;
   private final AdminService adminService;
-  private final com.bank.platform.ledger.InterestService interestService;
-  private final com.bank.platform.admin.ReportService reportService;
-  private final com.bank.platform.ledger.StatementService statementService;
+  private final InterestService interestService;
+  private final ReportService reportService;
+  private final StatementService statementService;
 
   public AdminController(
       UserRepository users,
@@ -50,9 +60,9 @@ public class AdminController {
       TransactionRepository transactions,
       AuditLogRepository audits,
       AdminService adminService,
-      com.bank.platform.ledger.InterestService interestService,
-      com.bank.platform.admin.ReportService reportService,
-      com.bank.platform.ledger.StatementService statementService) {
+      InterestService interestService,
+      ReportService reportService,
+      StatementService statementService) {
     this.users = users;
     this.accounts = accounts;
     this.transactions = transactions;
@@ -63,11 +73,18 @@ public class AdminController {
     this.statementService = statementService;
   }
 
+  /**
+   * Audit rows carry JSON metadata (amounts, counterparty IBANs, emails,
+   * account numbers) that made the log auditable in the first place - the
+   * viewer surfaces it instead of hiding the trail's substance.
+   */
   public record AuditResponse(
-      Long id, UUID actorId, String action, String entity, String entityId, String createdAt) {
+      Long id, UUID actorId, String action, String entity, String entityId,
+      Map<String, String> metadata, String createdAt) {
     static AuditResponse from(AuditLog log) {
       return new AuditResponse(
           log.getId(), log.getActorId(), log.getAction(), log.getEntity(), log.getEntityId(),
+          AuditLog.metadataMap(log.getMetadata()),
           log.getCreatedAt().toString());
     }
   }
@@ -76,16 +93,18 @@ public class AdminController {
   public Page<UserResponse> users(
       @RequestParam(defaultValue = "") String q,
       @PageableDefault(size = 20) Pageable pageable) {
+    Pageable capped = capped(pageable);
     if (q.isBlank()) {
-      return users.findAll(pageable).map(UserResponse::from);
+      return users.findAll(capped).map(UserResponse::from);
     }
-    return users.findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(q, q, pageable)
+    return users.findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(q, q, capped)
         .map(UserResponse::from);
   }
 
   @GetMapping("/users/{id}/accounts")
-  public java.util.List<AccountResponse> userAccounts(@PathVariable UUID id) {
-    return accounts.findByUserIdOrderByCreatedAtAsc(id).stream().map(com.bank.platform.accounts.AccountMapper::toResponse).toList();
+  public List<AccountResponse> userAccounts(@PathVariable UUID id) {
+    return accounts.findByUserIdOrderByCreatedAtAsc(id).stream()
+        .map(AccountMapper::toResponse).toList();
   }
 
   @GetMapping("/transactions")
@@ -96,49 +115,52 @@ public class AdminController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-    java.time.Instant fromInstant = from == null ? null : from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-    java.time.Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-    Page<com.bank.platform.ledger.Transaction> page = transactions.findAll(
-        com.bank.platform.ledger.TransactionSpecs.filters(accountId, flagged, reviewed, fromInstant, toInstant),
-        pageable);
-    java.util.Set<UUID> ids = page.getContent().stream()
-        .flatMap(tx -> java.util.stream.Stream.of(tx.getFromAccountId(), tx.getToAccountId()))
-        .filter(value -> value != null)
-        .collect(Collectors.toSet());
-    Map<UUID, String> ibans = accounts.findAllById(ids).stream()
-        .collect(Collectors.toMap(Account::getId, Account::getIban));
-    return page.map(tx -> com.bank.platform.ledger.TransactionMapper.toResponse(tx, ibans));
+    Instant fromInstant = from == null ? null : from.atStartOfDay(ZoneOffset.UTC).toInstant();
+    Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+    Page<Transaction> page = transactions.findAll(
+        TransactionSpecs.filters(accountId, flagged, reviewed, fromInstant, toInstant),
+        withInsertionTiebreak(capped(pageable)));
+    Map<UUID, String> ibans = statementService.ibanMap(page.getContent());
+    return page.map(tx -> TransactionMapper.toResponse(tx, ibans));
   }
 
   @GetMapping("/audit-logs")
   public Page<AuditResponse> auditLogs(
       @RequestParam(required = false) String action,
       @PageableDefault(size = 20, sort = "id", direction = Sort.Direction.DESC) Pageable pageable) {
+    Pageable capped = capped(pageable);
     if (action != null && !action.isBlank()) {
-      return audits.findByAction(action.trim().toUpperCase(), pageable).map(AuditResponse::from);
+      return audits.findByAction(action.trim().toUpperCase(), capped).map(AuditResponse::from);
     }
-    return audits.findAll(pageable).map(AuditResponse::from);
+    return audits.findAll(capped).map(AuditResponse::from);
   }
 
   @PostMapping("/interest/run")
-  public java.util.Map<String, Integer> runInterest() {
+  public Map<String, Integer> runInterest() {
     return interestService.accrueMonthly();
   }
 
   @PostMapping("/transactions/{id}/review")
   public TransactionResponse review(Authentication authentication, @PathVariable UUID id) {
-    com.bank.platform.ledger.Transaction tx = adminService.reviewTransaction(authentication.getName(), id);
+    Transaction tx = adminService.reviewTransaction(authentication.getName(), id);
     Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
-    return com.bank.platform.ledger.TransactionMapper.toResponse(tx, ibans);
+    return TransactionMapper.toResponse(tx, ibans);
+  }
+
+  @PostMapping("/transactions/{id}/decline")
+  public TransactionResponse decline(Authentication authentication, @PathVariable UUID id) {
+    Transaction tx = adminService.declineTransaction(authentication.getName(), id);
+    Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
+    return TransactionMapper.toResponse(tx, ibans);
   }
 
   @GetMapping("/reports/daily-totals")
-  public java.util.List<ReportService.DayTotal> dailyTotals(@RequestParam(defaultValue = "30") int days) {
+  public List<ReportService.DayTotal> dailyTotals(@RequestParam(defaultValue = "30") int days) {
     return reportService.dailyTotals(days);
   }
 
   @GetMapping("/accounts/{id}/statement.pdf")
-  public org.springframework.http.ResponseEntity<byte[]> adminStatementPdf(
+  public ResponseEntity<byte[]> adminStatementPdf(
       @PathVariable UUID id,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
@@ -148,21 +170,44 @@ public class AdminController {
 
   @PostMapping("/accounts/{id}/freeze")
   public AccountResponse freeze(Authentication authentication, @PathVariable UUID id) {
-    return com.bank.platform.accounts.AccountMapper.toResponse(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.FROZEN));
+    return AccountMapper.toResponse(
+        adminService.setStatus(authentication.getName(), id, AccountStatus.FROZEN));
   }
 
   @PostMapping("/accounts/{id}/unfreeze")
   public AccountResponse unfreeze(Authentication authentication, @PathVariable UUID id) {
-    return com.bank.platform.accounts.AccountMapper.toResponse(adminService.setStatus(authentication.getName(), id, com.bank.platform.accounts.AccountStatus.ACTIVE));
+    return AccountMapper.toResponse(
+        adminService.setStatus(authentication.getName(), id, AccountStatus.ACTIVE));
   }
 
-  private org.springframework.http.ResponseEntity<byte[]> pdf(StatementService.Statement statement) {
+  /**
+   * No admin listing may stream unbounded rows because a caller asked for
+   * size=9999999 - cap the page size (and never page backwards off the start).
+   */
+  private static Pageable capped(Pageable pageable) {
+    int size = Math.min(Math.max(pageable.getPageSize(), 1), 100);
+    int page = Math.max(pageable.getPageNumber(), 0);
+    return PageRequest.of(page, size, pageable.getSort());
+  }
+
+  /**
+   * Transactions tied on created_at (rows persisted in one flush share a
+   * timestamp) resolve by insertion sequence, newest first. The UUID id is
+   * random, so without this the queue order for tied rows is arbitrary and a
+   * page boundary can duplicate or skip rows.
+   */
+  private static Pageable withInsertionTiebreak(Pageable pageable) {
+    return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(),
+        pageable.getSort().and(Sort.by(Sort.Direction.DESC, "seq")));
+  }
+
+  private ResponseEntity<byte[]> pdf(StatementService.Statement statement) {
     byte[] pdf = statementService.renderPdf(statement);
     String filename = "statement-" + statement.account().getIban() + ".pdf";
-    return org.springframework.http.ResponseEntity.ok()
-        .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
-            org.springframework.http.ContentDisposition.attachment().filename(filename).build().toString())
-        .contentType(org.springframework.http.MediaType.APPLICATION_PDF)
+    return ResponseEntity.ok()
+        .header(HttpHeaders.CONTENT_DISPOSITION,
+            ContentDisposition.attachment().filename(filename).build().toString())
+        .contentType(MediaType.APPLICATION_PDF)
         .body(pdf);
   }
 

@@ -6,14 +6,18 @@ import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.accounts.AccountStatus;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
+import com.bank.platform.ledger.HeldTransferService;
 import com.bank.platform.ledger.Transaction;
 import com.bank.platform.ledger.TransactionNotFoundException;
 import com.bank.platform.ledger.TransactionRepository;
+import com.bank.platform.ledger.TransferValidationException;
+import com.bank.platform.ledger.TxStatus;
 import com.bank.platform.auth.Role;
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.notifications.NotificationService;
 import java.util.UUID;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,22 +30,44 @@ public class AdminService {
   private final AuditLogRepository audits;
   private final NotificationService notifications;
   private final TransactionRepository transactions;
+  private final HeldTransferService heldTransfers;
 
   public AdminService(UserRepository users, AccountRepository accounts, AuditLogRepository audits,
-      NotificationService notifications, TransactionRepository transactions) {
+      NotificationService notifications, TransactionRepository transactions, HeldTransferService heldTransfers) {
     this.users = users;
     this.accounts = accounts;
     this.audits = audits;
     this.notifications = notifications;
     this.transactions = transactions;
+    this.heldTransfers = heldTransfers;
   }
 
+  /**
+   * Operator decision on a queue item.
+   *
+   * A HELD transfer (large transfer awaiting review) is APPROVED: money moves
+   * under locks inside the same transaction, the row becomes POSTED, and both
+   * parties are notified - all inside {@link HeldTransferService#settleHeldTransfer},
+   * which owns the whole held-transfer lifecycle. A flagged-but-posted row (e.g. a
+   * large simulated deposit, which credits the moment it arrives) is
+   * acknowledged here: there is no money to settle, so the flag is cleared.
+   */
   @Transactional
   public Transaction reviewTransaction(String adminEmail, UUID transactionId) {
-    User admin = users.findByEmail(adminEmail)
-        .orElseThrow(() -> new UsernameNotFoundException("Admin not found"));
+    User admin = operatorOf(adminEmail);
     Transaction tx = transactions.findById(transactionId)
         .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+
+    if (tx.getStatus() == TxStatus.HELD) {
+      return heldTransfers.settleHeldTransfer(adminEmail, transactionId);
+    }
+
+    // Only posted flagged rows (e.g. a large simulated deposit that credits on
+    // arrival) are acknowledged; a CANCELLED or already-resolved row is not a
+    // live queue item anymore.
+    if (tx.getStatus() != TxStatus.POSTED || !tx.isFlagged()) {
+      throw new TransferValidationException("Nothing to review here");
+    }
     tx.setReviewed(true);
     transactions.save(tx);
     AuditLog reviewed = new AuditLog(admin.getId(), "TRANSACTION_REVIEWED", "Transaction", tx.getId().toString());
@@ -50,12 +76,17 @@ public class AdminService {
     return tx;
   }
 
+  /** Declines a HELD transfer - the lifecycle logic lives in the ledger. */
+  @Transactional
+  public Transaction declineTransaction(String adminEmail, UUID transactionId) {
+    return heldTransfers.declineHeldTransfer(adminEmail, transactionId);
+  }
+
   @Transactional
   public Account setStatus(String adminEmail, UUID accountId, AccountStatus status) {
-    User admin = users.findByEmail(adminEmail)
-        .orElseThrow(() -> new UsernameNotFoundException("Admin not found"));
+    User admin = operatorOf(adminEmail);
     if (admin.getRole() != Role.ADMIN) {
-      throw new org.springframework.security.access.AccessDeniedException("Admins only");
+      throw new AccessDeniedException("Admins only");
     }
     Account account = accounts.findById(accountId)
         .orElseThrow(() -> new AccountNotFoundException(accountId));
@@ -69,5 +100,10 @@ public class AdminService {
         action, status == AccountStatus.FROZEN ? "Account frozen" : "Account re-activated",
         "Account " + account.getIban() + (status == AccountStatus.FROZEN ? " was frozen by operations." : " is active again.")));
     return account;
+  }
+
+  private User operatorOf(String adminEmail) {
+    return users.findByEmail(adminEmail)
+        .orElseThrow(() -> new UsernameNotFoundException("Admin not found"));
   }
 }

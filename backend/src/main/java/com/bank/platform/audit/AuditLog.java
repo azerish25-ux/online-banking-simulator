@@ -1,5 +1,7 @@
 package com.bank.platform.audit;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -8,6 +10,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.PrePersist;
 import jakarta.persistence.Table;
 import java.time.Instant;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.UUID;
 
 @Entity
@@ -58,14 +62,37 @@ public class AuditLog {
   public String getMetadata() { return metadata; }
   public void setMetadata(String v) { metadata = v; }
 
-  /** Minimal JSON object builder for audit context. Values must not contain double quotes. */
+  /**
+   * JSON object builder for audit context. Serialized with Jackson (a shared
+   * mapper is fine - it is stateless after configuration), so values with
+   * quotes, backslashes or control characters are escaped instead of producing
+   * malformed JSON.
+   */
+  private static final ObjectMapper JSON = new ObjectMapper();
+
   public static String metadata(String... pairs) {
-    StringBuilder sb = new StringBuilder("{");
+    Map<String, String> map = new LinkedHashMap<>();
     for (int i = 0; i + 1 < pairs.length; i += 2) {
-      if (i > 0) sb.append(',');
-      sb.append('"').append(pairs[i]).append("\":\"").append(pairs[i + 1]).append('"');
+      map.put(pairs[i], pairs[i + 1]);
     }
-    return sb.append('}').toString();
+    try {
+      return JSON.writeValueAsString(map);
+    } catch (Exception ex) {
+      throw new IllegalStateException("Cannot serialize audit metadata", ex);
+    }
+  }
+
+  /** Parses stored metadata JSON back into key/value pairs for the audit viewer. */
+  public static Map<String, String> metadataMap(String stored) {
+    if (stored == null || stored.isBlank()) {
+      return Map.of();
+    }
+    try {
+      return JSON.readValue(stored, new TypeReference<LinkedHashMap<String, String>>() {});
+    } catch (Exception ex) {
+      // A corrupt metadata cell must not take the audit log down with it.
+      return Map.of();
+    }
   }
   public Instant getCreatedAt() { return createdAt; }
 }

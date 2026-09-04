@@ -106,10 +106,10 @@ class BankingUxTest {
         .andExpect(content().string(containsString("\"Hello, \"\"Bob\"\"\"")))
         .andExpect(content().string(containsString("250.0000")));
 
-    // Bob cannot download Alice's statement.
+    // Bob cannot download Alice's statement (foreign account = not found).
     mvc.perform(get("/api/v1/accounts/" + aliceId + "/statement.csv")
             .header("Authorization", "Bearer " + bob))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isNotFound());
 
     // Monthly summary reflects deposit inflow and transfer outflow.
     mvc.perform(get("/api/v1/accounts/" + aliceId + "/summary")

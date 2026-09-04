@@ -3,6 +3,7 @@ package com.bank.platform.ledger;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -10,6 +11,7 @@ import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.support.ApiTestClient;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -31,6 +33,7 @@ class MoneyFlowTest {
   @Autowired ObjectMapper objectMapper;
   @Autowired AuditLogRepository auditLogs;
   @Autowired jakarta.persistence.EntityManagerFactory emf;
+  @Autowired MoneyService money;
 
   ApiTestClient client;
 
@@ -114,9 +117,42 @@ class MoneyFlowTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].toIban").value(bobIban));
 
-    // Bob cannot peek at Alice's account.
+    // Bob cannot peek at Alice's account: indistinguishable from a missing one.
     mvc.perform(get("/api/v1/accounts/" + aliceId).header("Authorization", "Bearer " + bobToken))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isNotFound());
+  }
+
+  @Test
+  void amountsPastLedgerScaleRejectedCleanlyInsteadOf500() throws Exception {
+    String email = "subcent@example.com";
+    String token = register(email, "Subcent User");
+    String accountId = accountId(token);
+    String other = client.accountIban(register("subcent-b@example.com", "Subcent Bee"));
+
+    // Sub-cent values at the ledger's own 4-decimal scale are fine.
+    mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"amount":"0.0006"}"""))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.balance").value("0.0006"));
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"toIban":"%s","amount":"0.0004"}""".formatted(other)))
+        .andExpect(status().isCreated());
+
+    // Values finer than the ledger scale (5+ decimals) would round to zero and
+    // violate the DB amount > 0 constraint. The API schema rejects them before
+    // the service; the service itself must ALSO refuse them with a clean
+    // validation error instead of surfacing a constraint violation as a 500.
+    assertThrows(TransferValidationException.class, () -> money.deposit(
+        email, java.util.UUID.fromString(accountId), new BigDecimal("0.00005")));
+    assertThrows(TransferValidationException.class, () -> money.transfer(
+        email, java.util.UUID.fromString(accountId), other,
+        new BigDecimal("0.00005"), null, "sub-cent guard", null));
   }
 
   private String register(String email, String name) throws Exception {
