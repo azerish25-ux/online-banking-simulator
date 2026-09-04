@@ -12,8 +12,10 @@ export function HeroStats() {
   const query = usePublicStats();
   const stats = query.data ?? null;
 
+  // "Accounts opened" is a count of real customer accounts; the API also
+  // reports users separately, and mixing the two would mislabel the figure.
   const items = [
-    { label: "Accounts opened", value: stats ? stats.users.toLocaleString("en-US") : "-" },
+    { label: "Accounts opened", value: stats ? stats.accounts.toLocaleString("en-US") : "-" },
     { label: "Transfers settled", value: stats ? stats.transfers.toLocaleString("en-US") : "-" },
     { label: "Transfer volume", value: stats ? usd(stats.volume) : "-" }
   ];

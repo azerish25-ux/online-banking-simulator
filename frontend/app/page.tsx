@@ -2,6 +2,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Button } from "../components/ui/button";
 import { Routes } from "../lib/routes";
+import { BrandName } from "../lib/brand";
 import { HeroStats } from "./hero-stats";
 
 /**
@@ -13,7 +14,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-ink-900">
       <div className="mx-auto max-w-5xl px-5 py-20">
-        <p className="caps text-brass-400">Northbank · Core banking engine</p>
+        <p className="caps text-brass-400">{BrandName} · demo core</p>
 
         <h1 className="display mt-5 max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight md:text-6xl">
           Money that moves

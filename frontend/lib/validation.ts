@@ -1,16 +1,19 @@
 import { z } from "zod";
 
 /** Single source of truth for form rules - mirrors the API validation. */
+// Mirrors the API rules - including the 72-character ceiling: BCrypt silently
+// truncates longer passwords, so capping here keeps the client and the hash
+// function in agreement.
 export const loginSchema = z.object({
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(1, "Password is required")
+  password: z.string().min(1, "Password is required").max(72, "Maximum 72 characters")
 });
 export type LoginForm = z.infer<typeof loginSchema>;
 
 export const registerSchema = z.object({
   fullName: z.string().min(2, "Enter your full name"),
   email: z.string().email("Enter a valid email"),
-  password: z.string().min(8, "Minimum 8 characters")
+  password: z.string().min(8, "Minimum 8 characters").max(72, "Maximum 72 characters")
 });
 export type RegisterForm = z.infer<typeof registerSchema>;
 
