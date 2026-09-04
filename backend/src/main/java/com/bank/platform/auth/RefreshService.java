@@ -46,18 +46,29 @@ public class RefreshService {
 
   @Transactional
   public TokenPair issue(User user) {
+    // Opportunistic housekeeping on every mint keeps the table bounded: rows
+    // only leave once they are past their expiry (a revoked-but-unexpired
+    // token must still be findable so replaying it burns its family).
+    refreshTokens.purgeExpired(Instant.now());
     byte[] bytes = new byte[32];
     random.nextBytes(bytes);
     String plain = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     refreshTokens.save(new RefreshToken(
         user.getId(), sha256(plain), Instant.now().plusSeconds(refreshDays * 24 * 3600)));
     String access = jwtService.generate(user.getEmail(), user.getRole().name());
-    return new TokenPair(access, plain, jwtService.getAccessMinutes() * 60, user);
+    return new TokenPair(access, plain, jwtService.getAccessSeconds(), user);
   }
 
-  @Transactional
+  /**
+   * The 401 is signalled by throwing BadCredentialsException, but the state
+   * changes made before it (consuming the token, burning the family) are
+   * deliberate and must commit - otherwise a RuntimeException would roll them
+   * back and a burned family would resurrect on the next replay.
+   */
+  @Transactional(noRollbackFor = BadCredentialsException.class)
   public TokenPair rotate(String presented) {
-    RefreshToken found = refreshTokens.findByTokenHash(sha256(presented)).orElse(null);
+    String hash = sha256(presented);
+    RefreshToken found = refreshTokens.findByTokenHash(hash).orElse(null);
     // Bulk revocations bypass the persistence context: reload the row so a
     // concurrently-revoked token can never read as valid.
     if (found != null) {
@@ -70,8 +81,24 @@ public class RefreshService {
       }
       throw new BadCredentialsException("Invalid refresh token");
     }
-    found.setRevoked(true);
-    refreshTokens.save(found);
+    // Serialize rotations per user before consuming. Two threads presenting
+    // the SAME token queue on this row lock: the winner consumes and mints its
+    // successor, and only after that commit does the loser's consume return 0,
+    // at which point the family burn also revokes the winner's new token.
+    // Without the lock the loser could burn the family before the winner's
+    // successor row commits, leaving a live session behind.
+    users.findByIdForUpdate(found.getUserId())
+        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    // Check-and-consume in one UPDATE: two parallel rotations presenting the
+    // same token cannot both pass an in-Java revoked check and mint separate
+    // sessions - the loser is treated as a replay and the family is burned.
+    if (refreshTokens.consume(hash) == 0) {
+      refreshTokens.revokeAllByUserId(found.getUserId());
+      throw new BadCredentialsException("Invalid refresh token");
+    }
+    // consume() bypassed the persistence context: re-read the row so the
+    // managed copy reflects the revoked state we just wrote.
+    entityManager.refresh(found);
     User user = users.findById(found.getUserId())
         .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     return issue(user);
