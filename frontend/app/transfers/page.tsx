@@ -7,33 +7,54 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { transferSchema as schema, type TransferForm as Form } from "../../lib/validation";
 import { AppShell } from "../../components/layout/app-shell";
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { Field, Input } from "../../components/ui/input";
 import { useToast } from "../../components/feedback/toast";
+import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { useAccounts, useBeneficiaries, useTransfer, type TransferInput } from "../../lib/queries";
 import { usd } from "../../lib/format";
 import { Routes } from "../../lib/routes";
-
 
 export default function TransfersPage() {
   const { push } = useToast();
   const accounts = useAccounts();
   const beneficiaries = useBeneficiaries();
   const transfer = useTransfer();
-  const [receipt, setReceipt] = React.useState<{ id: string; toIban: string; amount: string; flagged: boolean } | null>(null);
+  const [receipt, setReceipt] = React.useState<{ id: string; toIban: string; amount: string; status: string } | null>(null);
   const { register, handleSubmit, setValue, watch, reset, formState } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: { fromAccountId: "", toIban: "", amount: "", memo: "" }
   });
-  const chosenBeneficiary = watch("toIban");
+  const watchFrom = watch("fromAccountId");
+  const watchTo = watch("toIban");
+  const watchAmount = watch("amount");
+  const chosenBeneficiary = watchTo;
+  const { resetIdempotencyKey } = transfer;
 
-  // Default the source account once accounts arrive; beneficiaries load
-  // failures surface as a hint instead of vanishing silently.
+  // Editing the transfer is a new intent: the outstanding idempotency key
+  // (which exists to make retries of THIS transfer safe) no longer applies.
+  const lastIntent = React.useRef({ from: "", to: "", amount: "" });
+  React.useEffect(() => {
+    const next = { from: watchFrom, to: watchTo, amount: watchAmount };
+    const prev = lastIntent.current;
+    if (prev.from !== next.from || prev.to !== next.to || prev.amount !== next.amount) {
+      lastIntent.current = next;
+      resetIdempotencyKey();
+    }
+  }, [watchFrom, watchTo, watchAmount, resetIdempotencyKey]);
+
+  // Default the source account once, when accounts first arrive. Deliberately
+  // not on every refetch: invalidation-driven refetches (e.g. after a transfer
+  // or deposit elsewhere) would otherwise overwrite the account the user chose
+  // - or the one kept after a successful send.
+  const sourceInitialized = React.useRef(false);
   React.useEffect(() => {
     const accs = accounts.data;
-    if (accs && accs.length > 0) setValue("fromAccountId", accs[0].id);
+    if (!sourceInitialized.current && accs && accs.length > 0) {
+      sourceInitialized.current = true;
+      setValue("fromAccountId", accs[0].id);
+    }
   }, [accounts.data, setValue]);
 
   React.useEffect(() => {
@@ -43,9 +64,17 @@ export default function TransfersPage() {
   React.useEffect(() => {
     if (transfer.isSuccess && transfer.data) {
       const d = transfer.data;
-      setReceipt({ id: d.id, toIban: d.toIban, amount: d.amount, flagged: Boolean(d.flagged) });
-      push("Transfer posted.", "success");
-      reset({ fromAccountId: d.id ? watch("fromAccountId") : "", toIban: "", amount: "", memo: "" });
+      setReceipt({ id: d.id, toIban: d.toIban, amount: d.amount, status: d.status });
+      push(
+        status === "HELD"
+          ? "Transfer submitted for review - it is sent once an operator approves it."
+          : "Transfer posted.",
+        status === "HELD" ? "info" : "success"
+      );
+      // Keep the source account; clear the rest for the next transfer. The
+      // effect fires only when isSuccess flips, so reading the current form
+      // here is safe - the intent effect above clears the idempotency key.
+      reset({ fromAccountId: lastIntent.current.from, toIban: "", amount: "", memo: "" });
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transfer.isSuccess]);
@@ -77,13 +106,17 @@ export default function TransfersPage() {
                 ))}
               </select>
             </Field>
-            <Field label="Recipient IBAN" error={formState.errors.toIban?.message}>
+            <Field
+              label="Recipient IBAN"
+              error={formState.errors.toIban?.message}
+              hint="The recipient must hold an account in this simulator - add a beneficiary to fill it in one tap."
+            >
               <Input placeholder="DE..." autoComplete="off" {...register("toIban")} />
             </Field>
             <Field
               label="Amount (USD)"
               error={formState.errors.amount?.message}
-              hint="Transfers of $10,000 or more are held for operator review."
+              hint="Transfers of $10,000 or more are held - no money moves until an operator approves."
             >
               <Input placeholder="10.00" inputMode="decimal" {...register("amount")} />
             </Field>
@@ -125,12 +158,17 @@ export default function TransfersPage() {
           {receipt && (
             <Card className="mt-4 border-emerald-900/60">
               <div className="flex items-center gap-2">
-                <CardTitle>Transfer posted</CardTitle>
-                {receipt.flagged ? <Badge tone="warning">UNDER REVIEW</Badge> : <Badge tone="success">POSTED</Badge>}
+                <CardTitle>{receipt.status === "HELD" ? "Transfer submitted for review" : "Transfer posted"}</CardTitle>
+                <TxStatusBadge status={receipt.status} />
               </div>
               <CardDescription>
                 {usd(receipt.amount)} → <span className="mono">{receipt.toIban}</span>
               </CardDescription>
+              {receipt.status === "HELD" && (
+                <p className="muted mt-2 text-sm">
+                  No money has moved yet - the transfer is queued for operator review.
+                </p>
+              )}
               <p className="mono muted mt-2 text-xs">id {receipt.id}</p>
             </Card>
           )}
