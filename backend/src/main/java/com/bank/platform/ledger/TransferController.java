@@ -1,18 +1,21 @@
 package com.bank.platform.ledger;
 
-import com.bank.platform.accounts.AccountRepository;
+import com.bank.platform.accounts.AccountService;
 import com.bank.platform.ledger.TransferDtos.MonthSummary;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
 import com.bank.platform.ledger.TransferDtos.TransferRequest;
 import com.bank.platform.ledger.TransferDtos.TransferResponse;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageImpl;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -34,16 +37,16 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class TransferController {
 
+  private final AccountService accounts;
   private final MoneyService money;
   private final TransactionRepository transactions;
-  private final AccountRepository accounts;
   private final StatementService statements;
 
-  public TransferController(MoneyService money, TransactionRepository transactions, AccountRepository accounts,
+  public TransferController(AccountService accounts, MoneyService money, TransactionRepository transactions,
       StatementService statements) {
+    this.accounts = accounts;
     this.money = money;
     this.transactions = transactions;
-    this.accounts = accounts;
     this.statements = statements;
   }
 
@@ -55,7 +58,7 @@ public class TransferController {
       @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
     UUID fromId = request.fromAccountId() != null
         ? request.fromAccountId()
-        : money.myAccounts(authentication.getName()).stream()
+        : accounts.myAccounts(authentication.getName()).stream()
             .findFirst()
             .orElseThrow(() -> new IllegalArgumentException("No source account found"))
             .getId();
@@ -78,23 +81,22 @@ public class TransferController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
       @RequestParam(defaultValue = "0") int page,
       @RequestParam(defaultValue = "20") int size) {
-    // Ownership check first: throws 403/404 for foreign or missing accounts.
-    money.accountDetail(authentication.getName(), accountId);
-    java.time.Instant fromInstant = from == null
-        ? java.time.Instant.EPOCH
-        : from.atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
-    java.time.Instant toInstant = to == null
-        ? java.time.Instant.now().plusSeconds(3600)
-        : to.plusDays(1).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+    // Ownership check first: throws 404 for foreign or missing accounts.
+    accounts.accountDetail(authentication.getName(), accountId);
+    Instant fromInstant = from == null
+        ? Instant.EPOCH
+        : from.atStartOfDay(ZoneOffset.UTC).toInstant();
+    Instant toInstant = to == null
+        ? Instant.now().plusSeconds(3600)
+        : to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     int safeSize = Math.min(Math.max(size, 1), 100);
     int safePage = Math.max(page, 0);
     List<Transaction> rows = transactions.historyPage(
         accountId, fromInstant, toInstant, safeSize, safePage * safeSize);
     long total = transactions.historyCount(accountId, fromInstant, toInstant);
-    Map<UUID, String> ibans = ibanMap(rows);
+    Map<UUID, String> ibans = statements.ibanMap(rows);
     List<TransactionResponse> mapped = rows.stream().map(tx -> TransactionMapper.toResponse(tx, ibans)).toList();
-    return new org.springframework.data.domain.PageImpl<>(mapped,
-        org.springframework.data.domain.PageRequest.of(safePage, safeSize), total);
+    return new PageImpl<>(mapped, PageRequest.of(safePage, safeSize), total);
   }
 
   @GetMapping("/accounts/{id}/summary")
@@ -113,7 +115,11 @@ public class TransferController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
     StatementService.Statement statement = statements.customerStatement(authentication.getName(), id, from, to);
     var account = statement.account();
-    List<Transaction> rows = statement.rows();
+    // Only settled rows appear in a statement - HELD/CANCELLED intents never
+    // moved money, so they must not read as movements (matches the PDF).
+    List<Transaction> rows = statement.rows().stream()
+        .filter(tx -> tx.getStatus() == TxStatus.POSTED)
+        .toList();
     Map<UUID, String> ibans = statements.ibanMap(rows);
 
     StringBuilder csv = new StringBuilder("id,created_at,from_iban,to_iban,amount,currency,memo,status\n");
@@ -152,16 +158,20 @@ public class TransferController {
         .body(pdf);
   }
 
-  private Map<UUID, String> ibanMap(List<Transaction> rows) {
-    java.util.Set<UUID> ids = rows.stream()
-        .flatMap(tx -> java.util.stream.Stream.of(tx.getFromAccountId(), tx.getToAccountId()))
-        .filter(value -> value != null)
-        .collect(Collectors.toSet());
-    return accounts.findAllById(ids).stream()
-        .collect(Collectors.toMap(a -> a.getId(), a -> a.getIban()));
-  }
-
+  /**
+   * CSV-escapes one cell. Cells are always quoted; user-controlled values that
+   * start with a spreadsheet formula character (= + - @ or a tab) are prefixed
+   * with a single quote so opening the export in Excel/Sheets cannot execute a
+   * formula smuggled through a memo.
+   */
   private String cell(String value) {
-    return '"' + value.replace("\"", "\"\"") + '"';
+    String safe = value == null ? "" : value;
+    if (!safe.isEmpty()) {
+      char first = safe.charAt(0);
+      if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+        safe = "'" + safe;
+      }
+    }
+    return '"' + safe.replace("\"", "\"\"") + '"';
   }
 }
