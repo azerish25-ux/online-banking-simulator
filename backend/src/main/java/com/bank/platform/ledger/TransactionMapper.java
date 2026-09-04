@@ -18,6 +18,7 @@ public final class TransactionMapper {
         tx.getAmount().toPlainString(),
         tx.getCurrency(),
         tx.getMemo(),
+        tx.getKind().name(),
         tx.getStatus().name(),
         tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
   }

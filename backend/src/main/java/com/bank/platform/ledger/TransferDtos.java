@@ -13,24 +13,22 @@ public final class TransferDtos {
   public record TransferRequest(
       @NotBlank String toIban,
       @Pattern(regexp = "^\\d+(\\.\\d{1,4})?$", message = "must be a positive amount with up to 4 decimals") String amount,
-      @Size(min = 3, max = 3) String currency,
+      // Single-currency ledger: null/blank means USD; anything else must say USD
+      // (case-insensitive). Accepting arbitrary ISO codes would let a "EUR"
+      // transfer pretend money changed currency when it simply moved USD.
+      @Pattern(regexp = "(?i)\\s*USD\\s*", message = "only USD is supported (single-currency ledger)") String currency,
       @Size(max = 140) String memo,
       UUID fromAccountId) {}
-
-  public record DepositRequest(
-      @Pattern(regexp = "^\\d+(\\.\\d{1,4})?$", message = "must be a positive amount with up to 4 decimals") String amount) {}
 
   public record TransferResponse(
       UUID id, String fromIban, String toIban, String amount, String currency,
       String memo, String status, String createdAt, boolean flagged) {}
 
-  public record AccountResponse(
-      UUID id, String iban, String type, String balance, String status) {}
-
   public record MonthSummary(String month, String inflow, String outflow) {}
 
   public record TransactionResponse(
       UUID id, String fromIban, String toIban, String amount, String currency,
-      String memo, String status, String createdAt, boolean flagged, boolean reviewed) {}
+      String memo, String kind, String status, String createdAt,
+      boolean flagged, boolean reviewed) {}
 }
 

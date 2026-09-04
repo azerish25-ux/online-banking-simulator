@@ -40,27 +40,46 @@ class OpsReviewTest {
 
     deposit(alice, aliceId, "20000.00");
 
-    // A five-figure transfer is auto-flagged; a small one is not.
+    // A five-figure transfer is auto-flagged AND HELD (money has not moved
+    // yet); a small one settles instantly and is not flagged.
     String bigId = transfer(alice, bobIban, "15000.00", true);
     transfer(alice, bobIban, "10.00", false);
 
-    // Review queue filters to the flagged, unreviewed item.
+    // While held, the sender keeps their funds (only the $10 small transfer
+    // has moved) and the recipient has just that $10.
+    mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + alice))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].balance").value("19990.0000"));
+    mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + bob))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].balance").value("10.0000"));
+
+    // Review queue filters to the flagged, unreviewed items (held transfer +
+    // flagged deposit), newest first.
     mvc.perform(get("/api/v1/admin/transactions").header("Authorization", "Bearer " + admin)
             .param("flagged", "true")
             .param("reviewed", "false"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].id").value(bigId))
-        .andExpect(jsonPath("$.content[0].flagged").value(true));
+        .andExpect(jsonPath("$.content[0].flagged").value(true))
+        .andExpect(jsonPath("$.content[0].status").value("HELD"));
 
     // Customers cannot touch the review queue.
     mvc.perform(get("/api/v1/admin/transactions").header("Authorization", "Bearer " + alice))
         .andExpect(status().isForbidden());
 
-    // Reviewing clears the queue and audits the decision.
+    // Approving settles the held transfer: money moves and the flag clears.
     mvc.perform(post("/api/v1/admin/transactions/" + bigId + "/review")
             .header("Authorization", "Bearer " + admin))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.reviewed").value(true));
+        .andExpect(jsonPath("$.reviewed").value(true))
+        .andExpect(jsonPath("$.status").value("POSTED"));
+    mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + alice))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].balance").value("4990.0000"));
+    mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + bob))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].balance").value("15010.0000"));
     mvc.perform(get("/api/v1/admin/transactions").header("Authorization", "Bearer " + admin)
             .param("flagged", "true")
             .param("reviewed", "false"))
@@ -68,7 +87,7 @@ class OpsReviewTest {
         .andExpect(jsonPath("$.content.length()").value(1))
         .andExpect(jsonPath("$.content[0].amount").value("20000.0000"));
     mvc.perform(get("/api/v1/admin/audit-logs").header("Authorization", "Bearer " + admin)
-            .param("action", "TRANSACTION_REVIEWED"))
+            .param("action", "TRANSFER_APPROVED"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].entityId").value(bigId));
 
@@ -99,6 +118,44 @@ class OpsReviewTest {
     String csvBody = csv.getResponse().getContentAsString();
     assertTrue(csvBody.startsWith("id,created_at"), "CSV keeps its header");
     assertTrue(csvBody.trim().split("\n").length == 1, "future window has no rows");
+  }
+
+  @Test
+  void declineKeepsMoneyPutAndOnlyHeldRowsAreDeclinable() throws Exception {
+    String admin = login("admin-test@bank.local", "admin-test-123");
+    String alice = register("ops-d@example.com", "Ops Decline");
+    String bob = register("ops-e@example.com", "Ops Decline B");
+    String aliceId = accountId(alice);
+    String bobIban = accountIban(bob);
+    deposit(alice, aliceId, "20000.00");
+
+    String heldId = transfer(alice, bobIban, "12000.00", true);
+
+    // Decline: the row is CANCELLED, no money has moved, the queue drains to
+    // the flagged deposit only, and the decision is audited.
+    mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/decline")
+            .header("Authorization", "Bearer " + admin))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("CANCELLED"))
+        .andExpect(jsonPath("$.reviewed").value(true));
+    mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + alice))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].balance").value("20000.0000"));
+    mvc.perform(get("/api/v1/accounts").header("Authorization", "Bearer " + bob))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].balance").value("0"));
+    mvc.perform(get("/api/v1/admin/audit-logs").header("Authorization", "Bearer " + admin)
+            .param("action", "TRANSFER_DECLINED"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].entityId").value(heldId));
+
+    // A second decision on the same row is rejected - nothing settles twice.
+    mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/decline")
+            .header("Authorization", "Bearer " + admin))
+        .andExpect(status().isBadRequest());
+    mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/review")
+            .header("Authorization", "Bearer " + admin))
+        .andExpect(status().isBadRequest());
   }
 
   private String register(String email, String name) throws Exception {

@@ -31,7 +31,10 @@ public class Transaction {
   @Column(nullable = false, length = 3)
   private String currency = "USD";
 
-  @Column(name = "idempotency_key", unique = true, length = 64)
+  // Uniqueness is enforced in the DB as a composite index on
+  // (from_account_id, idempotency_key) - see V11. A global unique here would
+  // let two unrelated users collide on the same key string.
+  @Column(name = "idempotency_key", length = 64)
   private String idempotencyKey;
 
   @Column(nullable = false, length = 32)
@@ -54,6 +57,12 @@ public class Transaction {
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
+  // Monotonic insert sequence (DB identity, see V14). Listings tie-break equal
+  // created_at values on this column so "newest first" is total: the random
+  // UUID id cannot express insertion order. Read-only - the database assigns it.
+  @Column(insertable = false, updatable = false)
+  private Long seq;
+
   protected Transaction() {}
 
   @PrePersist
@@ -69,10 +78,12 @@ public class Transaction {
   public String getCurrency() { return currency; }
   public String getIdempotencyKey() { return idempotencyKey; }
   public TxStatus getStatus() { return status; }
+  public void setStatus(TxStatus v) { status = v; }
   public TxKind getKind() { return kind; }
   public void setKind(TxKind v) { kind = v; }
   public String getMemo() { return memo; }
   public Instant getCreatedAt() { return createdAt; }
+  public Long getSeq() { return seq; }
 
   public void setFromAccountId(UUID v) { fromAccountId = v; }
   public void setToAccountId(UUID v) { toAccountId = v; }
