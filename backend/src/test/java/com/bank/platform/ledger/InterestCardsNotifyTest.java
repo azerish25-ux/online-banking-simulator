@@ -65,6 +65,37 @@ class InterestCardsNotifyTest {
   }
 
   @Test
+  void loanAtFullLimitCapsTheChargeAndNeverBreaksTheRun() throws Exception {
+    String token = register("p8d@example.com", "P Eight D");
+    String savingsId = openAccount(token, "SAVINGS");
+    String loanId = openAccount(token, "LOAN");
+
+    deposit(token, savingsId, "1200.00");
+    String savingsIban = accountIban(token, savingsId);
+    // Draw the loan right up to its $1000 limit: -999.00 borrowed.
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"toIban":"%s","amount":"999.00","fromAccountId":"%s"}"""
+                .formatted(savingsIban, loanId)))
+        .andExpect(status().isCreated());
+
+    // The 1% monthly charge (-9.99) would push the loan past its limit and
+    // previously aborted the whole run with a constraint violation. Now the
+    // charge is capped at the remaining $1.00 headroom.
+    assertEquals(2, interestService.accrueMonthly().get("accrued"));
+    // Loan: -999.00 - 1.00 = -1000.00 (exactly at the limit, never beyond).
+    // Savings: (1200 + 999) * 0.04/12 = 7.33 interest.
+    expectBalance(token, loanId, "-1000.0000");
+    expectBalance(token, savingsId, "2206.3300");
+
+    // A second run is a no-op (nothing accrued twice), including the maxed loan.
+    assertEquals(0, interestService.accrueMonthly().get("accrued"));
+    expectBalance(token, loanId, "-1000.0000");
+  }
+
+  @Test
   void cardsIssueOnceListMaskedAndFreeze() throws Exception {
     String token = register("p8b@example.com", "P Eight B");
     String checkingId = accountId(token);

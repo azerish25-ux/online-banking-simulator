@@ -7,6 +7,7 @@ import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.UserRepository;
+import com.bank.platform.common.Money;
 import com.bank.platform.notifications.NotificationService;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
@@ -61,6 +62,14 @@ public class InterestService {
 
     int posted = 0;
     for (Account account : candidates) {
+      // Belt and braces on top of the FOR UPDATE lock: if a competing run
+      // committed this account's accrual while we waited for the lock, the
+      // re-read row now carries this month's lastInterestAt - skip it so
+      // interest can never post twice for the same account-month.
+      if (account.getLastInterestAt() != null
+          && !account.getLastInterestAt().isBefore(month.atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant())) {
+        continue;
+      }
       BigDecimal monthlyRate = account.getType() == AccountType.SAVINGS
           ? savingsAnnualRate.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_EVEN)
           : loanAnnualRate.divide(BigDecimal.valueOf(12), 10, RoundingMode.HALF_EVEN);
@@ -71,9 +80,26 @@ public class InterestService {
         if (account.getBalance().compareTo(BigDecimal.ZERO) >= 0) {
           continue;
         }
+        // A loan drawn to its full limit cannot go deeper: the DB guarantees
+        // balance >= -credit_limit, so a charge that would breach it is capped
+        // at the remaining headroom. Otherwise one maxed loan would abort the
+        // whole monthly run for every account.
+        BigDecimal chargeCap = account.getCreditLimit().negate().subtract(account.getBalance());
+        // e.g. balance -999.50 vs limit -1000 → can charge at most -0.50 more.
+        if (delta.compareTo(chargeCap) < 0) {
+          delta = chargeCap;
+        }
+        // A legitimate charge is negative (it deepens the debt); only a cap
+        // that leaves zero headroom means there is nothing to post.
+        if (delta.compareTo(BigDecimal.ZERO) == 0) {
+          continue;
+        }
       } else if (delta.compareTo(BigDecimal.ZERO) <= 0) {
         continue;
       }
+      // Post the (possibly capped) delta; the amount written to the ledger is
+      // effectively final so lambdas below can reference it.
+      BigDecimal amountPosted = delta.abs();
       account.setBalance(account.getBalance().add(delta).setScale(4, RoundingMode.HALF_EVEN));
       account.setLastInterestAt(java.time.Instant.now());
       accounts.save(account);
@@ -86,17 +112,17 @@ public class InterestService {
         tx.setFromAccountId(account.getId());
         tx.setMemo("Loan interest " + month);
       }
-      tx.setAmount(delta.abs());
+      tx.setAmount(amountPosted);
       tx.setCurrency("USD");
       tx.setKind(TxKind.INTEREST);
       transactions.save(tx);
       AuditLog interest = new AuditLog(account.getUserId(), "INTEREST_POSTED", "Transaction", tx.getId().toString());
-      interest.setMetadata(AuditLog.metadata("amount", delta.abs().toPlainString(), "account", account.getIban(), "month", month.toString()));
+      interest.setMetadata(AuditLog.metadata("amount", amountPosted.toPlainString(), "account", account.getIban(), "month", month.toString()));
       audits.save(interest);
       users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(
           owner.getId(), owner.getEmail(), "INTEREST_POSTED", "Monthly interest posted",
           (account.getType() == AccountType.SAVINGS ? "Earned " : "Charged ")
-              + delta.abs().toPlainString() + " USD on account " + account.getIban() + "."));
+              + Money.usd(amountPosted) + " on account " + account.getIban() + "."));
       posted++;
     }
     return Map.of("accrued", posted);
