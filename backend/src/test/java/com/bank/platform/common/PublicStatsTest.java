@@ -39,7 +39,7 @@ class PublicStatsTest {
     String aliceId = accountId(alice);
     String bobIban = accountIban(bob);
 
-    long transfersBefore = transactions.countByFromAccountIdNotNull();
+    long transfersBefore = transactions.countSettledTransfers(com.bank.platform.ledger.TxStatus.POSTED);
 
     deposit(alice, aliceId, "500.00");
     transfer(alice, bobIban, "120.00");
@@ -48,6 +48,8 @@ class PublicStatsTest {
     mvc.perform(get("/api/public/stats"))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.users").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)))
+        // Two registrations auto-open two checking accounts.
+        .andExpect(jsonPath("$.accounts").value(org.hamcrest.Matchers.greaterThanOrEqualTo(2)))
         .andExpect(jsonPath("$.transfers").value(transfersBefore + 1))
         .andExpect(jsonPath("$.volume").value(org.hamcrest.Matchers.matchesPattern("\\d+(\\.\\d+)?")));
   }

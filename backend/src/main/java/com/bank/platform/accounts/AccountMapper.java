@@ -1,7 +1,5 @@
 package com.bank.platform.accounts;
 
-import com.bank.platform.ledger.TransferDtos.AccountResponse;
-
 /** Sole construction site for the account wire shape. */
 public final class AccountMapper {
 

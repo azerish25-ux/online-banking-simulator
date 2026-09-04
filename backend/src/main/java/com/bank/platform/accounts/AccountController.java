@@ -1,12 +1,13 @@
 package com.bank.platform.accounts;
 
 import com.bank.platform.ledger.MoneyService;
-import com.bank.platform.ledger.TransferDtos.AccountResponse;
-import com.bank.platform.ledger.TransferDtos.DepositRequest;
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.UUID;
+import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -20,28 +21,34 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1/accounts")
 public class AccountController {
 
+  private final AccountService accounts;
   private final MoneyService money;
 
-  public AccountController(MoneyService money) {
+  public AccountController(AccountService accounts, MoneyService money) {
+    this.accounts = accounts;
     this.money = money;
   }
 
   @GetMapping
   public List<AccountResponse> mine(Authentication authentication) {
-    return money.myAccounts(authentication.getName()).stream().map(AccountMapper::toResponse).toList();
+    return accounts.myAccounts(authentication.getName()).stream().map(AccountMapper::toResponse).toList();
   }
 
-  public record OpenAccountRequest(@jakarta.validation.constraints.NotBlank String type) {}
+  public record OpenAccountRequest(@NotBlank String type) {}
+
+  /** Amount travels as a string so JSON never loses cents to float rounding. */
+  public record DepositRequest(
+      @Pattern(regexp = "^\\d+(\\.\\d{1,4})?$", message = "must be a positive amount with up to 4 decimals") String amount) {}
 
   @PostMapping
-  @ResponseStatus(org.springframework.http.HttpStatus.CREATED)
+  @ResponseStatus(HttpStatus.CREATED)
   public AccountResponse open(Authentication authentication, @Valid @RequestBody OpenAccountRequest request) {
-    return AccountMapper.toResponse(money.openAccount(authentication.getName(), request.type()));
+    return AccountMapper.toResponse(accounts.openAccount(authentication.getName(), request.type()));
   }
 
   @GetMapping("/{id}")
   public AccountResponse detail(Authentication authentication, @PathVariable UUID id) {
-    return AccountMapper.toResponse(money.accountDetail(authentication.getName(), id));
+    return AccountMapper.toResponse(accounts.accountDetail(authentication.getName(), id));
   }
 
   @PostMapping("/{id}/deposit")

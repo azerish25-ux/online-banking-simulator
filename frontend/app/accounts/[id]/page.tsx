@@ -7,13 +7,14 @@ import { AppShell } from "../../../components/layout/app-shell";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../../components/ui/card";
+import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../../components/ui/table";
-import type { IssuedCard } from "../../../lib/api-types";
+import type { CardItem, IssuedCard } from "../../../lib/api-types";
 import { useToast } from "../../../components/feedback/toast";
 import { useAccount, useCards, useIssueCard, useSetCardStatus, useTransactions } from "../../../lib/queries";
-import { fmtDate, usd } from "../../../lib/format";
+import { decimalToCents, fmtDate, signedUsd, usd, usdFromCents } from "../../../lib/format";
 import { Routes } from "../../../lib/routes";
 
 
@@ -22,11 +23,16 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
   const account = useAccount(params.id);
   const recent = useTransactions(params.id, 0, 8);
   const isLoan = account.data?.type === "LOAN";
+  // A drawn loan (negative balance) is debt: the hero presents it as a rose
+  // "amount you owe" figure, exactly like the dashboard card.
+  const isOutstandingLoan =
+    account.data != null && isLoan && decimalToCents(account.data.balance) < 0n;
   // LOAN accounts can never hold cards; the query stays idle for them.
   const cards = useCards(isLoan ? "" : params.id);
   const issue = useIssueCard();
   const setCardStatus = useSetCardStatus();
   const [issued, setIssued] = React.useState<IssuedCard | null>(null);
+  const [freezeCandidate, setFreezeCandidate] = React.useState<CardItem | null>(null);
 
   React.useEffect(() => {
     if (issue.isSuccess && issue.data) {
@@ -49,7 +55,16 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
   return (
     <AppShell>
       <p className="text-sm"><Link href={Routes.dashboard} className="text-brass-300 hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Overview</Link></p>
-      {account.data == null ? (
+      {account.isError ? (
+        // A bad or foreign account link must say so, not shimmer forever:
+        // the API answers 404/400 and the query never resolves to data.
+        <div className="mt-3">
+          <EmptyState
+            title="Account not found"
+            description="This link looks wrong, or the account is no longer available. Head back to your overview and pick an account from there."
+          />
+        </div>
+      ) : account.data == null ? (
         <div className="mt-3 space-y-2"><Skeleton className="h-24" /><Skeleton className="h-40" /></div>
       ) : (
         <>
@@ -58,9 +73,21 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
             <Badge tone="info">{account.data.type}</Badge>
             <Badge tone={account.data.status === "ACTIVE" ? "success" : "danger"}>{account.data.status}</Badge>
           </div>
-          <p className="mt-1 text-4xl font-bold tabular-nums">{usd(account.data.balance)}</p>
-          {account.data.type === "SAVINGS" && <p className="muted text-sm">Earns monthly interest, posted automatically.</p>}
-          {account.data.type === "LOAN" && <p className="muted text-sm">Negative balance is what you owe. Interest accrues monthly while negative.</p>}
+          {isOutstandingLoan ? (
+            // Same treatment as the dashboard card: a drawn loan is debt, so it
+            // reads as a rose "amount you owe" figure, never a bare negative.
+            <>
+              <p className="caps muted mt-1 text-xs">Outstanding loan - amount you owe</p>
+              <p className="mt-1 text-4xl font-bold tabular-nums text-rose">{usdFromCents(-decimalToCents(account.data.balance))}</p>
+              <p className="muted text-sm">Interest accrues monthly while the loan is outstanding.</p>
+            </>
+          ) : (
+            <>
+              <p className="mt-1 text-4xl font-bold tabular-nums">{usd(account.data.balance)}</p>
+              {account.data.type === "SAVINGS" && <p className="muted text-sm">Earns monthly interest, posted automatically.</p>}
+              {account.data.type === "LOAN" && <p className="muted text-sm">Negative balance is what you owe. Interest accrues monthly while negative.</p>}
+            </>
+          )}
 
           <div className="mt-4 grid gap-4 lg:grid-cols-2">
             <Card>
@@ -90,7 +117,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
                         <p className="muted text-xs">Exp {c.expMonth}/{c.expYear} · <Badge tone={c.status === "ACTIVE" ? "success" : "danger"}>{c.status}</Badge></p>
                       </div>
                       {c.status === "ACTIVE" ? (
-                        <Button size="sm" variant="secondary" onClick={() => setCardStatus.mutate({ card: c, frozen: true })}>Freeze</Button>
+                        <Button size="sm" variant="secondary" onClick={() => setFreezeCandidate(c)}>Freeze</Button>
                       ) : (
                         <Button size="sm" variant="secondary" onClick={() => setCardStatus.mutate({ card: c, frozen: false })}>Unfreeze</Button>
                       )}
@@ -113,7 +140,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
                         <TRow key={t.id}>
                           <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
                           <TD className="max-w-40 truncate">{t.memo ?? (t.fromIban ? "Transfer" : "Deposit")}</TD>
-                          <TD className="text-right font-semibold tabular-nums">{usd(t.amount)}</TD>
+                          <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, account.data.iban)}</TD>
                         </TRow>
                       ))}
                     </tbody>
@@ -124,6 +151,29 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
           </div>
         </>
       )}
+
+      <ConfirmDialog
+        open={freezeCandidate != null}
+        title="Freeze this card?"
+        confirmLabel="Freeze card"
+        busy={setCardStatus.isPending}
+        body={
+          freezeCandidate ? (
+            <>
+              Card <span className="mono">•••• {freezeCandidate.last4}</span> will stop working until you
+              unfreeze it. You can unfreeze any time - this is not permanent.
+            </>
+          ) : null
+        }
+        onClose={() => setFreezeCandidate(null)}
+        onConfirm={() => {
+          if (!freezeCandidate) return;
+          setCardStatus.mutate(
+            { card: freezeCandidate, frozen: true },
+            { onSuccess: () => setFreezeCandidate(null) }
+          );
+        }}
+      />
     </AppShell>
   );
 }

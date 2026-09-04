@@ -36,6 +36,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["markAllRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/cards/{id}/unfreeze": {
         parameters: {
             query?: never;
@@ -228,6 +244,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/transactions/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/interest/run": {
         parameters: {
             query?: never;
@@ -364,22 +396,6 @@ export interface paths {
             cookie?: never;
         };
         get: operations["unreadCount"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/v1/health": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get: operations["healthV1"];
         put?: never;
         post?: never;
         delete?: never;
@@ -681,10 +697,11 @@ export interface components {
             email?: string;
             fullName?: string;
             role?: string;
+            totpEnabled?: boolean;
         };
         RegisterRequest: {
             email: string;
-            password?: string;
+            password: string;
             fullName: string;
         };
         AuthResponse: {
@@ -710,6 +727,7 @@ export interface components {
             amount?: string;
             currency?: string;
             memo?: string;
+            kind?: string;
             status?: string;
             createdAt?: string;
             flagged?: boolean;
@@ -765,9 +783,9 @@ export interface components {
             paged?: boolean;
             unpaged?: boolean;
             /** Format: int32 */
-            pageSize?: number;
-            /** Format: int32 */
             pageNumber?: number;
+            /** Format: int32 */
+            pageSize?: number;
         };
         SortObject: {
             direction?: string;
@@ -839,6 +857,9 @@ export interface components {
             action?: string;
             entity?: string;
             entityId?: string;
+            metadata?: {
+                [key: string]: string;
+            };
             createdAt?: string;
         };
         PageAuditResponse: {
@@ -867,6 +888,8 @@ export interface components {
         PublicStats: {
             /** Format: int64 */
             users?: number;
+            /** Format: int64 */
+            accounts?: number;
             /** Format: int64 */
             transfers?: number;
             volume?: string;
@@ -924,6 +947,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["NotificationResponse"];
+                };
+            };
+        };
+    };
+    markAllRead: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": {
+                        [key: string]: number;
+                    };
                 };
             };
         };
@@ -1220,6 +1265,28 @@ export interface operations {
             };
         };
     };
+    decline: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransactionResponse"];
+                };
+            };
+        };
+    };
     runInterest: {
         parameters: {
             query?: never;
@@ -1465,28 +1532,6 @@ export interface operations {
                 content: {
                     "*/*": {
                         [key: string]: number;
-                    };
-                };
-            };
-        };
-    };
-    healthV1: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "*/*": {
-                        [key: string]: Record<string, never>;
                     };
                 };
             };
