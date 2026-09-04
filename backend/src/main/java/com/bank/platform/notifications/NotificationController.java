@@ -2,6 +2,7 @@ package com.bank.platform.notifications;
 
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
+import com.bank.platform.common.ApiExceptionHandler;
 import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
@@ -49,9 +50,12 @@ public class NotificationController {
       Authentication authentication,
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
     // Repository bakes in createdAt desc; drop any request sort so Spring Data
-    // never appends a second order-by (see Part 3 sort trap).
+    // never appends a second order-by. The size is capped so a caller asking
+    // for size=9999999 cannot pull every row this user has.
+    int safeSize = Math.min(Math.max(pageable.getPageSize(), 1), 100);
+    int safePage = Math.max(pageable.getPageNumber(), 0);
     org.springframework.data.domain.PageRequest unsorted =
-        org.springframework.data.domain.PageRequest.of(pageable.getPageNumber(), pageable.getPageSize());
+        org.springframework.data.domain.PageRequest.of(safePage, safeSize);
     return service.mine(userOf(authentication.getName()).getId(), unsorted).map(NotificationResponse::from);
   }
 
@@ -63,21 +67,18 @@ public class NotificationController {
   @PostMapping("/{id}/read")
   public NotificationResponse markRead(Authentication authentication, @PathVariable UUID id) {
     User user = userOf(authentication.getName());
-    service.markRead(user.getId(), id);
-    return service.mine(user.getId(), Pageable.unpaged()).stream()
-        .filter(n -> n.getId().equals(id))
-        .findFirst()
-        .map(NotificationResponse::from)
-        .orElseThrow(() -> new NotificationNotFoundException(id));
+    return NotificationResponse.from(service.markRead(user.getId(), id));
+  }
+
+  /** Marks every unread notification for the caller in one statement. */
+  @PostMapping("/read-all")
+  public Map<String, Long> markAllRead(Authentication authentication) {
+    User user = userOf(authentication.getName());
+    return Map.of("marked", (long) service.markAllRead(user.getId()));
   }
 
   @ExceptionHandler(NotificationNotFoundException.class)
   public ResponseEntity<Map<String, Object>> notFound(NotificationNotFoundException ex) {
-    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of(
-        "type", "https://bank.local/problems/404",
-        "title", "Not Found",
-        "status", 404,
-        "detail", ex.getMessage(),
-        "timestamp", Instant.now().toString()));
+    return ApiExceptionHandler.response(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 }

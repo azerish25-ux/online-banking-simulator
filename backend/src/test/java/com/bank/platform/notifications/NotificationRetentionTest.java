@@ -47,4 +47,32 @@ class NotificationRetentionTest {
     assertTrue(repository.findById(fresh.getId()).isPresent());
     assertTrue(repository.findById(old.getId()).isEmpty());
   }
+
+  @Test
+  void markAllReadClearsEveryUnreadInOneStatement() {
+    User user = authService.register("readall@example.com", "secret123", "Read All User");
+    notifications.notify(user.getId(), user.getEmail(), "A", "One", "body");
+    notifications.notify(user.getId(), user.getEmail(), "B", "Two", "body");
+    repository.flush();
+
+    assertEquals(2, repository.countByUserIdAndReadFalse(user.getId()));
+    assertEquals(2, notifications.markAllRead(user.getId()));
+    // Bulk update bypasses the persistence context: re-read from the DB.
+    entityManager.clear();
+    assertEquals(0, repository.countByUserIdAndReadFalse(user.getId()));
+  }
+
+  @Test
+  void markReadReturnsTheRowDirectly() {
+    User user = authService.register("markone@example.com", "secret123", "Mark One User");
+    Notification saved =
+        notifications.notify(user.getId(), user.getEmail(), "A", "One", "body");
+    repository.flush();
+
+    Notification returned = notifications.markRead(user.getId(), saved.getId());
+    assertTrue(returned.isRead(), "the returned row must already be read");
+    repository.flush(); // persist the dirty update before reading through a fresh context
+    entityManager.clear();
+    assertEquals(0, repository.countByUserIdAndReadFalse(user.getId()));
+  }
 }

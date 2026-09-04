@@ -79,10 +79,15 @@ public class NotificationService {
   }
 
   @Transactional
-  public void markRead(UUID userId, UUID id) {
+  public Notification markRead(UUID userId, UUID id) {
     Notification found = notifications.findByIdAndUserId(id, userId)
         .orElseThrow(() -> new NotificationNotFoundException(id));
     found.markRead();
-    notifications.save(found);
+    return notifications.save(found);
+  }
+
+  @Transactional
+  public int markAllRead(UUID userId) {
+    return notifications.markAllRead(userId);
   }
 }
