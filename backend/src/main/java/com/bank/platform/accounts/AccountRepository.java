@@ -16,6 +16,8 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
   boolean existsByIban(String iban);
 
+  long countByUserIdAndType(UUID userId, AccountType type);
+
   Optional<Account> findByIban(String iban);
 
   @Lock(LockModeType.PESSIMISTIC_WRITE)

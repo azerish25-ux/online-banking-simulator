@@ -96,6 +96,8 @@ export default function DashboardPage() {
   // so the card reads as a net figure across all accounts.
   const totalCents = (accs ?? []).reduce((sum, a) => sum + decimalToCents(a.balance), 0n);
   const hasLoan = (accs ?? []).some((a) => a.type === "LOAN");
+  // One open loan at a time (the backend refuses a second).
+  const loanOptionDisabled = hasLoan;
 
   return (
     <AppShell>
@@ -105,7 +107,7 @@ export default function DashboardPage() {
           <p className="muted text-sm">{user ? "Welcome back, " + user.fullName + "." : "Loading..."}</p>
         </div>
         <div className="flex gap-2">
-          <Button variant="secondary" onClick={() => setOpenOpen(true)}>Open account</Button>
+          <Button variant="secondary" onClick={() => { setNewType("SAVINGS"); setOpenOpen(true); }}>Open account</Button>
           <Button variant="secondary" onClick={() => setDepositOpen(true)} disabled={!accs?.length}>
             Simulate deposit
           </Button>
@@ -204,8 +206,11 @@ export default function DashboardPage() {
             <select aria-label="Account type" value={newType} onChange={(e) => setNewType(e.target.value)} className="h-10 w-full rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none">
               <option value="CHECKING">Checking - everyday money</option>
               <option value="SAVINGS">Savings - earns monthly interest</option>
-              <option value="LOAN">Loan - borrow up to $1,000</option>
+              <option value="LOAN" disabled={loanOptionDisabled}>Loan - borrow up to $1,000</option>
             </select>
+            {loanOptionDisabled && (
+              <p className="muted mt-2 text-xs">You already have a loan open - settle it before taking out another.</p>
+            )}
           </Field>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setOpenOpen(false)}>Cancel</Button>
