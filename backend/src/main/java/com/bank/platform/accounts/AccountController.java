@@ -3,6 +3,7 @@ package com.bank.platform.accounts;
 import com.bank.platform.ledger.MoneyService;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import java.math.BigDecimal;
 import java.util.List;
@@ -38,7 +39,8 @@ public class AccountController {
 
   /** Amount travels as a string so JSON never loses cents to float rounding. */
   public record DepositRequest(
-      @Pattern(regexp = "^\\d+(\\.\\d{1,4})?$", message = "must be a positive amount with up to 4 decimals") String amount) {}
+      @NotNull @Pattern(regexp = "^\\d+(\\.\\d{1,4})?$",
+          message = "must be a positive amount with up to 4 decimals") String amount) {}
 
   @PostMapping
   @ResponseStatus(HttpStatus.CREATED)

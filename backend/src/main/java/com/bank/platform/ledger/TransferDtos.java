@@ -1,6 +1,7 @@
 package com.bank.platform.ledger;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
 import java.util.UUID;
@@ -12,7 +13,8 @@ public final class TransferDtos {
   /** Amount travels as a string so JSON never loses cents to float rounding. */
   public record TransferRequest(
       @NotBlank String toIban,
-      @Pattern(regexp = "^\\d+(\\.\\d{1,4})?$", message = "must be a positive amount with up to 4 decimals") String amount,
+      @NotNull @Pattern(regexp = "^\\d+(\\.\\d{1,4})?$",
+          message = "must be a positive amount with up to 4 decimals") String amount,
       // Single-currency ledger: null/blank means USD; anything else must say USD
       // (case-insensitive). Accepting arbitrary ISO codes would let a "EUR"
       // transfer pretend money changed currency when it simply moved USD.

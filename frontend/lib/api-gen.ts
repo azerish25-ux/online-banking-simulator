@@ -634,7 +634,7 @@ export interface components {
     schemas: {
         TransferRequest: {
             toIban: string;
-            amount?: string;
+            amount: string;
             currency?: string;
             memo?: string;
             /** Format: uuid */
@@ -745,7 +745,7 @@ export interface components {
             type: string;
         };
         DepositRequest: {
-            amount?: string;
+            amount: string;
         };
         IssuedCardResponse: {
             /** Format: uuid */
@@ -759,10 +759,11 @@ export interface components {
             status?: string;
         };
         PageTransactionResponse: {
-            /** Format: int32 */
-            totalPages?: number;
             /** Format: int64 */
             totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            pageable?: components["schemas"]["PageableObject"];
             first?: boolean;
             last?: boolean;
             /** Format: int32 */
@@ -773,19 +774,18 @@ export interface components {
             sort?: components["schemas"]["SortObject"][];
             /** Format: int32 */
             numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
             empty?: boolean;
         };
         PageableObject: {
-            /** Format: int64 */
-            offset?: number;
-            sort?: components["schemas"]["SortObject"][];
-            paged?: boolean;
-            unpaged?: boolean;
             /** Format: int32 */
             pageNumber?: number;
             /** Format: int32 */
             pageSize?: number;
+            paged?: boolean;
+            unpaged?: boolean;
+            /** Format: int64 */
+            offset?: number;
+            sort?: components["schemas"]["SortObject"][];
         };
         SortObject: {
             direction?: string;
@@ -802,10 +802,11 @@ export interface components {
             sort?: string[];
         };
         PageNotificationResponse: {
-            /** Format: int32 */
-            totalPages?: number;
             /** Format: int64 */
             totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            pageable?: components["schemas"]["PageableObject"];
             first?: boolean;
             last?: boolean;
             /** Format: int32 */
@@ -816,14 +817,14 @@ export interface components {
             sort?: components["schemas"]["SortObject"][];
             /** Format: int32 */
             numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
             empty?: boolean;
         };
         PageUserResponse: {
-            /** Format: int32 */
-            totalPages?: number;
             /** Format: int64 */
             totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            pageable?: components["schemas"]["PageableObject"];
             first?: boolean;
             last?: boolean;
             /** Format: int32 */
@@ -834,7 +835,6 @@ export interface components {
             sort?: components["schemas"]["SortObject"][];
             /** Format: int32 */
             numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
             empty?: boolean;
         };
         DayTotal: {
@@ -863,10 +863,11 @@ export interface components {
             createdAt?: string;
         };
         PageAuditResponse: {
-            /** Format: int32 */
-            totalPages?: number;
             /** Format: int64 */
             totalElements?: number;
+            /** Format: int32 */
+            totalPages?: number;
+            pageable?: components["schemas"]["PageableObject"];
             first?: boolean;
             last?: boolean;
             /** Format: int32 */
@@ -877,7 +878,6 @@ export interface components {
             sort?: components["schemas"]["SortObject"][];
             /** Format: int32 */
             numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
             empty?: boolean;
         };
         MonthSummary: {

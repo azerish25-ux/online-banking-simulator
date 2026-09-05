@@ -37,6 +37,13 @@ import org.springframework.web.bind.annotation.RestController;
 @RequestMapping("/api/v1")
 public class TransferController {
 
+  /**
+   * Deepest page a history call may address. Beyond it the OFFSET (page * size)
+   * is pointless anyway, and without a cap a caller asking for page=2^31-1
+   * overflows the int offset and 500s in SQL instead of getting an empty page.
+   */
+  private static final int MAX_PAGE_INDEX = 100_000;
+
   private final AccountService accounts;
   private final MoneyService money;
   private final TransactionRepository transactions;
@@ -90,7 +97,7 @@ public class TransferController {
         ? Instant.now().plusSeconds(3600)
         : to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     int safeSize = Math.min(Math.max(size, 1), 100);
-    int safePage = Math.max(page, 0);
+    int safePage = Math.min(Math.max(page, 0), MAX_PAGE_INDEX);
     List<Transaction> rows = transactions.historyPage(
         accountId, fromInstant, toInstant, safeSize, safePage * safeSize);
     long total = transactions.historyCount(accountId, fromInstant, toInstant);

@@ -123,6 +123,27 @@ class MoneyFlowTest {
   }
 
   @Test
+  void missingAmountIsA400NotA500() throws Exception {
+    String token = register("noamount@example.com", "No Amount");
+    String accountId = accountId(token);
+    String other = client.accountIban(register("noamount-b@example.com", "No Amount Bee"));
+
+    // A body without `amount` must fail Bean Validation with a 400 - never
+    // reach `new BigDecimal(null)` in the controller and 500.
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"toIban":"%s","currency":"USD"}""".formatted(other)))
+        .andExpect(status().isBadRequest());
+    mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{}"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
   void amountsPastLedgerScaleRejectedCleanlyInsteadOf500() throws Exception {
     String email = "subcent@example.com";
     String token = register(email, "Subcent User");
@@ -212,6 +233,22 @@ class MoneyFlowTest {
             .param("accountId", accountId))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].flagged").value(true));
+  }
+
+  @Test
+  void absurdPageDepthIsClampedNotAnOverflow500() throws Exception {
+    String token = register("hugepage@example.com", "Huge Page");
+    String accountId = accountId(token);
+    client.deposit(token, accountId, "10.00");
+    // page=Integer.MAX_VALUE used to overflow the int OFFSET into SQL and 500;
+    // it must come back as an empty page instead.
+    mvc.perform(get("/api/v1/transactions")
+            .header("Authorization", "Bearer " + token)
+            .param("accountId", accountId)
+            .param("page", String.valueOf(Integer.MAX_VALUE))
+            .param("size", "100"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content.length()").value(0));
   }
 
   @Test

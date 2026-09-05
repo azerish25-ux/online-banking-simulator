@@ -35,18 +35,21 @@ public interface TransactionRepository
   List<Transaction> findSettledByAccountSince(UUID accountId, TxStatus status, Instant since);
 
   // Statements read oldest-first like a paper bank statement (history - the
-  // interactive feed - stays newest-first). The id tiebreak keeps rows created
-  // in the same instant in a stable order.
+  // interactive feed - stays newest-first). Rows persisted in one flush share
+  // created_at; the monotonic seq tiebreak keeps them in real insertion order
+  // (the UUID id is random and cannot express it - see V14).
   @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
-      + "and t.createdAt >= :from and t.createdAt < :to order by t.createdAt asc, t.id asc")
+      + "and t.createdAt >= :from and t.createdAt < :to order by t.createdAt asc, t.seq asc")
   List<Transaction> statementRows(UUID accountId, Instant from, Instant to);
 
+  // Rows tied on created_at resolve newest-inserted-first via the DB-assigned
+  // seq column (the random UUID id cannot express insertion order - V14).
   @Query(value = "SELECT * FROM ("
       + "SELECT t.* FROM transactions t WHERE t.from_account_id = :accountId "
       + "UNION ALL "
       + "SELECT t.* FROM transactions t WHERE t.to_account_id = :accountId"
       + ") u WHERE u.created_at >= :from AND u.created_at < :to "
-      + "ORDER BY u.created_at DESC, u.id DESC LIMIT :limit OFFSET :offset",
+      + "ORDER BY u.created_at DESC, u.seq DESC LIMIT :limit OFFSET :offset",
       nativeQuery = true)
   List<Transaction> historyPage(UUID accountId, Instant from, Instant to, int limit, int offset);
 
