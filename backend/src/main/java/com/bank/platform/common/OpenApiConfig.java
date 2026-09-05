@@ -5,6 +5,8 @@ import io.swagger.v3.oas.models.OpenAPI;
 import io.swagger.v3.oas.models.info.Info;
 import io.swagger.v3.oas.models.security.SecurityRequirement;
 import io.swagger.v3.oas.models.security.SecurityScheme;
+import io.swagger.v3.oas.models.servers.Server;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -13,9 +15,13 @@ import org.springframework.context.annotation.Configuration;
 public class OpenApiConfig {
 
   private final String version;
+  private final String serverUrl;
 
-  public OpenApiConfig(@Value("${info.app.version:1.2.0}") String version) {
+  public OpenApiConfig(
+      @Value("${info.app.version:1.2.0}") String version,
+      @Value("${app.api.server-url:http://localhost:8080}") String serverUrl) {
     this.version = version;
+    this.serverUrl = serverUrl;
   }
 
   @Bean
@@ -27,6 +33,11 @@ public class OpenApiConfig {
             // health endpoint reports - a pom bump can no longer drift the two.
             .version(version)
             .description("Full-stack online banking demo. Errors are RFC-7807; money travels as JSON strings."))
+        // Pin the servers list. Without it springdoc derives the URL from the
+        // incoming request, so a test-regenerated contract says
+        // "http://localhost" while a live backend on :8080 emits
+        // "http://localhost:8080" and the contract gate can never agree.
+        .servers(List.of(new Server().url(serverUrl)))
         .addSecurityItem(new SecurityRequirement().addList("bearer"))
         .components(new Components().addSecuritySchemes("bearer",
             new SecurityScheme()
