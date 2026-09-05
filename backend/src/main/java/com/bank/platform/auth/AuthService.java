@@ -20,6 +20,7 @@ public class AuthService {
   private final AuditLogRepository audits;
   private final PasswordEncoder passwords;
   private final TotpService totp;
+  private final TotpThrottle totpThrottle;
   private final RefreshTokenRepository refreshTokens;
 
   public AuthService(
@@ -28,12 +29,14 @@ public class AuthService {
       AuditLogRepository audits,
       PasswordEncoder passwords,
       TotpService totp,
+      TotpThrottle totpThrottle,
       RefreshTokenRepository refreshTokens) {
     this.users = users;
     this.accounts = accounts;
     this.audits = audits;
     this.passwords = passwords;
     this.totp = totp;
+    this.totpThrottle = totpThrottle;
     this.refreshTokens = refreshTokens;
   }
 
@@ -84,9 +87,14 @@ public class AuthService {
   @Transactional
   public User enableTotp(String email, String code) {
     User user = userOf(email);
+    // A session holder must not be able to brute-force the six-digit code at
+    // network speed to enable 2FA with their own (or a victim's) session.
+    totpThrottle.verifyAvailable(email);
     if (user.getTotpSecret() == null || !totp.verify(user.getTotpSecret(), code)) {
+      totpThrottle.recordFailure(email);
       throw new BadCredentialsException("Invalid code");
     }
+    totpThrottle.recordSuccess(email);
     user.setTotpEnabled(true);
     users.save(user);
     audits.save(metadataAudit(user, "TOTP_ENABLED"));
@@ -97,9 +105,12 @@ public class AuthService {
   @Transactional
   public User disableTotp(String email, String code) {
     User user = userOf(email);
+    totpThrottle.verifyAvailable(email);
     if (!user.isTotpEnabled() || user.getTotpSecret() == null || !totp.verify(user.getTotpSecret(), code)) {
+      totpThrottle.recordFailure(email);
       throw new BadCredentialsException("Invalid code");
     }
+    totpThrottle.recordSuccess(email);
     user.setTotpEnabled(false);
     user.setTotpSecret(null);
     users.save(user);

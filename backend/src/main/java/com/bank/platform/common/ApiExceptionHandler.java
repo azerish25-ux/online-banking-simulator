@@ -2,6 +2,7 @@ package com.bank.platform.common;
 
 import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.auth.EmailTakenException;
+import com.bank.platform.auth.TooManyTotpAttemptsException;
 import com.bank.platform.beneficiaries.BeneficiaryExistsException;
 import com.bank.platform.beneficiaries.BeneficiaryNotFoundException;
 import com.bank.platform.ledger.InsufficientFundsException;
@@ -78,6 +79,18 @@ public class ApiExceptionHandler {
   @ExceptionHandler(BadCredentialsException.class)
   public ResponseEntity<Map<String, Object>> unauthorized(BadCredentialsException ex) {
     return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
+  }
+
+  /**
+   * An account burned its TOTP verification budget (code guessing defense).
+   * 429 with Retry-After, same RFC-7807 shape as every other error.
+   */
+  @ExceptionHandler(TooManyTotpAttemptsException.class)
+  public ResponseEntity<Map<String, Object>> totpThrottled(TooManyTotpAttemptsException ex) {
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header("Retry-After", "60")
+        .body(ApiExceptionHandler.body(
+            HttpStatus.TOO_MANY_REQUESTS, "Too Many Attempts", ex.getMessage()));
   }
 
   @ExceptionHandler(BeneficiaryExistsException.class)

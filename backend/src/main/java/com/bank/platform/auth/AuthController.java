@@ -31,6 +31,7 @@ public class AuthController {
   private final JwtService jwtService;
   private final RefreshService refreshService;
   private final TotpService totpService;
+  private final TotpThrottle totpThrottle;
   private final UserRepository users;
   private final boolean cookieSecure;
 
@@ -39,12 +40,14 @@ public class AuthController {
       JwtService jwtService,
       RefreshService refreshService,
       TotpService totpService,
+      TotpThrottle totpThrottle,
       UserRepository users,
       @Value("${app.cookie.secure:false}") boolean cookieSecure) {
     this.authService = authService;
     this.jwtService = jwtService;
     this.refreshService = refreshService;
     this.totpService = totpService;
+    this.totpThrottle = totpThrottle;
     this.users = users;
     this.cookieSecure = cookieSecure;
   }
@@ -79,9 +82,15 @@ public class AuthController {
     }
     User user = users.findByEmail(email)
         .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    // The per-IP auth limiter also guards this path, but the challenge token is
+    // proof the caller already knows the password - a per-account budget stops
+    // that caller from brute-forcing the six-digit code at network speed.
+    totpThrottle.verifyAvailable(email);
     if (!user.isTotpEnabled() || !totpService.verify(user.getTotpSecret(), request.code())) {
+      totpThrottle.recordFailure(email);
       throw new BadCredentialsException("Invalid code");
     }
+    totpThrottle.recordSuccess(email);
     return withRefresh(user, response);
   }
 
