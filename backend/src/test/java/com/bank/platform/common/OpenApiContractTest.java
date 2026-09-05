@@ -47,8 +47,11 @@ class OpenApiContractTest {
 
     JsonNode generatedNode = objectMapper.readTree(generated);
     if (Boolean.getBoolean("openapi.regen")) {
+      // springdoc emits object keys in JVM-dependent order, so a raw write
+      // churns the committed file on every regen. Sort keys canonically
+      // (mirroring the CI comparison) so a regen diff is a real change only.
       Files.writeString(COMMITTED,
-          objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(generatedNode));
+          objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(canonical(generatedNode)));
       return;
     }
 
@@ -70,7 +73,26 @@ class OpenApiContractTest {
     }
     com.fasterxml.jackson.databind.node.ObjectNode copy = root.deepCopy();
     copy.remove("servers");
-    return copy;
+    return canonical(copy);
+  }
+
+  /** Recursively sorts object keys so comparisons and regenerations never care about map order. */
+  private static JsonNode canonical(JsonNode node) {
+    if (node.isObject()) {
+      com.fasterxml.jackson.databind.node.ObjectNode sorted =
+          com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.objectNode();
+      node.properties().stream()
+          .sorted(java.util.Map.Entry.comparingByKey())
+          .forEach(e -> sorted.set(e.getKey(), canonical(e.getValue())));
+      return sorted;
+    }
+    if (node.isArray()) {
+      com.fasterxml.jackson.databind.node.ArrayNode array =
+          com.fasterxml.jackson.databind.node.JsonNodeFactory.instance.arrayNode();
+      node.forEach(item -> array.add(canonical(item)));
+      return array;
+    }
+    return node.deepCopy();
   }
 
   private String readCommitted() throws IOException {

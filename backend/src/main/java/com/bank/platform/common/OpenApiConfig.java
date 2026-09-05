@@ -18,7 +18,7 @@ public class OpenApiConfig {
   private final String serverUrl;
 
   public OpenApiConfig(
-      @Value("${info.app.version:1.2.0}") String version,
+      @Value("${info.app.version:1.3.0}") String version,
       @Value("${app.api.server-url:http://localhost:8080}") String serverUrl) {
     this.version = version;
     this.serverUrl = serverUrl;
