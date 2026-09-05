@@ -73,6 +73,52 @@ function renderPage(client: QueryClient) {
   );
 }
 
+describe("transfers page HELD outcome", () => {
+  it("says a review-threshold transfer is held, never that it posted", async () => {
+    vi.mocked(api).mockImplementation(async (path: string, options?: RequestInit) => {
+      if (path.startsWith("/v1/auth/me")) return user;
+      if (path.startsWith("/v1/notifications/unread-count")) return { unread: 0 };
+      if (path.startsWith("/v1/beneficiaries")) return [];
+      if (path.startsWith("/v1/accounts") && !path.includes("deposit")) return [checking, savings];
+      if (path === "/v1/transfers" && options?.method === "POST") {
+        return {
+          id: "tx-held",
+          fromIban: checking.iban,
+          toIban: savings.iban,
+          amount: "10000.00",
+          currency: "USD",
+          memo: "big wire",
+          status: "HELD",
+          createdAt: new Date().toISOString(),
+          flagged: true
+        };
+      }
+      return { id: "u1" };
+    });
+
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    renderPage(client);
+
+    // Wait for the form to be ready (source account defaults once accounts load).
+    const select = (await screen.findByLabelText("From account")) as HTMLSelectElement;
+    await waitFor(() => expect(select.options.length).toBe(2));
+
+    await userEvent.type(await screen.findByLabelText("Recipient IBAN"), savings.iban);
+    await userEvent.type(screen.getByLabelText("Amount (USD)"), "10000.00");
+    await userEvent.type(screen.getByLabelText("Memo (optional)"), "big wire");
+    await userEvent.click(screen.getByRole("button", { name: /Send transfer/ }));
+
+    // The receipt card must read HELD, and the toast must say the transfer is
+    // awaiting review - the regression where a bare `status` reference resolved
+    // to the legacy window.status global and toasted "Transfer posted.".
+    await screen.findByRole("heading", { name: "Transfer submitted for review" });
+    await waitFor(() =>
+      expect(screen.getByText(/it is sent once an operator approves it/)).toBeTruthy()
+    );
+    expect(screen.queryByText("Transfer posted.")).toBeNull();
+  });
+});
+
 describe("transfers page source account", () => {
   it("keeps the user's chosen source when accounts refetch", async () => {
     const paths: string[] = [];

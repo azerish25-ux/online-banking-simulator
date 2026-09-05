@@ -10,6 +10,42 @@ import { expect, test } from "@playwright/test";
  * full IBAN - the transfers form only ever shows truncated IBANs.
  */
 const email = `e2e-${Date.now()}@bank.local`;
+const emailHeld = `e2e-held-${Date.now()}@bank.local`;
+
+test("review-threshold transfer is held for review, never reported as posted", async ({ page }) => {
+  // Register → dashboard.
+  await page.goto("/register");
+  await page.getByLabel("Full name").fill("E2E Held User");
+  await page.getByLabel("Email").fill(emailHeld);
+  await page.getByLabel("Password", { exact: true }).fill("secret123");
+  await page.getByRole("button", { name: /Create account/ }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  // Open a savings account as the recipient, then fund checking past the
+  // $10,000 review threshold.
+  await page.getByRole("button", { name: "Open account" }).click();
+  await page.getByLabel("Account type").selectOption("SAVINGS");
+  await page.getByRole("button", { name: /^Open$/, exact: true }).click();
+  await expect(page.getByText("Account opened.")).toBeVisible();
+  const savingsIban = (await page.locator("p.mono").allTextContents())[1].trim();
+
+  await page.getByRole("button", { name: /Simulate deposit/ }).click();
+  await page.getByLabel("Amount (USD)").fill("10000");
+  await page.getByRole("button", { name: /^Deposit$/ }).click();
+  await expect(page.getByText("Deposited $10,000.00")).toBeVisible();
+
+  // A $10,000+ transfer must NOT toast "Transfer posted" - it is held until
+  // an operator approves it (the regression: a bare `status` reference
+  // resolved to window.status and always reported the transfer as posted).
+  await page.goto("/transfers");
+  await page.getByLabel("Recipient IBAN").fill(savingsIban);
+  await page.getByLabel("Amount (USD)").fill("10000.00");
+  await page.getByRole("button", { name: /Send transfer/ }).click();
+
+  await expect(page.getByRole("heading", { name: "Transfer submitted for review" })).toBeVisible();
+  await expect(page.getByText(/sent once an operator approves it/)).toBeVisible();
+  await expect(page.getByText("$10,000.00 →")).toBeVisible();
+});
 
 test("full money loop in the browser", async ({ page }) => {
   // Register → dashboard.

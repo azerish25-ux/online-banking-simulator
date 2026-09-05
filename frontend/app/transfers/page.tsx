@@ -64,12 +64,13 @@ export default function TransfersPage() {
   React.useEffect(() => {
     if (transfer.isSuccess && transfer.data) {
       const d = transfer.data;
+      const held = d.status === "HELD";
       setReceipt({ id: d.id, toIban: d.toIban, amount: d.amount, status: d.status });
       push(
-        status === "HELD"
+        held
           ? "Transfer submitted for review - it is sent once an operator approves it."
           : "Transfer posted.",
-        status === "HELD" ? "info" : "success"
+        held ? "info" : "success"
       );
       // Keep the source account; clear the rest for the next transfer. The
       // effect fires only when isSuccess flips, so reading the current form
