@@ -58,7 +58,19 @@ export function signedUsd(
 export function fmtDate(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return iso;
-  return d.toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+  const options: Intl.DateTimeFormatOptions = {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit"
+  };
+  // A row from a previous year must say so - December's activity otherwise
+  // reads as if it happened this year forever (activity and notifications
+  // both span years).
+  if (d.getFullYear() !== new Date().getFullYear()) {
+    options.year = "numeric";
+  }
+  return d.toLocaleString("en-US", options);
 }
 
 export function shortId(id: string): string {

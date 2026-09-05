@@ -1,3 +1,5 @@
+"use client";
+
 import * as React from "react";
 import Link from "next/link";
 import { BrandName } from "../../lib/brand";
@@ -14,6 +16,11 @@ export function AuthShell({
   children: React.ReactNode;
   footer?: React.ReactNode;
 }) {
+  // Title the browser tab like every other page ("Log in - ..."), not just the brand.
+  React.useEffect(() => {
+    document.title = BrandName + (title ? " · " + title : "");
+  }, [title]);
+
   return (
     <div className="flex min-h-screen items-center justify-center bg-ink-900 p-4">
       <div className="w-full max-w-md">

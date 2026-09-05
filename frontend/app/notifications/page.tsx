@@ -57,7 +57,7 @@ export default function NotificationsPage() {
                 <li key={n.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                   <div>
                     <p className="text-sm">
-                      {!n.read && <span className="mr-2 inline-block h-2 w-2 rounded-full bg-brass-400" aria-label="unread" />}
+                      {!n.read && <span role="img" aria-label="Unread" className="mr-2 inline-block h-2 w-2 rounded-full bg-brass-400" />}
                       <strong>{n.title}</strong>
                     </p>
                     <p className="muted text-sm">{n.body}</p>

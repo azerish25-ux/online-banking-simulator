@@ -20,10 +20,29 @@ const NAV = [
   { href: Routes.settings, label: "Security" }
 ];
 
+// Browser-tab titles per route. The shell owns them so every page reports
+// where the user is instead of just the brand name; order matters (longer
+// prefixes first so /accounts/123 matches before a bare /accounts rule).
+const ROUTE_TITLES: Array<{ prefix: string; label: string }> = [
+  { prefix: Routes.admin, label: "Operations" },
+  { prefix: Routes.transfers, label: "Send money" },
+  { prefix: Routes.activity, label: "Activity" },
+  { prefix: Routes.beneficiaries, label: "Beneficiaries" },
+  { prefix: Routes.notifications, label: "Notifications" },
+  { prefix: Routes.settings, label: "Security" },
+  { prefix: "/accounts/", label: "Account" },
+  { prefix: Routes.dashboard, label: "Overview" }
+];
+
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const qc = useQueryClient();
+
+  React.useEffect(() => {
+    const match = ROUTE_TITLES.find((r) => pathname.startsWith(r.prefix));
+    document.title = match ? BrandName + " · " + match.label : BrandName;
+  }, [pathname]);
   // Cached session + unread badge: no refetch churn on navigation.
   const me = useMe();
   const unread = useUnreadCount();

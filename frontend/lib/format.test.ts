@@ -60,6 +60,11 @@ describe("fmtDate", () => {
   it("renders a readable date", () => {
     expect(fmtDate("2026-09-02T17:00:00Z")).toContain("Sep");
   });
+  it("adds the year only for dates in a different year", () => {
+    const thisYear = new Date().getFullYear();
+    expect(fmtDate(thisYear + "-09-02T17:00:00Z")).not.toContain(", " + thisYear);
+    expect(fmtDate("1999-12-31T23:59:00Z")).toContain(", 1999");
+  });
   it("passes through invalid input", () => {
     expect(fmtDate("garbage")).toBe("garbage");
   });
