@@ -11,7 +11,8 @@ import { Field, Input } from "../../components/ui/input";
 import { PasswordInput } from "../../components/ui/password-input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
-import type { AuthResponse } from "../../lib/api-types";import { Routes } from "../../lib/routes";
+import type { AuthResponse } from "../../lib/api-types";
+import { Routes } from "../../lib/routes";
 
 export default function RegisterPage() {
   const router = useRouter();

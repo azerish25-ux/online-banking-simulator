@@ -20,7 +20,10 @@ export function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Session posture (deliberate split):
-  // - bank_token (access, 15m) is readable here FOR ROUTING ONLY.
+  // - bank_token (access, 15m) is readable here FOR ROUTING ONLY. Its cookie
+  //   Max-Age mirrors the JWT TTL (lib/api.ts), so an idle session past the
+  //   token lifetime may bounce to login even though the HttpOnly refresh
+  //   cookie could still repair it - accepted: routing is UX-only.
   // - refresh_token is HttpOnly: invisible to JS and to this middleware.
   // The API re-verifies signature + role on every call; a stolen access
   // token is therefore blast-radius-limited to 15 minutes. A full BFF

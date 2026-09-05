@@ -15,9 +15,6 @@ import { useToast } from "../../components/feedback/toast";
 import { useAddBeneficiary, useBeneficiaries, useRemoveBeneficiary } from "../../lib/queries";
 import type { Beneficiary } from "../../lib/api-types";
 
-
-
-
 export default function BeneficiariesPage() {
   const { push } = useToast();
   const beneficiaries = useBeneficiaries();
