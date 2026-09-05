@@ -3,12 +3,14 @@
 export const Routes = {
   home: "/",
   login: "/login",
+  loginMfa: "/login/mfa",
   register: "/register",
   dashboard: "/dashboard",
   transfers: "/transfers",
   activity: "/activity",
   beneficiaries: "/beneficiaries",
   notifications: "/notifications",
+  settings: "/settings",
   design: "/design",
   admin: "/admin",
   account: (id: string) => "/accounts/" + id

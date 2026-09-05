@@ -6,8 +6,8 @@
 
 | Suite | Command (run in folder) | What it proves |
 |-------|-------------------------|----------------|
-| Backend unit + API tests | `.\mvnw.cmd verify` in `backend/` | 32 tests + JaCoCo gate (≥55% line coverage) |
-| Frontend unit tests | `npm test` in `frontend/` | 38 Vitest tests (validation, formatting, API client, typed query hooks, RTL component suite) |
+| Backend unit + API tests | `.\mvnw.cmd verify` in `backend/` | 68 tests + JaCoCo gate (≥55% line coverage) |
+| Frontend unit tests | `npm test` in `frontend/` | 49 Vitest tests (validation, formatting, API client, typed query hooks, RTL component suite) |
 | Frontend build + lint | `npm run build`, `npm run lint` in `frontend/` | Production bundle + ESLint |
 | Browser e2e | `npx playwright test` in `frontend/` (stack running) | 8 tests: smoke, a11y, and the full money loop against real Postgres - served on the canonical `:3000` origin (the backend's CORS allow-list rejects others) |
 | README screenshots | `npx playwright test --config=playwright.screenshots.config.ts` in `frontend/` | Captures `docs/screenshots/*` from the live seeded product; excluded from the default suite and CI so PNGs only change when regenerated |
@@ -43,7 +43,7 @@ before merging a part. If CI ever gains a Postgres service, add a
 ## Performance notes (measured 2026-09-02, local PG 16)
 
 - Indexes: `idx_accounts_user`, `idx_tx_from`, `idx_tx_to`, `idx_tx_flagged`, beneficiary/audit/card indexes (see V1/V4/V5/V7).
-- `EXPLAIN` on the history query (`from = X OR to = X ORDER BY created_at DESC LIMIT 20`) shows a **seq scan**: the OR across two single-column indexes is not index-friendly. Fine at demo scale; if volume grows, rewrite as `UNION ALL` of two halves over a composite `(account_id, created_at)` access path.
+- The paged history query is a native `UNION ALL` of the from/to halves (`TransactionRepository.historyPage`), ordered `created_at DESC, id DESC` with a limit, over `idx_tx_from` / `idx_tx_to`; a composite `(account_id, created_at)` index is the next step if volume grows.
 - N+1 audit: every multi-row read resolves counterpart IBANs with one batched `findAllById` (`ibanMap`); no per-row queries in hot paths.
 - `GET .../summary` is Caffeine-cached (5 min, 2000 entries) and evicted on every money mutation incl. the interest job.
 - Responses carry `X-Request-Id` (minted or propagated) and logs embed it via the `traceId` MDC slot.

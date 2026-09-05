@@ -11,9 +11,7 @@ import { Field, Input } from "../../components/ui/input";
 import { PasswordInput } from "../../components/ui/password-input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
-import { Routes } from "../../lib/routes";
-
-
+import type { AuthResponse } from "../../lib/api-types";import { Routes } from "../../lib/routes";
 
 export default function RegisterPage() {
   const router = useRouter();
@@ -22,7 +20,7 @@ export default function RegisterPage() {
 
   async function onSubmit(values: Form) {
     try {
-      const data = await api("/v1/auth/register", { method: "POST", body: JSON.stringify(values) });
+      const data = await api<AuthResponse>("/v1/auth/register", { method: "POST", body: JSON.stringify(values) });
       setToken(data.accessToken);
       push("Account created. A checking account is ready.", "success");
       router.push(Routes.dashboard);

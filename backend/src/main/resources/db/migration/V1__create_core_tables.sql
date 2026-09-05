@@ -1,4 +1,4 @@
--- Part 2 core tables. Portable SQL: runs on PostgreSQL and H2 (PostgreSQL mode).
+-- Core tables. Portable SQL: runs on PostgreSQL and H2 (PostgreSQL mode).
 -- IDs are generated in Java (@PrePersist), so no DB-specific defaults.
 
 CREATE TABLE IF NOT EXISTS users (

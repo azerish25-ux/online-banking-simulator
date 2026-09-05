@@ -1,4 +1,4 @@
--- Part 8: interest support, virtual cards, in-app notifications.
+-- Interest support, virtual cards, in-app notifications.
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS credit_limit NUMERIC(19,4) NOT NULL DEFAULT 0;
 ALTER TABLE accounts ADD COLUMN IF NOT EXISTS last_interest_at TIMESTAMP WITH TIME ZONE;
 

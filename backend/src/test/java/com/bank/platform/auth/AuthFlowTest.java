@@ -68,8 +68,13 @@ class AuthFlowTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value("ada@example.com"));
 
+    // No credentials on a protected endpoint is 401 (RFC-7807) - the browser
+    // silent-refresh path only fires on 401, so 403 here would kill sessions
+    // at expiry instead of repairing them.
     mvc.perform(get("/api/v1/auth/me"))
-        .andExpect(status().isForbidden());
+        .andExpect(status().isUnauthorized())
+        .andExpect(jsonPath("$.title").value("Unauthorized"))
+        .andExpect(jsonPath("$.detail").exists());
   }
 
   @Test
@@ -109,6 +114,15 @@ class AuthFlowTest {
             .content("""
                 {"email":"not-an-email","password":"short","fullName":""}"""))
         .andExpect(status().isBadRequest());
+
+    // A missing password must be a clean validation failure, never a 500 or a
+    // leak of BCrypt internals (password is required, not merely size-capped).
+    mvc.perform(post("/api/v1/auth/register")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"email":"nopass@example.com","fullName":"No Password"}"""))
+        .andExpect(status().isBadRequest())
+        .andExpect(jsonPath("$.title").value("Validation Failed"));
   }
 
   @Test

@@ -10,8 +10,10 @@ export default function NotFound() {
         <CardTitle className="display">Page not found</CardTitle>
         <CardDescription>The page you are looking for does not exist.</CardDescription>
         <div className="mt-4">
-          <Link href={Routes.dashboard}>
-            <Button>Back to dashboard</Button>
+          {/* The landing page is public - a 404 visitor who is not signed in
+              would otherwise bounce off /dashboard straight to login. */}
+          <Link href={Routes.home}>
+            <Button>Back to the simulator</Button>
           </Link>
         </div>
       </Card>

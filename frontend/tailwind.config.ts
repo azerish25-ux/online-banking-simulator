@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Northbank design tokens - "private-bank ink".
+ * Simulator design tokens - "private-bank ink".
  *
  * The palette is bespoke: deep ink blues for surfaces, a brass accent that
  * reads as engraved hardware rather than a SaaS landing page, and a serif

@@ -9,6 +9,7 @@ import { useMe, useUnreadCount } from "../../lib/queries";
 import { Bell } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { Routes } from "../../lib/routes";
+import { BrandName } from "../../lib/brand";
 
 const NAV = [
   { href: Routes.dashboard, label: "Overview" },
@@ -16,7 +17,7 @@ const NAV = [
   { href: Routes.activity, label: "Activity" },
   { href: Routes.beneficiaries, label: "Beneficiaries" },
   { href: Routes.notifications, label: "Notifications" },
-  { href: Routes.design, label: "Design system" }
+  { href: Routes.settings, label: "Security" }
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -51,10 +52,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       </a>
       <div className="mx-auto flex min-h-screen max-w-6xl">
         <aside className="hidden w-56 shrink-0 border-r border-line p-5 md:block" aria-label="Primary">
-          <p className="display text-xl font-semibold tracking-tight">
-            Northbank
-          </p>
-          <p className="caps muted mt-1 normal-case text-brass-400">Private banking · demo</p>
+          <p className="display text-xl font-semibold tracking-tight">{BrandName}</p>
+          <p className="caps muted mt-1 normal-case text-brass-400">Simulator demo · no real money</p>
           <nav className="mt-6 flex flex-col gap-1">
             {navItems.map((item) => (
               <Link

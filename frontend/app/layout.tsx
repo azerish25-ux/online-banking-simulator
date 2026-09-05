@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Cormorant_Garamond, Inter } from "next/font/google";
+import { BrandName } from "../lib/brand";
 import "./globals.css";
 import { ToastProvider } from "../components/feedback/toast";
 import { QueryProvider } from "../components/providers/query-provider";
@@ -14,8 +15,9 @@ const display = Cormorant_Garamond({
 });
 
 export const metadata: Metadata = {
-  title: "Northbank - Enterprise Banking",
-  description: "Portfolio enterprise banking platform: Next.js + Spring Boot + PostgreSQL"
+  title: BrandName,
+  description:
+    "A full-stack online banking demo - accounts, transfers, interest, cards, 2FA and an operator console - built with Next.js and Spring Boot."
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

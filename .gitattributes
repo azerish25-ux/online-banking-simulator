@@ -1,0 +1,17 @@
+# Normalize all text to LF in the repository. The working tree may show CRLF
+# until files are renormalized (git add --renormalize) on a future commit.
+* text=auto eol=lf
+
+# Windows-native scripts keep CRLF so they run unchanged when checked out on
+# Windows (PowerShell and cmd handle LF fine, but this avoids any doubt).
+*.ps1 text eol=crlf
+*.bat text eol=crlf
+
+# Binary assets must never be touched by text normalization.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.pdf binary
+*.jar binary
+*.woff2 binary

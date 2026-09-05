@@ -1,33 +1,43 @@
 # Security Review
 
 (Originally "Part 6"; re-verified through the hardening release - refresh
-rotation, TOTP, proxy-header trust flag, deposit caps, RFC-7807 everywhere.)
+rotation, TOTP, proxy-header trust flag, deposit caps, RFC-7807 everywhere -
+and again through the 1.1.0 deep-dive audit of 2026-09-04 (session-refresh
+persistence, idempotency scoping, the interest race, the TOTP web UI, a
+fail-fast deployment guard) and the 1.2.0 audits of the same day, which made
+review-threshold transfers genuinely hold until an operator approves them,
+scoped idempotency keys per sender account, capped statements, closed the
+summary-cache authorization gap, re-scoped the refresh cookie to the path the
+browser actually calls, made the RFC-7807 error surface complete, and capped
+passwords by UTF-8 byte length instead of characters.)
 
 Scope: Spring Boot API + Next.js frontend, local single-instance deployment.
-Method: code review + automated tests (AdminFlowTest, RateLimitTest) + live verification.
+Method: code review + automated tests (58 fast tests + JaCoCo gate, concurrency
+IT against real Postgres in CI) + live verification on the seeded stack.
 
 ## ✅ Passing
 
 | # | Control | How it holds |
 |---|---------|--------------|
-| 1 | Password storage | BCrypt(12), never logged or returned (no getter on the wire; `UserResponse` excludes hash) |
-| 2 | AuthN | JWT HS256, 15-min access tokens, `sub` + `role` claims, signature verified per request |
+| 1 | Password storage | BCrypt(12), never logged or returned (no getter on the wire; `UserResponse` excludes hash); the 72-byte BCrypt ceiling is enforced as bytes (`@PasswordBytes`), so multibyte passwords can't silently truncate |
+| 2 | AuthN | JWT HS512, 15-min access tokens, `sub`/`role`/`iss`/`aud`/`jti` claims, signature + issuer + audience verified per request |
 | 3 | AuthZ | Stateless filter sets `ROLE_*`; `/admin/**` additionally guarded by `@PreAuthorize("hasRole('ADMIN')")` (defense in depth: `AdminService` re-checks the role) |
-| 4 | Credential stuffing | Token-bucket rate limit on login/register (20/min/IP default, `Retry-After`, isolated test at 5/min) |
+| 4 | Credential stuffing | Token-bucket rate limit on login/register (20/min/real-IP default, `Retry-After`, isolated test at 5/min). `X-Forwarded-For` is honored only behind `TRUST_PROXY_HEADERS=true`; in the compose deployment the backend publishes no host port, so every request arrives through the Next.js proxy and gets its own bucket |
 | 5 | Login enumeration | Identical "Invalid email or password" for unknown email vs wrong password; register-duplicate 409 is accepted tradeoff |
-| 6 | Money safety | Pessimistic locking (ID-ordered), `NUMERIC(19,4)` + `BigDecimal`, amounts as JSON strings, idempotency keys |
+| 6 | Money safety | Pessimistic locking (ID-ordered), `NUMERIC(19,4)` + `BigDecimal`, amounts as JSON strings; idempotency keys scoped to owner + source account + kind (a foreign replay returns 404, never another user's row); interest accrual selects candidates `FOR UPDATE` so concurrent runs can't double-accrue |
 | 7 | Frozen accounts | `FROZEN` status blocks transfers AND deposits at the service layer; freeze/unfreeze audited with admin actor |
 | 8 | Audit trail | Every register/deposit/transfer/freeze writes `audit_logs`; admin-only viewer with action filter |
 | 9 | Transport headers (API) | `nosniff`, `DENY` framing, `no-referrer`, locked `Permissions-Policy`, strict CSP (`default-src 'none'`) |
 | 10 | CORS | Exact-origin allowlist (default `http://localhost:3000`), only needed methods/headers; browser app uses same-origin proxy anyway |
-| 11 | Secrets | JWT secret, admin password, DB creds via env (`JWT_SECRET`, `APP_ADMIN_*`, `PG_*`); defaults are dev-only with a loud boot warning |
-| 12 | Error handling | RFC-7807 bodies, no stack traces to clients, validation messages field-scoped |
+| 11 | Secrets | JWT secret, admin password, DB creds via env (`JWT_SECRET`, `APP_ADMIN_*`, `PG_*`); defaults warn loudly at boot and `app.deployment-env=production` refuses to start until real secrets are set |
+| 12 | Error handling | RFC-7807 on every path: field validation, business failures, constraint violations, malformed JSON/UUIDs, unknown routes, and a catch-all so even an unhandled exception answers a problem+json body - never HTML or a stack trace. Missing/invalid/expired credentials answer **401** (the status the browser's silent refresh keys on) via the security entry point; authenticated-but-forbidden stays **403** - both RFC-7807 |
+| 13 | Review queue | Transfers at/above the threshold never settle on submit: a HELD row records the intent and an operator must approve it (money moves under the same ID-ordered locks; the HELD→POSTED flip is atomic so two approvals can't double-settle) or decline it (CANCELLED, no money ever moves). Flagged deposits credit on arrival and only need acknowledging. Replays of a held transfer's idempotency key return the same row |
 
 ## ⚠️ Known limitations (documented, not ignored)
 
 1. **Default admin password** (`change-me-admin-123`) if env is unset - boot log warns loudly; production checklists must set `APP_ADMIN_PASSWORD`.
-2. **Rate limiter is in-memory** - correct for one instance; move to Redis behind a load balancer.
-3. **Refresh rotation + TOTP shipped (Phase C)** - 7-day HttpOnly rotating refresh with reuse detection (family burn on replay), TOTP setup/QR/enable/disable plus a 5-minute purpose-bound login challenge. Remaining: no WebAuthn/passkeys yet.
+2. **Rate limiter is in-memory per instance** - buckets evict on expiry, which is correct for one instance; Redis is the documented step behind a load balancer.
+3. **Refresh rotation + TOTP complete** - 7-day HttpOnly rotating refresh with reuse detection (family burn on replay). The purge job deletes only expired rows - revoked-but-unexpired rows must survive or replay detection breaks. TOTP is end-to-end: setup/QR/secret on the Security page, enable and disable (code-confirmed), and a 5-minute purpose-bound `/login/mfa` challenge - verified live with real codes. Remaining: no WebAuthn/passkeys yet.
 4. **No account lockout** - rate limiting + BCrypt cost make online brute force uneconomical; lockout risks user-enumeration and support load.
 5. **Middleware role check is UX-only** - it decodes (not verifies) the JWT for routing; the API re-verifies signature + role on every call.
 
@@ -35,14 +45,19 @@ Method: code review + automated tests (AdminFlowTest, RateLimitTest) + live veri
 
 - `X-Forwarded-For` is ignored unless `TRUST_PROXY_HEADERS=true`; deposits capped at `DEPOSIT_MAX` (default 100000) and flagged at the review threshold.
 - Actuator matchers narrowed to health/info; CORS allows + exposes `X-Request-Id`.
-- Refresh cookie: `HttpOnly; Path=/api/v1/auth; SameSite=Lax`, `Secure` iff `COOKIE_SECURE=true`.
+- Refresh cookie: `HttpOnly; Path=/backend/v1/auth; SameSite=Lax`, `Secure` iff `COOKIE_SECURE=true` - scoped to the proxied path the browser actually calls, so the cookie is sent on refresh requests (previously `Path=/api/v1/auth`, which never matched `/backend/v1/auth/*`, silently killing every session at the first token expiry).
 - Access cookie stays readable for edge routing only - blast radius 15 minutes; documented in `middleware.ts`.
 
 ## How to re-verify
 
 ```powershell
-.\mvnw.cmd test                      # backend: 8 tests incl. freeze flow + 429 test (from backend/)
-npm run build                         # frontend (from frontend/)
-.\start-all.ps1; .\seed-demo.ps1      # live stack + demo data
-# login as admin@bank.local / change-me-admin-123 -> Operations -> freeze Alice -> her transfer fails 400
+.\mvnw.cmd verify                    # backend: 68 tests + JaCoCo gate (from backend/)
+cd ..\frontend; npm run lint; npm test   # 49 unit/component tests
+npm run build; npx playwright test   # e2e against the running stack
+.\start-all.ps1; .\seed-demo.ps1     # live stack + demo data
+# customer: alice@bank.local / secret123 -> Security -> Set up authenticator,
+#   enter a code from an authenticator app, log out, log in -> /login/mfa challenge
+# operator: admin@bank.local / change-me-admin-123 -> Operations -> review queue:
+#   the seeded $12,500 wire sits HELD - Approve settles it, Decline cancels it;
+#   freeze Alice -> her transfer fails 400
 ```

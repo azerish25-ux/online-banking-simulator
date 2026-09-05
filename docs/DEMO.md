@@ -4,8 +4,8 @@ Audience: interviewer. Stack running via `.\start-all.ps1`, data via `.\seed-dem
 
 ## 0:00 - Landing (15s)
 
-Open http://localhost:3000. "Northbank: Next.js up front, Spring Boot + Postgres behind.
-Every money mutation is audited, transfers are atomic and idempotent."
+Open http://localhost:3000. "Online Banking Simulator: Next.js up front, Spring Boot + Postgres behind.
+Every money mutation is audited, transfers are atomic and idempotent, and large wires wait for operator approval."
 
 ## 0:15 - Customer flow (45s)
 
@@ -25,7 +25,8 @@ Every money mutation is audited, transfers are atomic and idempotent."
 
 1. New tab, log in as `admin@bank.local` / `change-me-admin-123` → **Operations**.
 2. Search Alice → **Freeze** her account. Back as Alice: transfer fails with a clear error.
-3. Show the **review queue** (the $15k+ demo transfer is flagged), mark it reviewed.
+3. Show the **review queue**: the seeded $12,500 wire sits HELD with real Approve/Decline
+actions - approve it and both sides get a notification.
 4. **Daily totals** + **audit log** filtered to `ACCOUNT_FROZEN`.
 
 ## Closer lines

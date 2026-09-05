@@ -44,15 +44,16 @@ test("landing, dashboard, and transfer receipt", async ({ page }) => {
   await page.getByLabel("Password", { exact: true }).fill("secret123");
   await page.getByRole("button", { name: /^Log in$/ }).click();
   await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByText("Total balance")).toBeVisible();
+  await expect(page.getByText(/(Net position|Total) across accounts/)).toBeVisible();
   await shot(page, "dashboard.png", true);
 
-  // 3 - Transfer flow: post a real transfer, capture the receipt. The form
-  // data is ready once any option exists (the demo user may hold one account
-  // or several; the first is fine as the source).
+  // 3 - Transfer flow: post a real transfer, capture the receipt. Register
+  // auto-opens exactly one checking account and the seed adds none, so the
+  // source select holds one option - wait for it to exist rather than
+  // asserting a magic count.
   await page.goto("/transfers");
   const from = page.getByLabel("From account");
-  await expect(from.locator("option")).toHaveCount(2, { timeout: 15_000 });
+  await expect.poll(() => from.locator("option").count(), { timeout: 15_000 }).toBeGreaterThan(0);
   await page.getByLabel("Recipient IBAN").fill(bobIban);
   await page.getByLabel("Amount (USD)").fill("250.00");
   await page.getByLabel("Memo (optional)").fill("September rent");

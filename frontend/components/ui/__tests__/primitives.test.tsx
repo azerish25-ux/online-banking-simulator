@@ -89,6 +89,33 @@ describe("Modal", () => {
     render(<Modal open={false} onClose={() => {}} title="Open account">content</Modal>);
     expect(screen.queryByRole("dialog")).toBeNull();
   });
+
+  it("keeps Tab cycling inside the dialog and never reaches background content", async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(
+      <div>
+        <button>Outside before</button>
+        <Modal open onClose={onClose} title="Confirm">
+          <button>First inside</button>
+          <button>Second inside</button>
+        </Modal>
+        <button>Outside after</button>
+      </div>
+    );
+    const dialog = screen.getByRole("dialog", { name: "Confirm" });
+    // Initial focus is the close button inside the dialog.
+    expect(screen.getByLabelText("Close dialog")).toHaveFocus();
+    // Tab forward: close → First → Second → wraps back to close... four full
+    // cycles must never land on an outside button.
+    for (let i = 0; i < 12; i++) {
+      await user.tab();
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    }
+    // Shift+Tab from the close button wraps to the last focusable inside.
+    await user.tab({ shift: true });
+    expect(screen.getByRole("button", { name: "Second inside" })).toHaveFocus();
+  });
 });
 
 describe("PasswordInput", () => {

@@ -1,4 +1,4 @@
-﻿-- Part B: domain constraints, transaction kinds, update timestamps.
+-- Domain constraints, transaction kinds, update timestamps.
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS kind VARCHAR(16) NOT NULL DEFAULT 'TRANSFER';
 UPDATE transactions SET kind = 'DEPOSIT' WHERE from_account_id IS NULL AND memo LIKE 'Simulated deposit%';
 UPDATE transactions SET kind = 'INTEREST' WHERE memo LIKE '%interest%';

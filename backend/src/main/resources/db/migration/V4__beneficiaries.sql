@@ -1,4 +1,4 @@
--- Part 5: saved beneficiaries (transfer address book).
+-- Saved beneficiaries (transfer address book).
 CREATE TABLE IF NOT EXISTS beneficiaries (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id),

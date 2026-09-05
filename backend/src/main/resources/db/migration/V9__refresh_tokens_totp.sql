@@ -1,4 +1,4 @@
--- Part C: rotating refresh tokens + TOTP two-factor columns.
+-- Rotating refresh tokens + TOTP two-factor columns.
 CREATE TABLE IF NOT EXISTS refresh_tokens (
   id UUID PRIMARY KEY,
   user_id UUID NOT NULL REFERENCES users(id),
