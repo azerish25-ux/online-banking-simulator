@@ -4,6 +4,7 @@ import * as React from "react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
+import { Pager } from "../../components/ui/pager";
 import { useToast } from "../../components/feedback/toast";
 import { useAdminReviewQueue, useDeclineTransaction, useReviewTransaction } from "../../lib/queries";
 import { fmtDate, usd } from "../../lib/format";
@@ -16,11 +17,24 @@ import { fmtDate, usd } from "../../lib/format";
  */
 export function ReviewQueueSection() {
   const { push } = useToast();
-  const queue = useAdminReviewQueue();
+  const [queuePage, setQueuePage] = React.useState(0);
+  const queue = useAdminReviewQueue(queuePage);
   const review = useReviewTransaction();
   const decline = useDeclineTransaction();
-  const rows = queue.data ?? [];
+  const rows = queue.data?.content ?? [];
+  const totalPages = queue.data?.totalPages ?? 1;
+  const openCount = queue.data?.totalElements ?? rows.length;
   const busy = review.isPending || decline.isPending;
+
+  // Clearing the last row of a page steps back so the operator is not left
+  // staring at an empty page while older items still await review.
+  const rowsAtPageStart = React.useRef(0);
+  React.useEffect(() => {
+    if (rows.length === 0 && rowsAtPageStart.current > 0 && queuePage > 0) {
+      setQueuePage((p) => p - 1);
+    }
+    rowsAtPageStart.current = rows.length;
+  }, [rows.length, queuePage]);
 
   React.useEffect(() => {
     if (review.isError) push(review.error.message, "error");
@@ -31,7 +45,7 @@ export function ReviewQueueSection() {
     <Card>
       <div className="mb-3 flex items-center justify-between">
         <CardTitle>Review queue</CardTitle>
-        <Badge tone={rows.length > 0 ? "danger" : "success"}>{rows.length} open</Badge>
+        <Badge tone={openCount > 0 ? "danger" : "success"}>{openCount} open</Badge>
       </div>
       {rows.length === 0 ? (
         <CardDescription>No flagged activity awaiting review.</CardDescription>
@@ -93,6 +107,11 @@ export function ReviewQueueSection() {
             );
           })}
         </ul>
+      )}
+      {openCount > 0 && (
+        <div className="mt-3">
+          <Pager page={queuePage} totalPages={totalPages} onChange={setQueuePage} />
+        </div>
       )}
     </Card>
   );

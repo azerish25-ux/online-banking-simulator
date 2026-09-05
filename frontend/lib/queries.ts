@@ -46,7 +46,7 @@ export const queryKeys = {
   admin: {
     users: (q: string, page: number) => ["admin", "users", q, page] as const,
     transactions: ["admin", "transactions"] as const,
-    reviewQueue: ["admin", "review-queue"] as const,
+    reviewQueue: (page: number) => ["admin", "review-queue", page] as const,
     audits: (action: string, page: number) => ["admin", "audits", action, page] as const,
     dailyTotals: ["admin", "daily-totals"] as const,
     userAccounts: (userId: string) => ["admin", "user-accounts", userId] as const
@@ -343,13 +343,10 @@ export function useAdminUsers(q: string, page = 0): UseQueryResult<Page<User>, A
   });
 }
 
-export function useAdminReviewQueue(): UseQueryResult<Tx[], ApiError> {
+export function useAdminReviewQueue(page = 0): UseQueryResult<Page<Tx>, ApiError> {
   return useQuery({
-    queryKey: queryKeys.admin.reviewQueue,
-    queryFn: async () => {
-      const page = await api<Page<Tx>>("/v1/admin/transactions?flagged=true&reviewed=false&size=20");
-      return page.content ?? [];
-    }
+    queryKey: queryKeys.admin.reviewQueue(page),
+    queryFn: () => api<Page<Tx>>("/v1/admin/transactions?flagged=true&reviewed=false&size=20&page=" + page)
   });
 }
 
@@ -393,7 +390,9 @@ export function useReviewTransaction(): UseMutationResult<Tx, ApiError, string> 
   return useMutation({
     mutationFn: (id) => api<Tx>("/v1/admin/transactions/" + id + "/review", { method: "POST" }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.admin.reviewQueue });
+      // Invalidate every queue page (a prefix match): resolving an item can
+      // shift rows across page boundaries.
+      void qc.invalidateQueries({ queryKey: ["admin", "review-queue"] });
       void qc.invalidateQueries({ queryKey: ["transactions"] });
     }
   });
@@ -405,7 +404,7 @@ export function useDeclineTransaction(): UseMutationResult<Tx, ApiError, string>
   return useMutation({
     mutationFn: (id) => api<Tx>("/v1/admin/transactions/" + id + "/decline", { method: "POST" }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: queryKeys.admin.reviewQueue });
+      void qc.invalidateQueries({ queryKey: ["admin", "review-queue"] });
       void qc.invalidateQueries({ queryKey: ["transactions"] });
     }
   });
