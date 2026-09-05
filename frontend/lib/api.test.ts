@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ApiError, SESSION_EXPIRED_EVENT, api, authedFetch, clearToken, expireSession, getToken, setToken } from "./api";
+import { ACCESS_TOKEN_COOKIE_MAX_AGE, ApiError, SESSION_EXPIRED_EVENT, api, authedFetch, clearToken, expireSession, getToken, setToken, tokenCookie } from "./api";
 
 function mockFetchOnce(body: unknown, status = 200) {
   global.fetch = vi.fn(async () => new Response(JSON.stringify(body), { status })) as never;
@@ -17,6 +17,17 @@ describe("token cookie", () => {
     expect(getToken()).toBe("abc.123");
     clearToken();
     expect(getToken()).toBeNull();
+  });
+
+  it("dies with the access token instead of lingering for a week", () => {
+    const cookie = tokenCookie("abc.123");
+    // Max-Age mirrors the 15-minute access-token TTL, not the old 7-day value.
+    expect(cookie).toContain("max-age=" + ACCESS_TOKEN_COOKIE_MAX_AGE);
+    expect(cookie.includes("max-age=604800")).toBe(false);
+    expect(cookie).toContain("samesite=lax");
+    expect(cookie.includes("; Secure")).toBe(false); // dev http stays Secure-less
+    // Over HTTPS the cookie must be marked Secure.
+    expect(tokenCookie("abc.123", true)).toContain("; Secure");
   });
 });
 

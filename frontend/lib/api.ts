@@ -19,8 +19,32 @@ export function getToken(): string | null {
   return match ? decodeURIComponent(match[1]) : null;
 }
 
+/**
+ * The bank_token cookie is JS-readable (the Edge middleware needs it for UX
+ * routing) and carries the access token, whose default lifetime is 15 minutes
+ * (backend app.jwt.access-minutes). Its Max-Age mirrors that TTL so a stolen
+ * cookie dies with the JWT it holds; the silent-refresh path rewrites the
+ * cookie on every rotation, so active sessions never notice. Trade-off: after
+ * 15 idle minutes a fresh navigation may land on login even though the
+ * HttpOnly refresh cookie could still repair the session - routing here is
+ * UX-only, the API is the authority.
+ */
+export const ACCESS_TOKEN_COOKIE_MAX_AGE = 15 * 60;
+
+/** The full Set-Cookie value; split out so tests can pin the exact attributes. */
+export function tokenCookie(token: string, secure: boolean = isSecureContext()): string {
+  return "bank_token=" + encodeURIComponent(token)
+      + "; path=/; max-age=" + ACCESS_TOKEN_COOKIE_MAX_AGE
+      + "; samesite=lax"
+      + (secure ? "; Secure" : "");
+}
+
+function isSecureContext(): boolean {
+  return typeof window !== "undefined" && window.location.protocol === "https:";
+}
+
 export function setToken(token: string) {
-  document.cookie = "bank_token=" + encodeURIComponent(token) + "; path=/; max-age=604800; samesite=lax";
+  document.cookie = tokenCookie(token);
 }
 
 export function clearToken() {
