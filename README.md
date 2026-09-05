@@ -23,7 +23,7 @@ the ops queue is a real threshold-triggered hold, not a prop.
 - **Review queue** - transfers at/above the threshold never settle on submit: they stay HELD until an operator approves (money moves) or declines (nothing ever moved); flagged deposits credit on arrival and just need acknowledging
 - **Interest engine** - monthly job (savings earn, loans charged, charges clamped at the credit limit so one maxed loan can't break the run), idempotent per month, admin-triggerable
 - **Virtual cards** - Luhn-valid issuance, show-once PAN, freeze/unfreeze (tokenization-lite: hashes + last4)
-- **Auth** - JWT access tokens (iss/aud, HS512), rotating refresh tokens with atomic rotation + reuse detection, TOTP two-factor end to end (Security page setup + `/login/mfa` challenge), login rate limiting per real client IP, BCrypt(12)
+- **Auth** - JWT access tokens (iss/aud, HS512), rotating refresh tokens with atomic rotation + reuse detection, TOTP two-factor end to end (Security page setup + `/login/mfa` challenge) with per-account verification throttling, login rate limiting per real client IP, BCrypt(12)
 - **Notifications** - in-app center + unread badge, email stub wired into every money event
 - **Ops console** - user search, freeze/unfreeze, review queue with Approve/Decline, daily totals, audit viewer
 - **Security posture** - RBAC, security headers, locked CORS, RFC-7807 errors on every path, `X-Request-Id` correlation, documented residual risks
@@ -35,7 +35,7 @@ the ops queue is a real threshold-triggered hold, not a prop.
 flowchart LR
     Browser --> Next["Next.js :3000<br/>(rewrite proxy /backend/*)"]
     Next --> API["Spring Boot :8080<br/>/api/v1/*"]
-    API --> PG[("PostgreSQL :5432<br/>Flyway V1-V12")]
+    API --> PG[("PostgreSQL :5432<br/>Flyway V1-V15")]
     API --> Cache[("Caffeine<br/>summaries + public stats")]
 ```
 
@@ -86,7 +86,7 @@ Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
 ## Verify it
 
 ```powershell
-Set-Location backend; .\mvnw.cmd verify     # 68 tests + JaCoCo gate (H2 in PG mode)
+Set-Location backend; .\mvnw.cmd verify     # 82 tests + JaCoCo gate (H2 in PG mode)
 # The concurrency proof against real PostgreSQL (CI's concurrency-postgres job
 # runs the identical recipe against its Postgres service):
 .\mvnw.cmd test "-Dtest=TransferConcurrencyIT" `
@@ -96,8 +96,8 @@ Set-Location backend; .\mvnw.cmd verify     # 68 tests + JaCoCo gate (H2 in PG m
   "-Dspring.datasource.driver-class-name=org.postgresql.Driver"
 Set-Location ..\frontend
 npm run lint
-npm test                                    # 51 tests: lib units + RTL component suite
-npx playwright test                         # 8 e2e: smoke + a11y + full money loop (needs the stack running)
+npm test                                    # 60 tests: lib units + RTL component suite
+npx playwright test                         # smoke + a11y + the full money loop (incl. the ≥$10k HELD path) + silent refresh (needs the stack running)
 npm run build
 # README screenshots (requires the seeded stack; kept out of CI by design):
 npx playwright test --config=playwright.screenshots.config.ts
@@ -116,8 +116,8 @@ backend publishes no host port and is reached only through the Next.js proxy.
 ## How it was built
 
 Ten parts, each independently runnable and verified live against real Postgres -
-see [docs/roadmap-10-parts.md](docs/roadmap-10-parts.md), plus the 1.1.0 and
-1.2.0 audit passes ([changelog](CHANGELOG.md)). Supporting docs:
+see [docs/roadmap-10-parts.md](docs/roadmap-10-parts.md), plus the 1.1.0-1.3.0
+audit passes ([changelog](CHANGELOG.md)). Supporting docs:
 [architecture](docs/architecture.md), [security review](docs/security-review.md),
 [testing & CI](docs/devops-ci.md), [2-minute demo](docs/DEMO.md).
 
@@ -125,11 +125,12 @@ see [docs/roadmap-10-parts.md](docs/roadmap-10-parts.md), plus the 1.1.0 and
 
 - A banking monolith (Next.js 14 + Spring Boot 3 + PostgreSQL 16) with atomic,
   idempotent money movement, an operator review queue, and full audit trails
-- A 12-migration Flyway schema including a Java migration that retires an
-  unnamed CHECK constraint portably across PostgreSQL and H2
+- A 15-version Flyway schema (three Java migrations: portable unnamed-CHECK
+  retirement, idempotency-key scoping, and a one-loan-per-user partial index)
 - Auth hardened with rotating refresh tokens (atomic rotation + reuse
-  detection), TOTP 2FA, JWT with verified issuer/audience, RBAC, per-client-IP
-  rate limiting, and security headers; residual risks documented
+  detection), TOTP 2FA with per-account verification throttling, JWT with
+  verified issuer/audience, RBAC, per-client-IP rate limiting, an access-token
+  cookie that dies with its JWT, and security headers; residual risks documented
 - CI with a contract-drift gate (OpenAPI vs code), an authenticated full-stack
   Playwright job against real PostgreSQL, and JaCoCo coverage gates
 - Ledger integrity proven under load: a 24-way parallel-transfer test on real

@@ -6,10 +6,10 @@
 
 | Suite | Command (run in folder) | What it proves |
 |-------|-------------------------|----------------|
-| Backend unit + API tests | `.\mvnw.cmd verify` in `backend/` | 68 tests + JaCoCo gate (≥55% line coverage) |
-| Frontend unit tests | `npm test` in `frontend/` | 49 Vitest tests (validation, formatting, API client, typed query hooks, RTL component suite) |
+| Backend unit + API tests | `.\mvnw.cmd verify` in `backend/` | 82 tests + JaCoCo gate (≥55% line coverage) |
+| Frontend unit tests | `npm test` in `frontend/` | 60 Vitest tests (validation, formatting, API client, typed query hooks, RTL component suite) |
 | Frontend build + lint | `npm run build`, `npm run lint` in `frontend/` | Production bundle + ESLint |
-| Browser e2e | `npx playwright test` in `frontend/` (stack running) | 8 tests: smoke, a11y, and the full money loop against real Postgres - served on the canonical `:3000` origin (the backend's CORS allow-list rejects others) |
+| Browser e2e | `npx playwright test` in `frontend/` (stack running) | smoke + a11y + the full money loop (including the ≥$10k review-threshold hold) + the silent-refresh spec, all against real Postgres on the canonical `:3000` origin (the backend's CORS allow-list rejects others) |
 | README screenshots | `npx playwright test --config=playwright.screenshots.config.ts` in `frontend/` | Captures `docs/screenshots/*` from the live seeded product; excluded from the default suite and CI so PNGs only change when regenerated |
 | Live stack | `.\start-all.ps1` then `.\seed-demo.ps1` (repo root) | Real Postgres end-to-end, health-gated |
 
@@ -17,7 +17,8 @@
 
 Six jobs: `backend` (`mvn verify`), `frontend` (`ci → lint → test → build → smoke playwright`),
 `docker` (`compose build` + `config --quiet`), `contract` (boots the API against a real
-Postgres service, exports the OpenAPI spec, `git diff --exit-code` fails on drift),
+Postgres service, exports the OpenAPI spec, and fails on drift via an order-insensitive
+canonical comparison of committed vs generated spec),
 `concurrency-postgres` (the parallel-transfer atomicity proof against a real
 PostgreSQL service - the test profile's H2 URL is overridden with system properties),
 and `banking-e2e` (full stack + seeded users + the whole Playwright suite in a real browser).
@@ -43,7 +44,7 @@ before merging a part. If CI ever gains a Postgres service, add a
 ## Performance notes (measured 2026-09-02, local PG 16)
 
 - Indexes: `idx_accounts_user`, `idx_tx_from`, `idx_tx_to`, `idx_tx_flagged`, beneficiary/audit/card indexes (see V1/V4/V5/V7).
-- The paged history query is a native `UNION ALL` of the from/to halves (`TransactionRepository.historyPage`), ordered `created_at DESC, id DESC` with a limit, over `idx_tx_from` / `idx_tx_to`; a composite `(account_id, created_at)` index is the next step if volume grows.
+- The paged history query is a native `UNION ALL` of the from/to halves (`TransactionRepository.historyPage`), ordered `created_at DESC, seq DESC` (the DB-assigned monotonic insert sequence, V14 - rows persisted in one flush share `created_at`, so the random UUID id can't order them) with a limit, over `idx_tx_from_created` / `idx_tx_to_created`.
 - N+1 audit: every multi-row read resolves counterpart IBANs with one batched `findAllById` (`ibanMap`); no per-row queries in hot paths.
 - `GET .../summary` is Caffeine-cached (5 min, 2000 entries) and evicted on every money mutation incl. the interest job.
 - Responses carry `X-Request-Id` (minted or propagated) and logs embed it via the `traceId` MDC slot.

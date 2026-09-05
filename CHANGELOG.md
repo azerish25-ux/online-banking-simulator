@@ -4,6 +4,75 @@ All notable changes to the Online Banking Simulator are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-09-05
+
+Third audit pass: real bugs first (one of them shipped with the working
+1.2.0 refactor), then API/session hardening, then the machine-flat edges that
+made the product feel generated rather than built.
+
+### Correctness
+
+- **A review-threshold transfer no longer toasts "Transfer posted".** The
+  success effect compared a bare `status`, which resolved to the legacy
+  `window.status` DOM global instead of the response - so every held wire
+  reported itself as settled while its receipt card correctly said HELD.
+  Regression-tested in RTL and covered by a new e2e flow that deposits past
+  the threshold and sends a real held transfer (`transfers-page.test.tsx`,
+  `banking.spec.ts`). ESLint's `no-restricted-globals` now bans bare `status`
+  so the class of bug cannot silently compile again.
+- **Missing `amount` on transfers/deposits answers 400, not 500** - a body
+  without it used to reach `new BigDecimal(null)` and fall into the catch-all.
+  `amount` is now `@NotNull` on both payloads (OpenAPI contract regenerated:
+  it is `required` in the committed spec).
+- **History pagination cannot overflow anymore** - `page=Integer.MAX_VALUE`
+  used to wrap the `int` OFFSET negative and 500 in SQL; the page depth is
+  now capped and an out-of-range page returns an empty result.
+- **Customer history and statements order by real insertion order**: rows
+  persisted in one flush share `created_at`, and the random UUID id can't
+  break the tie - the DB-assigned `seq` (V14) now does, matching the admin
+  queue. Listings and exports can never shuffle same-instant rows.
+
+### Security & session hardening
+
+- **TOTP verification is throttled per account** (`mfa/verify`, `totp/enable`,
+  `totp/disable`): a per-account budget of 5 wrong codes per minute answers
+  429 `Retry-After` when exhausted - six digits can no longer be brute-forced
+  at network speed by a client holding a session or a challenge token
+  (`TotpThrottle`, `TotpThrottleTest`).
+- **The `bank_token` cookie dies with the JWT it carries**: Max-Age dropped
+  from 7 days to the 15-minute access-token lifetime, and `Secure` is set over
+  HTTPS. Silent refresh rewrites the cookie on every rotation, so active
+  sessions never notice; a session idle past the TTL bounces to login on its
+  next navigation (routing-only trade-off, documented in `middleware.ts` and
+  the security review).
+- **Credit is capped**: a customer could previously open unlimited LOAN
+  accounts and mint unbounded $1,000 credit. One open loan per user now -
+  service-level check plus a PostgreSQL partial unique index (V15, Java
+  migration skipped on H2), and the dashboard disables the Loan option once
+  one exists (`AccountLimitsTest`).
+- `/actuator/health` no longer exposes DB/disk detail to anonymous callers
+  (`show-details: never`); `/api/health` stays the liveness probe.
+
+### Ops & API quality
+
+- The admin **review queue is paginated** - it previously showed a fixed
+  first-20 snapshot with no way to reach older items; resolving the last item
+  on a page steps back instead of stranding the operator on an empty page.
+- One currency policy (`Currencies.normalize`) replaces the duplicate private
+  checks in the two money-movement paths; CSV statement rendering moves into
+  `StatementService` beside the PDF renderer so both exports share one idea
+  of what a statement is; `AuditLog.of(...)` collapses the
+  new-then-`setMetadata` boilerplate repeated across six services.
+
+### UI & copy
+
+- Browser tabs name the page you're on ("... · Send money", "... · Operations")
+  instead of only the brand; timestamps add the year when a row belongs to a
+  different one; the notifications unread dot is labelled for screen readers.
+- Formatting tidy-up (mashed imports, stray blank lines) and the dependency
+  floors raised: Spring Boot 3.2.5 → 3.2.12 (final 3.2.x), Next 14.2.5 →
+  14.2.35.
+
 ## [1.2.0] - 2026-09-04
 
 Follow-up audit of the whole repo. The review queue became real, the remaining
