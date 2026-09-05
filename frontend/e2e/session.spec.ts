@@ -24,7 +24,7 @@ test("silent refresh keeps the session alive past access-token expiry", async ({
   await page.getByLabel("Password", { exact: true }).fill("secret123");
   await page.getByRole("button", { name: /Create account/ }).click();
   await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByText(/across accounts|Overview|Simulate deposit/).first()).toBeVisible();
+  await expect(page.getByText(/across accounts|Overview|Deposit funds/).first()).toBeVisible();
 
   // Idle past the token lifetime: the next authed request is guaranteed to
   // arrive with an expired access token and must be repaired by one silent

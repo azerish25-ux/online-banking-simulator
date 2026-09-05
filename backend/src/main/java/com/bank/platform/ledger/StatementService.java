@@ -48,7 +48,14 @@ public class StatementService {
     this.maxRows = maxRows;
   }
 
-  public record Statement(Account account, List<Transaction> rows, Instant from, Instant to) {}
+  /**
+   * One statement over a {@link Period}: inclusive calendar days on the page,
+   * and every consumer of the window - the row query, the closing-balance
+   * cut, the CSV and the "Period ... to ..." label - takes the same exclusive end
+   * from the period, so the printed rows and the two balance figures can
+   * never disagree about where the period ends.
+   */
+  public record Statement(Account account, List<Transaction> rows, Period period) {}
 
   /** A ready-to-stream CSV export: the server-chosen filename and its body. */
   public record CsvStatement(String filename, String content) {}
@@ -99,17 +106,21 @@ public class StatementService {
   @Transactional(readOnly = true)
   public Statement customerStatement(String email, UUID accountId, LocalDate from, LocalDate to) {
     Account account = accounts.accountDetail(email, accountId);
-    LocalDate safeFrom = from != null ? from : defaultFrom();
-    LocalDate safeTo = to != null ? to : defaultTo();
-    return new Statement(account, rows(accountId, safeFrom, safeTo), startOf(safeFrom), startOf(safeTo));
+    Period period = window(from, to);
+    return new Statement(account, rows(accountId, period), period);
   }
 
   @Transactional(readOnly = true)
   public Statement adminStatement(UUID accountId, LocalDate from, LocalDate to) {
     Account account = accountRepository.findById(accountId).orElseThrow(() -> new AccountNotFoundException(accountId));
-    LocalDate safeFrom = from != null ? from : defaultFrom();
-    LocalDate safeTo = to != null ? to : defaultTo();
-    return new Statement(account, rows(accountId, safeFrom, safeTo), startOf(safeFrom), startOf(safeTo));
+    Period period = window(from, to);
+    return new Statement(account, rows(accountId, period), period);
+  }
+
+  /** The requested window, or the default (today and the 30 days before) when open. */
+  private static Period window(LocalDate from, LocalDate to) {
+    Period defaults = Period.lastThirtyDays();
+    return new Period(from != null ? from : defaults.from(), to != null ? to : defaults.to());
   }
 
   @Transactional(readOnly = true)
@@ -122,50 +133,45 @@ public class StatementService {
         .collect(Collectors.toMap(Account::getId, Account::getIban));
   }
 
-  public static LocalDate defaultFrom() {
-    return LocalDate.now(ZoneOffset.UTC).minusDays(30);
-  }
-
-  public static LocalDate defaultTo() {
-    return LocalDate.now(ZoneOffset.UTC).plusDays(1);
-  }
-
-  private List<Transaction> rows(UUID accountId, LocalDate from, LocalDate to) {
-    LocalDate safeFrom = from != null ? from : defaultFrom();
-    LocalDate safeTo = to != null ? to : defaultTo();
-    Instant fromInstant = startOf(safeFrom);
-    Instant toInstant = startOf(safeTo);
+  private List<Transaction> rows(UUID accountId, Period period) {
     // Guard before loading: a statement for a huge window must not pull every
     // matching row into memory just to render (or to stream out as CSV).
-    long matching = transactions.historyCount(accountId, fromInstant, toInstant);
+    long matching = transactions.historyCount(accountId, period);
     if (matching > maxRows) {
       throw new TransferValidationException(
           "Statement covers " + matching + " transactions (max " + maxRows
               + "); narrow the date range");
     }
-    return transactions.statementRows(accountId, fromInstant, toInstant);
+    return transactions.statementRows(accountId, period);
   }
 
-  private static Instant startOf(LocalDate date) {
-    return date.atStartOfDay(ZoneOffset.UTC).toInstant();
-  }
-
-  /** Renders a one-or-more-page bank statement. All layout is code - no templates to drift. */
+  /**
+   * Renders a one-or-more-page bank statement. All layout is code - no
+   * templates to drift.
+   *
+   * <p>Opening and closing must be TRUE for the window on the page, not the
+   * account's lifetime. Both are the account's balance at one of the window's
+   * two cuts - current balance minus every settled movement at/after the
+   * bound - so a statement for a past period fetched later never prints
+   * today's balance as its closing, and the two figures always agree with
+   * the rows printed between them.
+   */
+  @Transactional(readOnly = true)
   public byte[] renderPdf(Statement statement) {
     Account account = statement.account();
     // Only POSTED rows ever moved money: HELD/CANCELLED rows are intents, so
-    // they must not shift the opening balance or appear as movements.
+    // they must not shift the balance figures or appear as movements.
     List<Transaction> posted = statement.rows().stream()
         .filter(tx -> tx.getStatus() == TxStatus.POSTED)
         .toList();
     Map<UUID, String> ibans = ibanMap(statement.rows());
-    BigDecimal net = BigDecimal.ZERO;
-    for (Transaction tx : posted) {
-      if (account.getId().equals(tx.getToAccountId())) net = net.add(tx.getAmount());
-      if (account.getId().equals(tx.getFromAccountId())) net = net.subtract(tx.getAmount());
-    }
-    BigDecimal closing = account.getBalance();
-    BigDecimal opening = closing.subtract(net);
+    // The SQL aggregate owns the +to/-from sign convention; both cuts call it
+    // (opening at the window start, closing at its exclusive end), so there
+    // is no in-memory net loop left to drift from it.
+    BigDecimal opening = account.getBalance()
+        .subtract(sumSettledAfter(account.getId(), statement.period().start()));
+    BigDecimal closing = account.getBalance()
+        .subtract(sumSettledAfter(account.getId(), statement.period().endExclusive()));
 
     try (PDDocument doc = new PDDocument();
         ByteArrayOutputStream out = new ByteArrayOutputStream()) {
@@ -189,8 +195,7 @@ public class StatementService {
       String[] header = {
           Brand.PDF_STATEMENT_HEADER,
           "IBAN " + account.getIban() + "  ·  " + account.getType().name() + "  ·  " + account.getStatus().name(),
-          "Period " + statement.from().atZone(ZoneOffset.UTC).toLocalDate()
-              + " to " + statement.to().atZone(ZoneOffset.UTC).toLocalDate(),
+          "Period " + statement.period().from() + " to " + statement.period().to(),
           "Opening " + Money.usd(opening) + "   ·   Closing " + Money.usd(closing),
           "Generated " + Instant.now().atZone(ZoneOffset.UTC).toLocalDate()};
 
@@ -230,6 +235,11 @@ public class StatementService {
     } catch (IOException ex) {
       throw new IllegalStateException("Could not render statement PDF", ex);
     }
+  }
+
+  private BigDecimal sumSettledAfter(UUID accountId, Instant after) {
+    return transactions.sumSettledMovementAfter(accountId, TxStatus.POSTED, after)
+        .orElse(BigDecimal.ZERO);
   }
 
   private static String shortIban(String iban) {

@@ -3,7 +3,7 @@ import { Routes } from "../lib/routes";
 
 test("landing page loads with product messaging", async ({ page }) => {
   await page.goto(Routes.home);
-  await expect(page.getByRole("heading", { name: /Money that moves/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Everything moves,/ })).toBeVisible();
   await expect(page.getByRole("link", { name: /Open an account/ })).toBeVisible();
 });
 

@@ -23,7 +23,7 @@ export const PasswordInput = React.forwardRef<HTMLInputElement, React.ComponentP
           onClick={toggle}
           aria-label={visible ? "Hide password" : "Show password"}
           aria-pressed={visible}
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-slate-400 hover:bg-ink-600 hover:text-slate-100"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-content-muted hover:bg-ink-600 hover:text-content"
         >
           <Label size={16} aria-hidden="true" />
         </button>

@@ -3,7 +3,7 @@
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useAdminTransactions } from "../../lib/queries";
-import { fmtDate, usd } from "../../lib/format";
+import { fmtDate, maskIban, usd } from "../../lib/format";
 
 export function ActivitySection() {
   const recent = useAdminTransactions();
@@ -28,7 +28,7 @@ export function ActivitySection() {
               {rows.map((t) => (
                 <TRow key={t.id}>
                   <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
-                  <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEP"} → {t.toIban ? "..." + t.toIban.slice(-6) : "-"}</TD>
+                  <TD className="mono">{maskIban(t.fromIban) ?? "DEP"} → {maskIban(t.toIban) ?? "-"}</TD>
                   <TD className="text-right font-semibold tabular-nums">{usd(t.amount)}</TD>
                 </TRow>
               ))}

@@ -1,12 +1,13 @@
 "use client";
 
-import { ArrowLeft, ArrowRight } from "lucide-react";
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field, Input } from "../../components/ui/input";
+import { Select } from "../../components/ui/select";
+import { Pager } from "../../components/ui/pager";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { TxStatusBadge } from "../../components/ui/tx-status-badge";
@@ -14,7 +15,7 @@ import { useToast } from "../../components/feedback/toast";
 import { useAccounts, useTransactions } from "../../lib/queries";
 import { statementUrl } from "../../lib/statements";
 import { downloadAuthed } from "../../lib/download";
-import { fmtDate, signedUsd } from "../../lib/format";
+import { accountLabel, fmtDate, maskIban, signedUsd } from "../../lib/format";
 
 const SIZE = 10;
 
@@ -70,17 +71,17 @@ export default function ActivityPage() {
           <p className="muted text-sm">Full transaction history with statement export.</p>
         </div>
         <div className="flex gap-2">
-          <select
+          <Select
             aria-label="Account"
             value={accountId}
             onChange={(e) => selectAccount(e.target.value)}
-            className="h-10 rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none"
+            className="h-10 rounded-md"
           >
             {(accounts.data ?? []).length === 0 && <option value="">No accounts</option>}
             {(accounts.data ?? []).map((a) => (
-              <option key={a.id} value={a.id}>{a.type} ...{a.iban.slice(-6)}</option>
+              <option key={a.id} value={a.id}>{accountLabel(a)}</option>
             ))}
-          </select>
+          </Select>
           <Button variant="secondary" onClick={() => download("csv")} disabled={!accountId}>CSV</Button>
           <Button variant="secondary" onClick={() => download("pdf")} disabled={!accountId}>PDF</Button>
         </div>
@@ -114,8 +115,8 @@ export default function ActivityPage() {
                 {rows.map((t) => (
                   <TRow key={t.id}>
                     <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
-                    <TD className="mono">{t.fromIban ? "..." + t.fromIban.slice(-6) : "DEPOSIT"}</TD>
-                    <TD className="mono">{t.toIban ? "..." + t.toIban.slice(-6) : "-"}</TD>
+                    <TD className="mono">{maskIban(t.fromIban) ?? "DEPOSIT"}</TD>
+                    <TD className="mono">{maskIban(t.toIban) ?? "-"}</TD>
                     <TD className="max-w-48 truncate">{t.memo ?? "-"}</TD>
                     <TD><TxStatusBadge status={t.status} /></TD>
                     <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, viewedAccount?.iban ?? "")}</TD>
@@ -123,13 +124,7 @@ export default function ActivityPage() {
                 ))}
               </tbody>
             </Table>
-            <div className="mt-3 flex items-center justify-between text-sm">
-              <span className="muted">Page {index + 1} of {Math.max(1, totalPages)}</span>
-              <div className="flex gap-2">
-                <Button variant="secondary" size="sm" disabled={index === 0} onClick={() => setIndex((i) => i - 1)}><ArrowLeft size={14} aria-hidden="true" /> Prev</Button>
-                <Button variant="secondary" size="sm" disabled={index + 1 >= totalPages} onClick={() => setIndex((i) => i + 1)}>Next <ArrowRight size={14} aria-hidden="true" /></Button>
-              </div>
-            </div>
+            <Pager page={index} totalPages={Math.max(1, totalPages)} onChange={setIndex} />
           </>
         )}
       </Card>

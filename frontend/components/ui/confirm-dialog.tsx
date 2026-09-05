@@ -3,10 +3,13 @@
 import * as React from "react";
 import { Button } from "./button";
 import { Modal } from "./modal";
+import { InlineAlert } from "./inline-alert";
 
 /**
  * Consequence dialog for destructive or hard-to-reverse actions. The confirm
- * button is danger-toned; Escape/backdrop/Cancel all abort.
+ * button is danger-toned; Escape/backdrop/Cancel all abort. When the action
+ * fails on the server the rejection renders here, beside the buttons that
+ * caused it - never as a corner toast behind the scrim.
  */
 export function ConfirmDialog({
   open,
@@ -14,6 +17,7 @@ export function ConfirmDialog({
   body,
   confirmLabel = "Confirm",
   busy = false,
+  error = null,
   onConfirm,
   onClose
 }: {
@@ -22,12 +26,19 @@ export function ConfirmDialog({
   body: React.ReactNode;
   confirmLabel?: string;
   busy?: boolean;
+  /** A server rejection to show inside the dialog (null clears it). */
+  error?: string | null;
   onConfirm: () => void;
   onClose: () => void;
 }) {
   return (
     <Modal open={open} onClose={busy ? () => {} : onClose} title={title}>
       <div className="text-sm leading-relaxed">{body}</div>
+      {error ? (
+        <div className="mt-4">
+          <InlineAlert>{error}</InlineAlert>
+        </div>
+      ) : null}
       <div className="mt-4 flex justify-end gap-2">
         <Button variant="secondary" disabled={busy} onClick={onClose}>
           Cancel

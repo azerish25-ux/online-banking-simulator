@@ -95,21 +95,19 @@ public class MoneyService {
 
   /**
    * Transfer entry point. Amounts at or above the review threshold do NOT
-   * settle here: a HELD row is recorded (no money moves) and an operator must
-   * approve it, which settles under locks in {@link HeldTransferService#settleHeldTransfer}.
-   * Smaller transfers settle atomically below: both account rows are locked in
-   * stable ID order (deadlock-safe), debited and credited, all in one
-   * transaction. An idempotent replay returns the original row - money never
-   * moves twice for one key, held or not.
+   * settle here: a HELD intent is recorded (no money moves) and an operator
+   * approves it later under locks in {@link HeldTransferService#settleHeldTransfer}.
+   * Smaller transfers settle atomically below - both account rows locked in
+   * stable ID order (deadlock-safe), debited and credited in one transaction.
+   * An idempotent replay returns the original row: money never moves twice
+   * for one key, held or not.
    *
-   * <p>Both accounts are resolved to their IDs only (never loaded as managed
-   * entities) before the instant path: {@link #post} must be the first reader
-   * of the two rows inside the transaction, because the pessimistic-lock read
-   * in {@link LedgerMovementService#move} does not refresh an entity that is
-   * already in the persistence context - a pre-load here would hand `move` a
-   * stale snapshot that its save then writes over the newer committed balance.
-   * The HELD path loads the entities afterwards: no money moves there, so an
-   * unlocked read cannot corrupt anything.
+   * <p>The accounts are resolved to IDs only (never loaded as managed
+   * entities) before the instant path, so {@link #post} is the first reader
+   * of the two rows - move()'s lock must not sit on a stale snapshot (the
+   * first-read discipline is documented at {@link LedgerMovementService}).
+   * The HELD path loads the entities afterwards, safely: nothing writes
+   * those rows in this transaction.
    */
   @CacheEvict(value = {"summaries", "public-stats"}, allEntries = true)
   @Transactional
@@ -133,8 +131,11 @@ public class MoneyService {
     if (!sender.getId().equals(actualOwner)) {
       throw new AccountNotFoundException(fromId);
     }
-    UUID toId = accounts.findIdByIban(toIban.trim().toUpperCase())
-        .orElseThrow(() -> new AccountNotFoundException(toIban));
+    String toIbanClean = toIban.trim().toUpperCase();
+    UUID toId = accounts.findIdByIban(toIbanClean)
+        .orElseThrow(() -> new AccountNotFoundException(toIbanClean,
+            "No account with IBAN " + toIbanClean
+                + " exists in this simulator - you can only transfer to accounts opened here."));
     if (fromId.equals(toId)) {
       throw new TransferValidationException("Cannot transfer to the same account");
     }
@@ -166,22 +167,20 @@ public class MoneyService {
       // nothing writes these rows later in this transaction.
       Account fromRef = accounts.findById(fromAccountId)
           .orElseThrow(() -> new AccountNotFoundException(fromAccountId));
-      Account toRef = accounts.findByIban(toIban.trim().toUpperCase())
-          .orElseThrow(() -> new AccountNotFoundException(toIban));
+      Account toRef = accounts.findByIban(toIbanClean)
+          .orElseThrow(() -> new AccountNotFoundException(toIbanClean,
+              "No account with IBAN " + toIbanClean
+                  + " exists in this simulator - you can only transfer to accounts opened here."));
       return heldTransfers.holdForReview(sender, fromRef, toRef, scaled, currency, memo, cleanKey, keyed);
     }
     return post(sender, fromId, toId, scaled, currency, memo, cleanKey, keyed);
   }
 
   /**
-   * Instant settlement path for transfers below the review threshold.
-   *
-   * <p>The caller resolves both accounts to IDs only, so the locking read in
-   * {@link LedgerMovementService#move} is also the first (and only) read of
-   * the two rows in this transaction - the row state it locks is the state it
-   * loads. Loading either account here beforehand would hand `move` a managed
-   * entity whose stale balance the save then writes over a newer committed
-   * value once real row-lock contention (PostgreSQL) forces the lock to wait.
+   * Instant settlement for below-threshold transfers. The caller resolved
+   * both accounts to IDs only, so move()'s locking read is the first (and
+   * only) read of the two rows - the state it locks is the state it loads
+   * (first-read discipline, see {@link LedgerMovementService}).
    */
   private Transaction post(User sender, UUID fromId, UUID toId, BigDecimal scaled,
       String currency, String memo, String cleanKey, boolean keyed) {

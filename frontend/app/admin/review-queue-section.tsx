@@ -5,9 +5,9 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { Pager } from "../../components/ui/pager";
-import { useToast } from "../../components/feedback/toast";
+import { useResultToast } from "../../components/feedback/use-result-toast";
 import { useAdminReviewQueue, useDeclineTransaction, useReviewTransaction } from "../../lib/queries";
-import { fmtDate, usd } from "../../lib/format";
+import { fmtDate, maskIban, usd } from "../../lib/format";
 
 /**
  * Operator queue: HELD rows are intents - approving settles the transfer,
@@ -16,7 +16,6 @@ import { fmtDate, usd } from "../../lib/format";
  * acknowledging to leave the queue.
  */
 export function ReviewQueueSection() {
-  const { push } = useToast();
   const [queuePage, setQueuePage] = React.useState(0);
   const queue = useAdminReviewQueue(queuePage);
   const review = useReviewTransaction();
@@ -36,10 +35,23 @@ export function ReviewQueueSection() {
     rowsAtPageStart.current = rows.length;
   }, [rows.length, queuePage]);
 
-  React.useEffect(() => {
-    if (review.isError) push(review.error.message, "error");
-    if (decline.isError) push(decline.error.message, "error");
-  }, [review.isError, review.error, decline.isError, decline.error, push]);
+  // Result → toast wiring lives in the shared owner. Approve (HELD row) and
+  // acknowledge (already-credited flagged row) settle through the same review
+  // mutation, and their success copy differs by the clicked action, not by
+  // the response - so the button records what it asked for in a ref (same
+  // pattern as the transfer page's last intent), read at toast time.
+  const lastReviewAction = React.useRef<"approve" | "acknowledge">("approve");
+  useResultToast(review, {
+    success: {
+      toast: () => ({
+        message:
+          lastReviewAction.current === "acknowledge" ? "Flag acknowledged." : "Approved - transfer settled."
+      })
+    }
+  });
+  useResultToast(decline, {
+    success: { toast: { message: "Declined - no money moved." } }
+  });
 
   return (
     <Card>
@@ -58,13 +70,13 @@ export function ReviewQueueSection() {
               <li key={t.id} className="rounded-md border border-line p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm">
-                    <span className="caps normal-case text-slate-400">
+                    <span className="label text-content-muted">
                       {isHeld ? "Transfer held · awaiting approval" : isDeposit ? "Deposit flagged · credited" : "Transfer flagged · settled"}
                     </span>
                     <span className="mono ml-2">
                       {isDeposit
-                        ? (t.toIban ? "..." + t.toIban.slice(-6) : "-")
-                        : (t.fromIban ? "..." + t.fromIban.slice(-6) : "-") + " → " + (t.toIban ? "..." + t.toIban.slice(-6) : "-")}
+                        ? (maskIban(t.toIban) ?? "-")
+                        : (maskIban(t.fromIban) ?? "-") + " → " + (maskIban(t.toIban) ?? "-")}
                     </span>
                     <span className="ml-2 font-semibold tabular-nums">{usd(t.amount)}</span>
                     <span className="muted ml-2 text-xs">{fmtDate(t.createdAt)}</span>
@@ -75,14 +87,17 @@ export function ReviewQueueSection() {
                         size="sm"
                         variant="danger"
                         disabled={busy}
-                        onClick={() => decline.mutate(t.id, { onSuccess: () => push("Declined - no money moved.", "success") })}
+                        onClick={() => decline.mutate(t.id)}
                       >
                         Decline
                       </Button>
                       <Button
                         size="sm"
                         disabled={busy}
-                        onClick={() => review.mutate(t.id, { onSuccess: () => push("Approved - transfer settled.", "success") })}
+                        onClick={() => {
+                          lastReviewAction.current = "approve";
+                          review.mutate(t.id);
+                        }}
                       >
                         Approve
                       </Button>
@@ -92,7 +107,10 @@ export function ReviewQueueSection() {
                       size="sm"
                       variant="secondary"
                       disabled={busy}
-                      onClick={() => review.mutate(t.id, { onSuccess: () => push("Flag acknowledged.", "success") })}
+                      onClick={() => {
+                        lastReviewAction.current = "acknowledge";
+                        review.mutate(t.id);
+                      }}
                     >
                       Acknowledge
                     </Button>

@@ -4,16 +4,12 @@ import * as React from "react";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
-import { Field, Input } from "../../components/ui/input";
+import { Input } from "../../components/ui/input";
 import { Pager } from "../../components/ui/pager";
 import { useAdminAudits } from "../../lib/queries";
-import { fmtDate, usd } from "../../lib/format";
+import { fmtDate, maskIban, usd } from "../../lib/format";
 import type { Audit } from "../../lib/api-types";
 
-/** Last-six of an IBAN, or "external" when a party is absent. */
-function shortIban(iban?: string): string {
-  return iban ? "..." + iban.slice(-6) : "external";
-}
 
 /**
  * Turns stored audit metadata into one readable line: "$12,000.00 · ...sender
@@ -25,11 +21,9 @@ function metaSummary(meta: Audit["metadata"]): string | null {
   const parts: string[] = [];
   if (meta.amount) parts.push(usd(meta.amount));
   if (meta.from || meta.to) {
-    parts.push(
-      (meta.from ? shortIban(meta.from) : "external") +
-        (meta.from && meta.to ? " → " : "") +
-        (meta.to ? shortIban(meta.to) : "")
-    );
+    const fromLabel = meta.from ? maskIban(meta.from) ?? "external" : "external";
+    const toLabel = meta.to ? maskIban(meta.to) ?? "external" : "external";
+    parts.push(fromLabel + (meta.from && meta.to ? " → " : "") + toLabel);
   }
   for (const key of ["email", "iban", "account", "month", "last4", "type", "transaction"]) {
     if (meta[key]) parts.push(key + ": " + meta[key]);
@@ -52,11 +46,9 @@ export function AuditSection() {
         <CardTitle>Audit log</CardTitle>
         <form
           onSubmit={(e) => { e.preventDefault(); setAction(draft.trim().toUpperCase()); setPage(0); }}
-          className="flex gap-2"
+          className="flex items-center gap-2"
         >
-          <Field label="">
-            <Input aria-label="Filter by action" placeholder="TRANSFER_POSTED..." value={draft} onChange={(e) => setDraft(e.target.value)} />
-          </Field>
+          <Input aria-label="Filter by action" placeholder="TRANSFER_POSTED..." value={draft} onChange={(e) => setDraft(e.target.value)} />
           <Button type="submit" variant="secondary" size="sm">Filter</Button>
         </form>
       </div>

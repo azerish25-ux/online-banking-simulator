@@ -9,6 +9,7 @@ import { Input } from "../../components/ui/input";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Pager } from "../../components/ui/pager";
 import { useToast } from "../../components/feedback/toast";
+import { useResultToast } from "../../components/feedback/use-result-toast";
 import { useAdminSetAccountStatus, useAdminUserAccounts, useAdminUsers } from "../../lib/queries";
 import type { Account } from "../../lib/api-types";
 import { adminStatementUrl } from "../../lib/statements";
@@ -28,6 +29,10 @@ export function UsersSection() {
   const [usersPage, setUsersPage] = React.useState(0);
   const [selectedId, setSelectedId] = React.useState("");
   const [freezeTarget, setFreezeTarget] = React.useState<{ account: Account; userId: string } | null>(null);
+  // A failed freeze leaves the confirm dialog open: the rejection renders
+  // inside it. Unfreeze is a direct row action whose failures have always
+  // been silent - that stays.
+  const [freezeError, setFreezeError] = React.useState<string | null>(null);
 
   const usersQuery = useAdminUsers(submittedQuery, usersPage);
   const accounts = useAdminUserAccounts(selectedId);
@@ -37,11 +42,22 @@ export function UsersSection() {
   const accountRows = accounts.data ?? [];
   const selected = usersQuery.data?.content.find((u) => u.id === selectedId) ?? null;
 
-  React.useEffect(() => {
-    if (setStatus.isSuccess && setStatus.data) {
-      push(setStatus.data.status === "FROZEN" ? "Account frozen." : "Account re-activated.", "success");
+  // Result → feedback wiring lives in the shared owner.
+  useResultToast(setStatus, {
+    error: false,
+    onFailure: (message) => {
+      if (freezeTarget) setFreezeError(message);
+    },
+    success: {
+      toast: (account) => ({
+        message: account.status === "FROZEN" ? "Account frozen." : "Account re-activated."
+      }),
+      run: () => {
+        setFreezeTarget(null);
+        setFreezeError(null);
+      }
     }
-  }, [setStatus.isSuccess, setStatus.data, push]);
+  });
 
   async function downloadAccountPdf(accountId: string) {
     try {
@@ -103,7 +119,10 @@ export function UsersSection() {
                     size="sm"
                     variant="danger"
                     disabled={setStatus.isPending}
-                    onClick={() => setFreezeTarget({ account: a, userId: selected.id })}
+                    onClick={() => {
+                      setFreezeError(null);
+                      setFreezeTarget({ account: a, userId: selected.id });
+                    }}
                   >
                     Freeze
                   </Button>
@@ -128,6 +147,7 @@ export function UsersSection() {
         title="Freeze this account?"
         confirmLabel="Freeze account"
         busy={setStatus.isPending}
+        error={freezeError}
         body={
           freezeTarget ? (
             <>
@@ -136,13 +156,13 @@ export function UsersSection() {
             </>
           ) : null
         }
-        onClose={() => setFreezeTarget(null)}
+        onClose={() => {
+          setFreezeTarget(null);
+          setFreezeError(null);
+        }}
         onConfirm={() => {
           if (!freezeTarget) return;
-          setStatus.mutate(
-            { account: freezeTarget.account, frozen: true, userId: freezeTarget.userId },
-            { onSuccess: () => setFreezeTarget(null) }
-          );
+          setStatus.mutate({ account: freezeTarget.account, frozen: true, userId: freezeTarget.userId });
         }}
       />
     </Card>

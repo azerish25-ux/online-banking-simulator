@@ -12,6 +12,7 @@ export const Routes = {
   notifications: "/notifications",
   settings: "/settings",
   design: "/design",
+  about: "/about",
   admin: "/admin",
   account: (id: string) => "/accounts/" + id
 } as const;

@@ -7,6 +7,7 @@
         "build": "next build",
         "start": "next start",
         "lint": "next lint",
+        "check:tokens": "node scripts/check-design-tokens.mjs",
         "test": "vitest run",
         "test:watch": "vitest",
         "openapi": "openapi-typescript openapi.json -o lib/api-gen.ts"

@@ -2,9 +2,12 @@ package com.bank.platform.ledger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import com.bank.platform.support.ApiTestClient;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.apache.pdfbox.Loader;
@@ -65,6 +68,45 @@ class StatementLayoutTest {
       long headings = occurrences(text, "Description");
       assertEquals(doc.getNumberOfPages(), headings,
           "every page must carry its own Date/Description/Amount heading");
+    }
+  }
+
+  /**
+   * The "Period ... to ..." line must show the SAME inclusive days the window
+   * was built from. This is the one place the label and the row query could
+   * drift apart again (an exclusive-end mistake renders rows through the last
+   * day but labels it as ending a day early), so the rendered dates are
+   * pinned here at text level, not just asserted to look like a date.
+   */
+  @Test
+  void datedWindowPrintsItsInclusiveDaysInThePeriodLabel() throws Exception {
+    String alice = client.register("stmt-label@example.com", "Stmt Label");
+    String aliceId = client.accountId(alice);
+    client.deposit(alice, aliceId, "10.00");
+
+    LocalDate from = LocalDate.now(ZoneOffset.UTC).minusDays(6);
+    LocalDate to = LocalDate.now(ZoneOffset.UTC).minusDays(1);
+    String text = statementText(alice, aliceId, from, to);
+
+    // The label is the exact inclusive window - neither day shifted by the
+    // exclusive end that the row query consumes.
+    assertTrue(text.contains("Period " + from + " to " + to),
+        "label must print the inclusive days:\n" + text);
+    assertFalse(text.contains("Period " + from + " to " + to.plusDays(1)),
+        "label must not print the exclusive next day:\n" + text);
+  }
+
+  private String statementText(String token, String accountId, LocalDate from, LocalDate to) throws Exception {
+    MvcResult pdf = mvc.perform(get("/api/v1/accounts/" + accountId + "/statement.pdf")
+            .header("Authorization", "Bearer " + token)
+            .param("from", from.toString())
+            .param("to", to.toString()))
+        .andExpect(status().isOk())
+        .andReturn();
+    byte[] bytes = pdf.getResponse().getContentAsByteArray();
+    assertTrue(bytes.length > 500, "PDF should have content");
+    try (PDDocument doc = Loader.loadPDF(bytes)) {
+      return new PDFTextStripper().getText(doc);
     }
   }
 

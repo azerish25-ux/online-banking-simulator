@@ -10,14 +10,14 @@ import { AppShell } from "../../components/layout/app-shell";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { Field, Input } from "../../components/ui/input";
-import { useToast } from "../../components/feedback/toast";
+import { Select } from "../../components/ui/select";
+import { useResultToast } from "../../components/feedback/use-result-toast";
 import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { useAccounts, useBeneficiaries, useTransfer, type TransferInput } from "../../lib/queries";
-import { usd } from "../../lib/format";
+import { accountLabel, usd } from "../../lib/format";
 import { Routes } from "../../lib/routes";
 
 export default function TransfersPage() {
-  const { push } = useToast();
   const accounts = useAccounts();
   const beneficiaries = useBeneficiaries();
   const transfer = useTransfer();
@@ -57,32 +57,26 @@ export default function TransfersPage() {
     }
   }, [accounts.data, setValue]);
 
-  React.useEffect(() => {
-    if (beneficiaries.isError) push("Couldn't load your beneficiaries - type the IBAN manually.", "error");
-  }, [beneficiaries.isError, push]);
-
-  React.useEffect(() => {
-    if (transfer.isSuccess && transfer.data) {
-      const d = transfer.data;
-      const held = d.status === "HELD";
-      setReceipt({ id: d.id, toIban: d.toIban, amount: d.amount, status: d.status });
-      push(
-        held
-          ? "Transfer submitted for review - it is sent once an operator approves it."
-          : "Transfer posted.",
-        held ? "info" : "success"
-      );
-      // Keep the source account; clear the rest for the next transfer. The
-      // effect fires only when isSuccess flips, so reading the current form
-      // here is safe - the intent effect above clears the idempotency key.
-      reset({ fromAccountId: lastIntent.current.from, toIban: "", amount: "", memo: "" });
+  // Result → toast wiring lives in the shared owner (the transfer's failure
+  // surfaces its own message by default). Success keeps the source account
+  // and clears the rest for the next transfer; the owner fires only on the
+  // settle transition and reads the current form through `lastIntent`, so a
+  // refetch after the send can never replay the receipt or the toast.
+  useResultToast(beneficiaries, {
+    error: { message: "Couldn't load your beneficiaries - type the IBAN manually." }
+  });
+  useResultToast(transfer, {
+    success: {
+      toast: (d) =>
+        d.status === "HELD"
+          ? { message: "Transfer submitted for review - it is sent once an operator approves it.", tone: "info" }
+          : { message: "Transfer posted." },
+      run: (d) => {
+        setReceipt({ id: d.id, toIban: d.toIban, amount: d.amount, status: d.status });
+        reset({ fromAccountId: lastIntent.current.from, toIban: "", amount: "", memo: "" });
+      }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [transfer.isSuccess]);
-
-  React.useEffect(() => {
-    if (transfer.isError) push(transfer.error.message, "error");
-  }, [transfer.isError, transfer.error, push]);
+  });
 
   function onSubmit(values: Form) {
     setReceipt(null);
@@ -91,33 +85,38 @@ export default function TransfersPage() {
 
   return (
     <AppShell>
+      <p className="text-sm">
+        <Link href={Routes.dashboard} className="text-brass-300 hover:underline">
+          <ArrowLeft size={14} aria-hidden="true" /> Back to overview
+        </Link>
+      </p>
       <h1 className="text-2xl font-bold tracking-tight">Send money</h1>
-      <p className="muted mt-1 text-sm">
-        Debited and credited atomically. Retries with the same key never double-send.{" "}
-        <Link href={Routes.dashboard} className="text-brass-300 hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Back to overview</Link>
+      <p className="muted mt-1 max-w-2xl text-sm">
+        Transfers post right away. Amounts of $10,000 or more go to the review
+        desk first - nothing leaves your account until an operator approves them.
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
         <Card className="max-w-xl">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <Field label="From account" error={formState.errors.fromAccountId?.message}>
-              <select aria-label="From account" {...register("fromAccountId")} className="h-10 w-full rounded-md border border-line bg-ink-950/70 px-3 text-sm focus:border-brass-500 focus:outline-none">
+              <Select aria-label="From account" {...register("fromAccountId")}>
                 {(accounts.data ?? []).map((a) => (
-                  <option key={a.id} value={a.id}>{a.type} ...{a.iban.slice(-6)} · {usd(a.balance)}</option>
+                  <option key={a.id} value={a.id}>{accountLabel(a, a.balance)}</option>
                 ))}
-              </select>
+              </Select>
             </Field>
             <Field
               label="Recipient IBAN"
               error={formState.errors.toIban?.message}
-              hint="The recipient must hold an account in this simulator - add a beneficiary to fill it in one tap."
+              hint="The recipient needs an account opened here - add a beneficiary to fill it in one tap."
             >
               <Input placeholder="DE..." autoComplete="off" {...register("toIban")} />
             </Field>
             <Field
               label="Amount (USD)"
               error={formState.errors.amount?.message}
-              hint="Transfers of $10,000 or more are held - no money moves until an operator approves."
+              hint="Transfers of $10,000 or more are held for review - no money moves until an operator approves."
             >
               <Input placeholder="10.00" inputMode="decimal" {...register("amount")} />
             </Field>
@@ -157,7 +156,7 @@ export default function TransfersPage() {
           </Card>
 
           {receipt && (
-            <Card className="mt-4 border-emerald-900/60">
+            <Card className="mt-4 border-success-border">
               <div className="flex items-center gap-2">
                 <CardTitle>{receipt.status === "HELD" ? "Transfer submitted for review" : "Transfer posted"}</CardTitle>
                 <TxStatusBadge status={receipt.status} />

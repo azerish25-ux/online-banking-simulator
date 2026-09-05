@@ -17,9 +17,15 @@ export const registerSchema = z.object({
 });
 export type RegisterForm = z.infer<typeof registerSchema>;
 
+// Cents-only entry: a USD customer types dollars and cents, and the UI shows
+// balances rounded to cents - an entered 4-decimal amount (the ledger's
+// internal scale) would toast "Deposited $1.23" for $1.2345 and strand
+// sub-cent dust no screen ever shows. Zero is rejected here, not by the
+// server a round-trip later (the modal would sit open with no inline error).
 const amountRule = z
   .string()
-  .regex(/^\d+(\.\d{1,4})?$/, "Positive amount, up to 4 decimals");
+  .regex(/^\d+(\.\d{1,2})?$/, "Enter an amount like 10.00")
+  .refine((v) => Number(v) > 0, "Enter an amount greater than zero");
 
 export const transferSchema = z.object({
   fromAccountId: z.string().min(1, "Choose a source account"),

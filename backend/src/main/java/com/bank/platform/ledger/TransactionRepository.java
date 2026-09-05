@@ -38,9 +38,23 @@ public interface TransactionRepository
   // interactive feed - stays newest-first). Rows persisted in one flush share
   // created_at; the monotonic seq tiebreak keeps them in real insertion order
   // (the UUID id is random and cannot express it - see V14).
+  //
+  // The half-open instant pair is the SQL floor; the day-window rule lives in
+  // Period - statementRows/historyPage/historyCount take an inclusive-day
+  // Period and derive the bounds, so callers cannot drift "to is inclusive"
+  // from the query bound again. Statements are always closed windows (the
+  // service defaults either side), so statementRowsBetween stays strict;
+  // history is genuinely open-ended, and its null-tolerant guards carry an
+  // explicit CAST because PostgreSQL cannot infer a parameter's type from an
+  // IS NULL comparison alone (SQLState 42P18) when the bound is a bare null.
   @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
       + "and t.createdAt >= :from and t.createdAt < :to order by t.createdAt asc, t.seq asc")
-  List<Transaction> statementRows(UUID accountId, Instant from, Instant to);
+  List<Transaction> statementRowsBetween(UUID accountId, Instant from, Instant to);
+
+  /** Statement rows over an inclusive-day {@link Period}, oldest-first. */
+  default List<Transaction> statementRows(UUID accountId, Period period) {
+    return statementRowsBetween(accountId, period.start(), period.endExclusive());
+  }
 
   // Rows tied on created_at resolve newest-inserted-first via the DB-assigned
   // seq column (the random UUID id cannot express insertion order - V14).
@@ -48,16 +62,28 @@ public interface TransactionRepository
       + "SELECT t.* FROM transactions t WHERE t.from_account_id = :accountId "
       + "UNION ALL "
       + "SELECT t.* FROM transactions t WHERE t.to_account_id = :accountId"
-      + ") u WHERE u.created_at >= :from AND u.created_at < :to "
+      + ") u WHERE (CAST(:from AS timestamp with time zone) IS NULL OR u.created_at >= :from) "
+      + "AND (CAST(:to AS timestamp with time zone) IS NULL OR u.created_at < :to) "
       + "ORDER BY u.created_at DESC, u.seq DESC LIMIT :limit OFFSET :offset",
       nativeQuery = true)
-  List<Transaction> historyPage(UUID accountId, Instant from, Instant to, int limit, int offset);
+  List<Transaction> historyPageBetween(UUID accountId, Instant from, Instant to, int limit, int offset);
+
+  /** One page of history over an inclusive-day {@link Period}, newest-first. */
+  default List<Transaction> historyPage(UUID accountId, Period period, int limit, int offset) {
+    return historyPageBetween(accountId, period.start(), period.endExclusive(), limit, offset);
+  }
 
   @Query(value = "SELECT COUNT(*) FROM transactions t "
       + "WHERE (t.from_account_id = :accountId OR t.to_account_id = :accountId) "
-      + "AND t.created_at >= :from AND t.created_at < :to",
+      + "AND (CAST(:from AS timestamp with time zone) IS NULL OR t.created_at >= :from) "
+      + "AND (CAST(:to AS timestamp with time zone) IS NULL OR t.created_at < :to)",
       nativeQuery = true)
-  long historyCount(UUID accountId, java.time.Instant from, java.time.Instant to);
+  long historyCountBetween(UUID accountId, Instant from, Instant to);
+
+  /** Row count for an inclusive-day {@link Period} (the window cap guard). */
+  default long historyCount(UUID accountId, Period period) {
+    return historyCountBetween(accountId, period.start(), period.endExclusive());
+  }
 
   @Query("select t from Transaction t where t.createdAt >= :since order by t.createdAt asc")
   List<Transaction> findSince(Instant since);
@@ -81,6 +107,20 @@ public interface TransactionRepository
       + "from Transaction t where t.createdAt >= :since and t.status = :status "
       + "order by t.createdAt asc")
   List<PostedRow> findPostedSince(@Param("since") Instant since, @Param("status") TxStatus status);
+
+  /**
+   * Signed net movement with createdAt at/after {@code after} (credits
+   * positive, debits negative) - the ONE owner of the +to/-from sign
+   * convention. The statement renderer derives both balance figures from it:
+   * current balance minus this sum at the window's start instant is the
+   * true opening, and at the window's exclusive end it is the closing - a
+   * statement for a past period never prints today's balance as its closing.
+   */
+  @Query("select coalesce(sum(case when t.toAccountId = :accountId then t.amount else -t.amount end), 0) "
+      + "from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
+      + "and t.status = :status and t.createdAt >= :after")
+  Optional<BigDecimal> sumSettledMovementAfter(@Param("accountId") UUID accountId,
+      @Param("status") TxStatus status, @Param("after") Instant after);
 
   /**
    * Atomically resolves a held transfer: moves it out of HELD into {@code to}

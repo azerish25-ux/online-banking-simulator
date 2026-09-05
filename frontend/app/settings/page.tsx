@@ -9,6 +9,7 @@ import { Field, Input } from "../../components/ui/input";
 import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/feedback/toast";
+import { useResultToast } from "../../components/feedback/use-result-toast";
 import { useMe, useTotpDisable, useTotpEnable, useTotpSetup } from "../../lib/queries";
 
 export default function SettingsPage() {
@@ -24,35 +25,45 @@ export default function SettingsPage() {
   const [enableCode, setEnableCode] = React.useState("");
   const [disableOpen, setDisableOpen] = React.useState(false);
   const [disableCode, setDisableCode] = React.useState("");
+  // A wrong code is rejected while the modal stays open with the bad value
+  // still in the field - the message renders under it, not in a corner toast.
+  const [disableError, setDisableError] = React.useState<string | null>(null);
 
-  // Surface failures once per mutation, not on every render.
+  // A fresh attempt never carries a previous rejection.
   React.useEffect(() => {
-    if (setup.isError) push(setup.error.message, "error");
-    if (enable.isError) push(enable.error.message, "error");
-    if (disable.isError) push(disable.error.message, "error");
-  }, [setup.isError, setup.error, enable.isError, enable.error, disable.isError, disable.error, push]);
+    if (disableOpen) setDisableError(null);
+  }, [disableOpen]);
 
-  React.useEffect(() => {
-    if (setup.isSuccess && setup.data) {
-      setPendingSetup(setup.data);
-      setEnableCode("");
+  // Result → feedback wiring lives in the shared owner. Setup succeeds into
+  // a state (the QR pane), so it has no toast - only its failure speaks.
+  // The enable pane is page-level, so its wrong-code failure stays a corner
+  // toast; the disable modal renders its rejection inline under the code.
+  useResultToast(setup, {
+    success: {
+      run: (d) => {
+        setPendingSetup(d);
+        setEnableCode("");
+      }
     }
-  }, [setup.isSuccess, setup.data, push]);
-
-  React.useEffect(() => {
-    if (enable.isSuccess) {
-      setPendingSetup(null);
-      push("Two-factor authentication is on. You'll be asked for a code at your next login.", "success");
+  });
+  useResultToast(enable, {
+    success: {
+      toast: { message: "Two-factor authentication is on. You'll be asked for a code at your next login." },
+      run: () => setPendingSetup(null)
     }
-  }, [enable.isSuccess, push]);
-
-  React.useEffect(() => {
-    if (disable.isSuccess) {
-      setDisableOpen(false);
-      setDisableCode("");
-      push("Two-factor authentication is off.", "success");
+  });
+  useResultToast(disable, {
+    error: false,
+    onFailure: setDisableError,
+    success: {
+      toast: { message: "Two-factor authentication is off." },
+      run: () => {
+        setDisableOpen(false);
+        setDisableCode("");
+        setDisableError(null);
+      }
     }
-  }, [disable.isSuccess, push]);
+  });
 
   async function copySecret() {
     if (!pendingSetup) return;
@@ -118,7 +129,7 @@ export default function SettingsPage() {
                   className="rounded-md border border-line"
                 />
                 <div className="min-w-0">
-                  <p className="caps mb-1 text-slate-400 normal-case">Secret key</p>
+                  <p className="label mb-1 text-content-muted">Secret key</p>
                   <p className="mono break-all rounded-md border border-line bg-ink-950/60 px-3 py-2">{pendingSetup.secret}</p>
                   <Button size="sm" variant="secondary" className="mt-2" onClick={copySecret}>
                     Copy secret
@@ -160,14 +171,17 @@ export default function SettingsPage() {
           security - consider re-enabling it afterwards.
         </p>
         <div className="mt-4">
-          <Field label="Authenticator code" hint="6 digits">
+          <Field label="Authenticator code" hint="6 digits" error={disableError ?? undefined}>
             <Input
               inputMode="numeric"
               autoComplete="one-time-code"
               maxLength={6}
               placeholder="000000"
               value={disableCode}
-              onChange={(e) => setDisableCode(e.target.value.replace(/\D/g, ""))}
+              onChange={(e) => {
+                setDisableCode(e.target.value.replace(/\D/g, ""));
+                setDisableError(null);
+              }}
               className="font-mono tracking-[0.4em]"
             />
           </Field>

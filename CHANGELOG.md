@@ -4,6 +4,132 @@ All notable changes to the Online Banking Simulator are documented here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+Fourth pass - make the artifacts trustworthy, then make the surfaces feel
+built rather than generated. The statement bug and the deposit-rail dead end
+are product bugs a customer would hit; the rest is the design system actually
+being one.
+
+### Correctness
+
+- **Statement opening/closing balances are now true for any window**, not
+  just the default "last 30 days". The PDF previously derived both figures
+  from the account's *current* balance minus in-window net, so a statement
+  for a past period printed today's balance as its closing. Closing is now
+  the balance at the window's end (current minus settled movement strictly
+  after it), opening is closing minus the in-window net, and `to` dates are
+  inclusive exactly like the history filter they mirror
+  (`StatementService`, new `sumSettledMovementAfter` repository query, and a
+  `StatementBalanceTest` that pins both past-window and current-window
+  figures).
+- **The deposit rail lets you choose where the money lands.** It previously
+  funded the oldest account silently - always the auto-opened CHECKING - so
+  a SAVINGS account could never be funded and a LOAN could not be repaid
+  through the headline rail. The dialog now picks the destination account,
+  disables frozen ones, and says where the deposit went in the success toast.
+- **A transfer to an IBAN that isn't an account here explains itself** -
+  same 404, but the detail says the recipient must have an account in the
+  simulator instead of echoing the searched value.
+
+### Design system
+
+- **The palette is now enforced, not just claimed.** Semantic tokens
+  (`content` ramp, `success`/`danger`/`warning`/`info` surface pairs,
+  `outflow`, `scrim`) replace every default Tailwind hue (`slate`/`red`/
+  `emerald`/`amber`/`sky`) and every raw hex in views and the flow chart;
+  `scripts/check-design-tokens.mjs` fails the build on either
+  (`npm run check:tokens`, wired into CI).
+- **New `Select` primitive** replaces three ad-hoc select styles; `Pager`
+  gains arrows and is used by Activity and Notifications; `maskIban` becomes
+  the one masked-IBAN helper (dead `shortId` removed, local duplicates
+  deleted); stray formatting and the redundant `caps ... normal-case` pairing
+  are gone in favor of a sentence-case `label` utility.
+- **Comment hygiene on the ledger**: the stale-snapshot "first-read"
+  discipline now lives once (at `LedgerMovementService`); `MoneyService`
+  points at it instead of re-explaining it twice.
+
+### Product & UX
+
+- **New public [/about](/about) page** - the demo seam. What is simulated,
+  what is real, the safety rails, and residual risks in plain words; linked
+  from the landing page, the auth screens, and the sidebar.
+- **Customer screens speak bank, not internals.** The landing hero and
+  feature columns were rewritten (no more slogan-as-filler or
+  "there is a test that races it"); the transfer page no longer explains
+  idempotency keys or atomicity to people trying to pay rent - the review
+  desk does the talking, and the mechanics live behind the seam.
+- **Deposit affordance renamed** "Deposit funds" (the e2e specs follow), so
+  a customer action reads like a product action with the simulation noted
+  where it matters.
+- **A restrained motion language**: modal overlay/dialog entrance, toast
+  slide-in with a dismiss button, skeleton pulse gated behind
+  `prefers-reduced-motion` via `motion-safe:` variants.
+- **Mobile shell rebuilt**: brand + actions on one row, a horizontally
+  scrollable nav beneath - no more overflow at 360px, `aria-current` on the
+  active item.
+- **Micro-truth fixes**: the dashboard hero says "Available balance" for a
+  single account instead of "Total across accounts"; `EmptyState` no longer
+  nests a Card inside a Card; table headers and form labels share one
+  letter-spaced label style.
+- The design gallery grew into a style guide - tokens, motion, and the
+  two-register voice rule - so future work has a reference to match.
+
+### Playtest fixes
+
+- **Statement exports actually download.** CSV and PDF exports 404'd on the
+  real stack: the URL builders already carried the `/backend` proxy prefix
+  while `downloadAuthed` prepended it again, so every export hit
+  `/backend/backend/...`. The builders now return plain API paths (the proxy
+  prefix belongs to the fetch layer), pinned by a unit regression and a new
+  e2e test that downloads both files through the running proxy.
+- **Amounts are validated where they are typed.** A zero amount previously
+  passed client validation and was rejected only by a round-trip toast; a
+  4-decimal amount was stored but displayed rounded to cents, so $1.2345
+  toasted as "Deposited $1.23" and could strand sub-cent dust. Entry is now
+  cents-only and zero is rejected inline on the deposit and transfer forms.
+- **Opening a loan no longer dead-ends.** A fresh loan sat at $0.00 with no
+  hint that drawing means transferring *from* it. The loan account page now
+  explains how to draw (up to the $1,000 line) and how to repay in both the
+  drawn and undrawn states, and the open-account option says the same.
+
+### Browser witnesses
+
+- **The operator console is now proven in the browser, not just by backend
+  suites** (`e2e/operator.spec.ts`): a fresh customer funds checking in
+  sub-threshold installments, holds a $10,000 transfer, an operator approves
+  it and later declines a second one, and the spec asserts every surface a
+  human would check - the review queue empties per decision, the audit log
+  records `TRANSFER_APPROVED`/`TRANSFER_DECLINED` with the moved funds, the
+  customer's balances move exactly on approval and never on decline, and the
+  feed shows `POSTED` then `CANCELLED`. Queue rows are matched by masked
+  sender→recipient tails plus amount, never by position, so parallel specs
+  and stale rows cannot flake it.
+- **The 2FA round trip is browser-covered end to end** (`e2e/totp.spec.ts`
+  + `e2e/totp-code.ts`, a ~40-line RFC 6238 generator): a fresh user enables
+  TOTP reading the real secret from the screen, signs out, is challenged at
+  the next login before any session exists, completes the challenge, then
+  disables 2FA and logs in again unchallenged. The generator was verified
+  against the live verifier before the spec was trusted.
+
+### Error consistency
+
+- **A server rejection now renders where the user is looking, not as a
+  corner toast behind a scrim.** Dialog-surface mutations keep their
+  dialogs open with the offending value still in the field; the rejection
+  is drawn next to that field (a deposit over the $100k cap under the
+  amount, a wrong authenticator code under the code) or as a dialog-level
+  alert inside the dialog (open-account, remove-beneficiary - previously
+  silent - card/account freeze confirms). Page-level mutations (transfer
+  send, operator review, beneficiary save) keep their corner toasts. All
+  of it still flows through the single `useResultToast` owner: it gained
+  one additive `onFailure` channel so dialogs render the failure inline
+  (`error: false`) while success, copy, and fire-exactly-once semantics
+  are untouched; an `InlineAlert` primitive owns the alert look and
+  `ConfirmDialog` gained an `error` slot. A banking e2e witness pins the
+  over-cap deposit rejection under the amount field with the dialog open
+  and no corner toast.
+
 ## [1.3.0] - 2026-09-05
 
 Third audit pass: real bugs first (one of them shipped with the working

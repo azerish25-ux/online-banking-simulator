@@ -33,10 +33,11 @@ public class OpenApiConfig {
             // health endpoint reports - a pom bump can no longer drift the two.
             .version(version)
             .description("Full-stack online banking demo. Errors are RFC-7807; money travels as JSON strings."))
-        // Pin the servers list. Without it springdoc derives the URL from the
-        // incoming request, so a test-regenerated contract says
-        // "http://localhost" while a live backend on :8080 emits
-        // "http://localhost:8080" and the contract gate can never agree.
+        // Pin the servers list (app.api.server-url, default the documented
+        // dev origin). Without it springdoc derives the URL from the incoming
+        // request - a MockMvc-regenerated contract says "http://localhost"
+        // while a live backend on :8080 emits "http://localhost:8080", so the
+        // same spec drifted between the two generation paths.
         .servers(List.of(new Server().url(serverUrl)))
         .addSecurityItem(new SecurityRequirement().addList("bearer"))
         .components(new Components().addSecuritySchemes("bearer",

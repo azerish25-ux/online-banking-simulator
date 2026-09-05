@@ -12,11 +12,11 @@ import { EmptyState } from "../../../components/ui/empty-state";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../../components/ui/table";
 import type { CardItem, IssuedCard } from "../../../lib/api-types";
+import { useResultToast } from "../../../components/feedback/use-result-toast";
 import { useToast } from "../../../components/feedback/toast";
 import { useAccount, useCards, useIssueCard, useSetCardStatus, useTransactions } from "../../../lib/queries";
 import { decimalToCents, fmtDate, signedUsd, usd, usdFromCents } from "../../../lib/format";
 import { Routes } from "../../../lib/routes";
-
 
 export default function AccountDetailPage({ params }: { params: { id: string } }) {
   const { push } = useToast();
@@ -33,24 +33,37 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
   const setCardStatus = useSetCardStatus();
   const [issued, setIssued] = React.useState<IssuedCard | null>(null);
   const [freezeCandidate, setFreezeCandidate] = React.useState<CardItem | null>(null);
+  // A failed freeze leaves the confirm dialog open with its buttons re-armed:
+  // the rejection renders inside that dialog, not in a corner toast behind it.
+  const [freezeError, setFreezeError] = React.useState<string | null>(null);
 
-  React.useEffect(() => {
-    if (issue.isSuccess && issue.data) {
-      setIssued(issue.data);
-      push("Virtual card issued. Copy it now - it is never shown again.", "success");
+  // Result → feedback wiring lives in the shared owner. Card-status success
+  // also closes the freeze confirmation (freeze and unfreeze both settle
+  // through this mutation; unfreeze never had a dialog open to close). A
+  // freeze failure is a dialog rejection (inline, below); an unfreeze failure
+  // is a direct page action, so it keeps its corner toast.
+  useResultToast(issue, {
+    success: {
+      toast: { message: "Virtual card issued. Copy it now - it is never shown again." },
+      run: (card) => setIssued(card)
     }
-  }, [issue.isSuccess, issue.data, push]);
-
-  React.useEffect(() => {
-    if (issue.isError) push(issue.error.message, "error");
-    if (setCardStatus.isError) push(setCardStatus.error.message, "error");
-  }, [issue.isError, issue.error, setCardStatus.isError, setCardStatus.error, push]);
-
-  React.useEffect(() => {
-    if (setCardStatus.isSuccess && setCardStatus.data) {
-      push(setCardStatus.data.status === "FROZEN" ? "Card frozen." : "Card active.", "success");
+  });
+  useResultToast(setCardStatus, {
+    error: false,
+    onFailure: (message) => {
+      if (freezeCandidate) setFreezeError(message);
+      else push(message, "error");
+    },
+    success: {
+      toast: (card) => ({
+        message: card.status === "FROZEN" ? "Card frozen." : "Card active."
+      }),
+      run: () => {
+        setFreezeCandidate(null);
+        setFreezeError(null);
+      }
     }
-  }, [setCardStatus.isSuccess, setCardStatus.data, push]);
+  });
 
   return (
     <AppShell>
@@ -74,18 +87,17 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
             <Badge tone={account.data.status === "ACTIVE" ? "success" : "danger"}>{account.data.status}</Badge>
           </div>
           {isOutstandingLoan ? (
-            // Same treatment as the dashboard card: a drawn loan is debt, so it
-            // reads as a rose "amount you owe" figure, never a bare negative.
+            // A drawn loan is debt - same "amount you owe" treatment as the cards.
             <>
-              <p className="caps muted mt-1 text-xs">Outstanding loan - amount you owe</p>
+              <p className="label muted mt-1 text-xs">Outstanding loan - amount you owe</p>
               <p className="mt-1 text-4xl font-bold tabular-nums text-rose">{usdFromCents(-decimalToCents(account.data.balance))}</p>
-              <p className="muted text-sm">Interest accrues monthly while the loan is outstanding.</p>
+              <p className="muted text-sm">Repay by sending money to this account from another of yours. Interest accrues monthly on what you owe.</p>
             </>
           ) : (
             <>
               <p className="mt-1 text-4xl font-bold tabular-nums">{usd(account.data.balance)}</p>
               {account.data.type === "SAVINGS" && <p className="muted text-sm">Earns monthly interest, posted automatically.</p>}
-              {account.data.type === "LOAN" && <p className="muted text-sm">Negative balance is what you owe. Interest accrues monthly while negative.</p>}
+              {account.data.type === "LOAN" && <p className="muted text-sm">Borrow up to $1,000 by sending money from this account to another of yours. Repay by sending money back here. Interest accrues monthly on what you owe.</p>}
             </>
           )}
 
@@ -100,7 +112,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
                 )}
               </div>
               {issued && (
-                <div className="mb-3 rounded-md border border-emerald-900/60 bg-emerald-950/40 p-4" role="status">
+                <div className="mb-3 rounded-md border border-success-border bg-success-surface p-4" role="status">
                   <p className="text-sm font-medium text-mint">Copy now - shown only once.</p>
                   <p className="mono mt-2 text-xl tracking-widest">{issued.pan}</p>
                   <p className="mono muted text-sm">CVV {issued.cvv} · Exp {issued.expMonth}/{issued.expYear}</p>
@@ -117,7 +129,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
                         <p className="muted text-xs">Exp {c.expMonth}/{c.expYear} · <Badge tone={c.status === "ACTIVE" ? "success" : "danger"}>{c.status}</Badge></p>
                       </div>
                       {c.status === "ACTIVE" ? (
-                        <Button size="sm" variant="secondary" onClick={() => setFreezeCandidate(c)}>Freeze</Button>
+                        <Button size="sm" variant="secondary" onClick={() => { setFreezeError(null); setFreezeCandidate(c); }}>Freeze</Button>
                       ) : (
                         <Button size="sm" variant="secondary" onClick={() => setCardStatus.mutate({ card: c, frozen: false })}>Unfreeze</Button>
                       )}
@@ -157,6 +169,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
         title="Freeze this card?"
         confirmLabel="Freeze card"
         busy={setCardStatus.isPending}
+        error={freezeError}
         body={
           freezeCandidate ? (
             <>
@@ -165,13 +178,13 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
             </>
           ) : null
         }
-        onClose={() => setFreezeCandidate(null)}
+        onClose={() => {
+          setFreezeCandidate(null);
+          setFreezeError(null);
+        }}
         onConfirm={() => {
           if (!freezeCandidate) return;
-          setCardStatus.mutate(
-            { card: freezeCandidate, frozen: true },
-            { onSuccess: () => setFreezeCandidate(null) }
-          );
+          setCardStatus.mutate({ card: freezeCandidate, frozen: true });
         }}
       />
     </AppShell>

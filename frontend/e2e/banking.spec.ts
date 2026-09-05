@@ -27,9 +27,14 @@ test("review-threshold transfer is held for review, never reported as posted", a
   await page.getByLabel("Account type").selectOption("SAVINGS");
   await page.getByRole("button", { name: /^Open$/, exact: true }).click();
   await expect(page.getByText("Account opened.")).toBeVisible();
-  const savingsIban = (await page.locator("p.mono").allTextContents())[1].trim();
+  // The toast can land before the second account card re-renders - wait for
+  // both cards, then read the savings IBAN (same discipline as the money-loop
+  // test below; reading p.mono[1] too early crashes on undefined).
+  const ibans = page.locator("p.mono");
+  await expect(ibans).toHaveCount(2);
+  const savingsIban = (await ibans.allTextContents())[1].trim();
 
-  await page.getByRole("button", { name: /Simulate deposit/ }).click();
+  await page.getByRole("button", { name: /Deposit funds/ }).click();
   await page.getByLabel("Amount (USD)").fill("10000");
   await page.getByRole("button", { name: /^Deposit$/ }).click();
   await expect(page.getByText("Deposited $10,000.00")).toBeVisible();
@@ -57,7 +62,7 @@ test("full money loop in the browser", async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard/);
 
   // Fund the checking account through the deposit dialog.
-  await page.getByRole("button", { name: /Simulate deposit/ }).click();
+  await page.getByRole("button", { name: /Deposit funds/ }).click();
   const amount = page.getByLabel("Amount (USD)");
   await expect(amount).toBeVisible();
   await amount.fill("500");
@@ -88,4 +93,68 @@ test("full money loop in the browser", async ({ page }) => {
   // The transfer lands on the dashboard feed with its memo.
   await page.goto("/dashboard");
   await expect(page.getByText("e2e rent")).toBeVisible();
+});
+
+test("an over-cap deposit rejection renders inline in the dialog, not as a corner toast", async ({ page }) => {
+  // Regression for the error-consistency pass: a server rejection used to
+  // surface only as a corner toast while the dialog stayed open with the bad
+  // amount still in the field. A bank keeps the rejection beside the field.
+  await page.goto("/register");
+  await page.getByLabel("Full name").fill("E2E Cap User");
+  await page.getByLabel("Email").fill(`e2e-cap-${Date.now()}@bank.local`);
+  await page.getByLabel("Password", { exact: true }).fill("secret123");
+  await page.getByRole("button", { name: /Create account/ }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  // Ask for more than the $100,000 per-deposit cap.
+  await page.getByRole("button", { name: /Deposit funds/ }).click();
+  await page.getByLabel("Amount (USD)").fill("100000.01");
+  await page.getByRole("button", { name: /^Deposit$/ }).click();
+
+  // The rejection appears under the amount field (role=alert), the dialog is
+  // still open, and nothing of it leaks into a corner toast.
+  await expect(page.getByRole("dialog").getByRole("alert")).toHaveText(
+    "Deposit exceeds the per-transaction limit"
+  );
+  await expect(page.getByRole("heading", { name: "Deposit funds" })).toBeVisible();
+  await expect(
+    page.getByRole("status").filter({ hasText: "Deposit exceeds the per-transaction limit" })
+  ).toHaveCount(0);
+
+  // Fixing the amount recovers: the inline error clears and the deposit posts.
+  await page.getByLabel("Amount (USD)").fill("50");
+  await page.getByRole("button", { name: /^Deposit$/ }).click();
+  await expect(page.getByText("Deposited $50.00 to CHECKING")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Deposit funds" })).toHaveCount(0);
+});
+
+test("statement exports download through the proxy", async ({ page }) => {
+  // Regression: statement URLs carried the /backend prefix AND downloadAuthed
+  // prepended it again, so every CSV/PDF export hit /backend/backend/... and
+  // 404'd. This walks the real rewrite proxy with a real account.
+  await page.goto("/register");
+  await page.getByLabel("Full name").fill("E2E Export User");
+  await page.getByLabel("Email").fill(`e2e-export-${Date.now()}@bank.local`);
+  await page.getByLabel("Password", { exact: true }).fill("secret123");
+  await page.getByRole("button", { name: /Create account/ }).click();
+  await expect(page).toHaveURL(/\/dashboard/);
+
+  // One deposit so the statement has a row.
+  await page.getByRole("button", { name: /Deposit funds/ }).click();
+  await page.getByLabel("Amount (USD)").fill("75");
+  await page.getByRole("button", { name: /^Deposit$/ }).click();
+  await expect(page.getByText(/Deposited \$75\.00/)).toBeVisible();
+
+  // Activity defaults to the first account; exports enable once it loads.
+  await page.goto("/activity");
+  const csvBtn = page.getByRole("button", { name: "CSV" });
+  await expect(csvBtn).toBeEnabled({ timeout: 10_000 });
+  const csvDownload = page.waitForEvent("download");
+  await csvBtn.click();
+  expect((await csvDownload).suggestedFilename()).toMatch(/\.csv$/);
+
+  const pdfBtn = page.getByRole("button", { name: "PDF" });
+  const pdfDownload = page.waitForEvent("download");
+  await pdfBtn.click();
+  expect((await pdfDownload).suggestedFilename()).toMatch(/\.pdf$/);
 });

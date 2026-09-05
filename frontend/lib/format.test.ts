@@ -1,12 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { decimalToCents, fmtDate, shortId, signedUsd, usd, usdFromCents } from "./format";
+import { accountLabel, decimalToCents, fmtDate, maskIban, signedUsd, usd, usdFromCents } from "./format";
 
 describe("usd", () => {
   it("formats string balances with two decimals", () => {
     expect(usd("500.0000")).toBe("$500.00");
   });
-  it("formats numbers", () => {
-    expect(usd(1234.5)).toBe("$1,234.50");
+  it("rounds exactly without passing through a float", () => {
+    // parseFloat("2.6750") is 2.6749999... and used to display $2.67; the
+    // exact cents path rounds half away from zero like every other money
+    // display in the app.
+    expect(usd("2.6750")).toBe("$2.68");
+    expect(usd("1234.5678")).toBe("$1,234.57");
   });
   it("falls back for garbage input", () => {
     expect(usd("nope")).toBe("$0.00");
@@ -70,11 +74,35 @@ describe("fmtDate", () => {
   });
 });
 
-describe("shortId", () => {
-  it("truncates long ids", () => {
-    expect(shortId("239d94d0-0bac")).toBe("239d94d0...");
+describe("maskIban", () => {
+  it("shows only the last six digits", () => {
+    expect(maskIban("DE07532735619885017984")).toBe("...017984");
   });
-  it("leaves short ids alone", () => {
-    expect(shortId("abc")).toBe("abc");
+  it("returns null for absent values so callers pick the label", () => {
+    expect(maskIban(null)).toBeNull();
+    expect(maskIban(undefined)).toBeNull();
+    expect(maskIban("")).toBeNull();
+  });
+});
+
+describe("accountLabel", () => {
+  const account = { type: "CHECKING", iban: "DE07532735619885017984" };
+
+  it("names an account as type + masked IBAN", () => {
+    expect(accountLabel(account)).toBe("CHECKING ...017984");
+  });
+
+  it("appends the balance only when the chooser shows funds", () => {
+    expect(accountLabel(account, "1234.50")).toBe("CHECKING ...017984 · $1,234.50");
+    expect(accountLabel(account, "75")).toBe("CHECKING ...017984 · $75.00");
+    // A drawn loan's balance is negative debt and must read as such.
+    expect(accountLabel({ type: "LOAN", iban: account.iban }, "-100.00")).toBe(
+      "LOAN ...017984 · -$100.00"
+    );
+  });
+
+  it("survives absent optional fields", () => {
+    expect(accountLabel({ iban: "" })).toBe("");
+    expect(accountLabel({ type: "SAVINGS" })).toBe("SAVINGS");
   });
 });

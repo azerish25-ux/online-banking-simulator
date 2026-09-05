@@ -7,9 +7,7 @@ import com.bank.platform.ledger.TransferDtos.TransferRequest;
 import com.bank.platform.ledger.TransferDtos.TransferResponse;
 import jakarta.validation.Valid;
 import java.math.BigDecimal;
-import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -90,17 +88,16 @@ public class TransferController {
       @RequestParam(defaultValue = "20") int size) {
     // Ownership check first: throws 404 for foreign or missing accounts.
     accounts.accountDetail(authentication.getName(), accountId);
-    Instant fromInstant = from == null
-        ? Instant.EPOCH
-        : from.atStartOfDay(ZoneOffset.UTC).toInstant();
-    Instant toInstant = to == null
-        ? Instant.now().plusSeconds(3600)
-        : to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     int safeSize = Math.min(Math.max(size, 1), 100);
     int safePage = Math.min(Math.max(page, 0), MAX_PAGE_INDEX);
-    List<Transaction> rows = transactions.historyPage(
-        accountId, fromInstant, toInstant, safeSize, safePage * safeSize);
-    long total = transactions.historyCount(accountId, fromInstant, toInstant);
+    // A dated filter is an inclusive-day window whose half-open bounds Period
+    // owns; a null side means the side is open (the queries are null-tolerant,
+    // so no sentinel bounds exist). An inverted from/to pair is rejected by
+    // Period and surfaces as a 400 before any query runs.
+    Period window = new Period(from, to);
+    List<Transaction> rows =
+        transactions.historyPage(accountId, window, safeSize, safePage * safeSize);
+    long total = transactions.historyCount(accountId, window);
     Map<UUID, String> ibans = statements.ibanMap(rows);
     List<TransactionResponse> mapped = rows.stream().map(tx -> TransactionMapper.toResponse(tx, ibans)).toList();
     return new PageImpl<>(mapped, PageRequest.of(safePage, safeSize), total);

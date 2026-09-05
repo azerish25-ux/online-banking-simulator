@@ -34,7 +34,7 @@ test("landing, dashboard, and transfer receipt", async ({ page }) => {
 
   // 1 - Landing hero with live public stats (logged out).
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Money that moves/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Everything moves,/ })).toBeVisible();
   await page.waitForTimeout(1200); // hero stats fetch
   await shot(page, "landing.png");
 

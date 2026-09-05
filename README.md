@@ -27,7 +27,8 @@ the ops queue is a real threshold-triggered hold, not a prop.
 - **Notifications** - in-app center + unread badge, email stub wired into every money event
 - **Ops console** - user search, freeze/unfreeze, review queue with Approve/Decline, daily totals, audit viewer
 - **Security posture** - RBAC, security headers, locked CORS, RFC-7807 errors on every path, `X-Request-Id` correlation, documented residual risks
-- **Design system** - a public [gallery](/design) of the shared primitives
+- **Design system** - a public [gallery](/design) of the shared primitives; the palette is enforced by `frontend/scripts/check-design-tokens.mjs`, so default Tailwind hues and raw hex literals cannot leak back in
+- **About this demo** - a public [/about](/about) page that explains what is simulated and what is real, in plain words
 
 ## Architecture
 
@@ -86,7 +87,7 @@ Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
 ## Verify it
 
 ```powershell
-Set-Location backend; .\mvnw.cmd verify     # 82 tests + JaCoCo gate (H2 in PG mode)
+Set-Location backend; .\mvnw.cmd verify     # 84 tests + JaCoCo gate (H2 in PG mode)
 # The concurrency proof against real PostgreSQL (CI's concurrency-postgres job
 # runs the identical recipe against its Postgres service):
 .\mvnw.cmd test "-Dtest=TransferConcurrencyIT" `

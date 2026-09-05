@@ -109,15 +109,21 @@ class OpsReviewTest {
     assertTrue(bytes[0] == '%' && bytes[1] == 'P' && bytes[2] == 'D' && bytes[3] == 'F',
         "PDF must start with %PDF");
 
-    // CSV honors date ranges: future window is header-only.
-    MvcResult csv = mvc.perform(get("/api/v1/accounts/" + aliceId + "/statement.csv")
+    // An impossible window is rejected, not silently empty: a "from" in the
+    // future with no "to" defaults to a window that ends before it starts
+    // (the old behavior rendered a header-only CSV AND a backward "Period
+    // <future> to <today>" label on the PDF). A valid dated range still works.
+    mvc.perform(get("/api/v1/accounts/" + aliceId + "/statement.csv")
             .header("Authorization", "Bearer " + alice)
             .param("from", LocalDate.now().plusDays(30).toString()))
+        .andExpect(status().isBadRequest());
+    MvcResult csv = mvc.perform(get("/api/v1/accounts/" + aliceId + "/statement.csv")
+            .header("Authorization", "Bearer " + alice)
+            .param("from", LocalDate.now().minusDays(1).toString()))
         .andExpect(status().isOk())
         .andReturn();
     String csvBody = csv.getResponse().getContentAsString();
     assertTrue(csvBody.startsWith("id,created_at"), "CSV keeps its header");
-    assertTrue(csvBody.trim().split("\n").length == 1, "future window has no rows");
   }
 
   @Test

@@ -1,7 +1,17 @@
-export function usd(minorOrMajor: string | number): string {
-  const n = typeof minorOrMajor === "string" ? parseFloat(minorOrMajor) : minorOrMajor;
-  if (Number.isNaN(n)) return "$0.00";
-  return n.toLocaleString("en-US", { style: "currency", currency: "USD" });
+/**
+ * Format a ledger amount for display. Amounts travel as exact decimal strings
+ * (the API never sends a number), so display must not round-trip through a
+ * float: parseFloat turns "2.6750" into 2.6749999... and displays a cent that
+ * the ledger never rounded. The BigInt cents path below is the one exact
+ * money formatter in the app - usd() is that path applied to a single value,
+ * so a row, a balance, and a summed total always round the same way. Anything
+ * that is not a ledger decimal (bad data) renders as $0.00 rather than
+ * throwing, like the old float path did for NaN.
+ */
+export function usd(amount: string): string {
+  // The ledger's wire shape: optional sign, digits, up to 4 fraction digits.
+  if (!/^-?\d+(\.\d{1,4})?$/.test(amount)) return "$0.00";
+  return usdFromCents(decimalToCents(amount));
 }
 
 /**
@@ -9,7 +19,7 @@ export function usd(minorOrMajor: string | number): string {
  * zero to the nearest cent. Use for anything that SUMS money, where float
  * arithmetic would accumulate rounding error. The server owns the ledger;
  * this only keeps client-side totals honest (the ledger keeps 4 decimals,
- * display rounds to cents - same as usd()).
+ * display rounds to cents - same as usd(), which is built on this).
  */
 export function decimalToCents(value: string): bigint {
   const raw = value.trim();
@@ -73,6 +83,26 @@ export function fmtDate(iso: string): string {
   return d.toLocaleString("en-US", options);
 }
 
-export function shortId(id: string): string {
-  return id.length > 8 ? id.slice(0, 8) + "..." : id;
+/**
+ * "...last six" of an IBAN for listings - enough to recognize an account you
+ * own, never enough to reproduce it. Absent values return null so the caller
+ * picks the label ("DEPOSIT", "external", "-") that fits the column.
+ */
+export function maskIban(iban: string | null | undefined): string | null {
+  return iban ? "..." + iban.slice(-6) : null;
+}
+
+/**
+ * How an account reads in a chooser ("CHECKING ...017984", plus the balance
+ * when the selector shows funds). Every account picker - the deposit
+ * destination, the transfer source, the activity filter - composes the same
+ * name; renaming accounts is a one-file edit. Pass balance only where the
+ * current option shows it, so the caller keeps its exact rendering.
+ */
+export function accountLabel(
+  account: { type?: string | null; iban?: string | null },
+  balance?: string
+): string {
+  const name = [account.type, maskIban(account.iban)].filter(Boolean).join(" ");
+  return balance === undefined ? name : name + " · " + usd(balance);
 }

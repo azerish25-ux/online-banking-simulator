@@ -9,39 +9,49 @@ import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Field, Input } from "../../components/ui/input";
+import { InlineAlert } from "../../components/ui/inline-alert";
 import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
-import { useToast } from "../../components/feedback/toast";
+import { useResultToast } from "../../components/feedback/use-result-toast";
 import { useAddBeneficiary, useBeneficiaries, useRemoveBeneficiary } from "../../lib/queries";
 import type { Beneficiary } from "../../lib/api-types";
 
 export default function BeneficiariesPage() {
-  const { push } = useToast();
   const beneficiaries = useBeneficiaries();
   const items = beneficiaries.data;
   const add = useAddBeneficiary();
   const removeBeneficiary = useRemoveBeneficiary();
   const [confirm, setConfirm] = React.useState<Beneficiary | null>(null);
+  const [removeError, setRemoveError] = React.useState<string | null>(null);
   const { register, handleSubmit, reset, formState } = useForm<Form>({ resolver: zodResolver(schema) });
 
+  // Each new confirm dialog starts clean - a rejection from a previous
+  // attempt must not reappear.
   React.useEffect(() => {
-    if (add.isSuccess) {
-      push("Beneficiary saved.", "success");
-      reset({ nickname: "", iban: "" });
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [add.isSuccess]);
+    if (confirm) setRemoveError(null);
+  }, [confirm]);
 
-  React.useEffect(() => {
-    if (add.isError) push(add.error.message, "error");
-  }, [add.isError, add.error, push]);
-
-  React.useEffect(() => {
-    if (removeBeneficiary.isSuccess) {
-      push("Beneficiary removed.", "success");
-      setConfirm(null);
+  // Result → feedback wiring lives in the shared owner. Saving a beneficiary
+  // is page-level, so its failures stay corner toasts; removing one settles
+  // in the confirm modal, so its (previously silent) failure now renders
+  // inline there instead of dropping the modal on the user with no word.
+  useResultToast(add, {
+    success: {
+      toast: { message: "Beneficiary saved." },
+      run: () => reset({ nickname: "", iban: "" })
     }
-  }, [removeBeneficiary.isSuccess, push]);
+  });
+  useResultToast(removeBeneficiary, {
+    error: false,
+    onFailure: setRemoveError,
+    success: {
+      toast: { message: "Beneficiary removed." },
+      run: () => {
+        setConfirm(null);
+        setRemoveError(null);
+      }
+    }
+  });
 
   function onSubmit(values: Form) {
     add.mutate(values);
@@ -64,7 +74,7 @@ export default function BeneficiariesPage() {
             <Field label="Nickname" error={formState.errors.nickname?.message}>
               <Input placeholder="Landlord" {...register("nickname")} />
             </Field>
-            <Field label="IBAN" error={formState.errors.iban?.message}>
+            <Field label="IBAN" error={formState.errors.iban?.message} hint="Any valid IBAN is accepted, but only accounts opened here can receive transfers.">
               <Input placeholder="DE..." autoComplete="off" {...register("iban")} />
             </Field>
             <Button type="submit" disabled={add.isPending}>
@@ -98,6 +108,11 @@ export default function BeneficiariesPage() {
         <p className="text-sm">
           Remove <strong>{confirm?.nickname}</strong> (<span className="mono">{confirm?.iban}</span>)? This cannot be undone.
         </p>
+        {removeError && (
+          <div className="mt-4">
+            <InlineAlert>{removeError}</InlineAlert>
+          </div>
+        )}
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button>
           <Button variant="danger" onClick={remove}>Remove</Button>

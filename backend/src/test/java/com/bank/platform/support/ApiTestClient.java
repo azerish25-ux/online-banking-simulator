@@ -24,6 +24,17 @@ public final class ApiTestClient {
     this.json = json;
   }
 
+  /** Operator token from the test-profile seed (admin-test@bank.local). */
+  public String adminToken() throws Exception {
+    MvcResult result = mvc.perform(post("/api/v1/auth/login")
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"email\":\"admin-test@bank.local\",\"password\":\"admin-test-123\"}"))
+        .andExpect(status().isOk())
+        .andReturn();
+    return json.readValue(result.getResponse().getContentAsString(), JsonNode.class)
+        .get("accessToken").asText();
+  }
+
   public String register(String email, String name) throws Exception {
     MvcResult result = mvc.perform(post("/api/v1/auth/register")
             .contentType(MediaType.APPLICATION_JSON)

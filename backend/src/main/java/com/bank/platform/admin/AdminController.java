@@ -9,6 +9,7 @@ import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.AuthDtos.UserResponse;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.ledger.InterestService;
+import com.bank.platform.ledger.Period;
 import com.bank.platform.ledger.StatementService;
 import com.bank.platform.ledger.Transaction;
 import com.bank.platform.ledger.TransactionMapper;
@@ -17,7 +18,6 @@ import com.bank.platform.ledger.TransactionSpecs;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -115,8 +115,12 @@ public class AdminController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
       @PageableDefault(size = 20, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-    Instant fromInstant = from == null ? null : from.atStartOfDay(ZoneOffset.UTC).toInstant();
-    Instant toInstant = to == null ? null : to.plusDays(1).atStartOfDay(ZoneOffset.UTC).toInstant();
+    // A dated bound is its inclusive day; Period owns the half-open instants
+    // (a null side stays an unfiltered read, and an inverted pair is rejected
+    // here rather than returning a silently empty page).
+    Period bounds = new Period(from, to);
+    Instant fromInstant = bounds.start();
+    Instant toInstant = bounds.endExclusive();
     Page<Transaction> page = transactions.findAll(
         TransactionSpecs.filters(accountId, flagged, reviewed, fromInstant, toInstant),
         withInsertionTiebreak(capped(pageable)));

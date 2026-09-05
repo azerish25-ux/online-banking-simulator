@@ -1,5 +1,7 @@
 import { cn } from "../../lib/cn";
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div aria-hidden className={cn("animate-pulse rounded-sm bg-ink-800", className)} />;
+  // The pulse is a motion cue, so it respects prefers-reduced-motion - under
+  // reduced motion the block still shapes the layout, just without pulsing.
+  return <div aria-hidden className={cn("rounded-sm bg-ink-800 motion-safe:animate-pulse", className)} />;
 }

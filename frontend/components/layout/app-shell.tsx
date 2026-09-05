@@ -9,7 +9,9 @@ import { useMe, useUnreadCount } from "../../lib/queries";
 import { Bell } from "lucide-react";
 import { cn } from "../../lib/cn";
 import { Routes } from "../../lib/routes";
-import { BrandName } from "../../lib/brand";
+import { BrandName, DemoTagline } from "../../lib/brand";
+import { usePageTitle } from "../../lib/page-title";
+import { AboutDemoLink } from "./demo-seam";
 
 const NAV = [
   { href: Routes.dashboard, label: "Overview" },
@@ -20,29 +22,55 @@ const NAV = [
   { href: Routes.settings, label: "Security" }
 ];
 
-// Browser-tab titles per route. The shell owns them so every page reports
-// where the user is instead of just the brand name; order matters (longer
-// prefixes first so /accounts/123 matches before a bare /accounts rule).
-const ROUTE_TITLES: Array<{ prefix: string; label: string }> = [
-  { prefix: Routes.admin, label: "Operations" },
-  { prefix: Routes.transfers, label: "Send money" },
-  { prefix: Routes.activity, label: "Activity" },
-  { prefix: Routes.beneficiaries, label: "Beneficiaries" },
-  { prefix: Routes.notifications, label: "Notifications" },
-  { prefix: Routes.settings, label: "Security" },
-  { prefix: "/accounts/", label: "Account" },
-  { prefix: Routes.dashboard, label: "Overview" }
-];
+/**
+ * The primary nav renders twice - a vertical rail on desktop, a scrollable
+ * bar under the brand on small screens - because the chrome genuinely
+ * differs, but the item list, the active-state rule, and aria-current are one
+ * thing and must not be maintained as two maps.
+ */
+function PrimaryNav({ items, pathname, variant }: {
+  items: { href: string; label: string }[];
+  pathname: string;
+  variant: "rail" | "bar";
+}) {
+  const rail = variant === "rail";
+  return (
+    <nav
+      aria-label="Primary"
+      className={
+        rail
+          ? "mt-6 flex flex-1 flex-col gap-1"
+          : "mt-3 flex gap-1 overflow-x-auto pb-0.5 md:hidden"
+      }
+    >
+      {items.map((item) => {
+        const active = pathname === item.href;
+        return (
+          <Link
+            key={item.href}
+            href={item.href}
+            aria-current={active ? "page" : undefined}
+            className={cn(
+              "rounded-md text-sm transition-colors hover:bg-ink-800",
+              rail ? "px-3 py-2" : "whitespace-nowrap px-3 py-1.5",
+              active ? "bg-ink-800 text-content" : "text-content-muted",
+              rail && active && "shadow-[inset_2px_0_0_0_var(--brand)]"
+            )}
+          >
+            {item.label}
+          </Link>
+        );
+      })}
+    </nav>
+  );
+}
 
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const qc = useQueryClient();
 
-  React.useEffect(() => {
-    const match = ROUTE_TITLES.find((r) => pathname.startsWith(r.prefix));
-    document.title = match ? BrandName + " · " + match.label : BrandName;
-  }, [pathname]);
+  usePageTitle();
   // Cached session + unread badge: no refetch churn on navigation.
   const me = useMe();
   const unread = useUnreadCount();
@@ -70,58 +98,43 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         Skip to content
       </a>
       <div className="mx-auto flex min-h-screen max-w-6xl">
-        <aside className="hidden w-56 shrink-0 border-r border-line p-5 md:block" aria-label="Primary">
+        <aside className="hidden w-56 shrink-0 flex-col border-r border-line p-5 md:flex" aria-label="Primary">
           <p className="display text-xl font-semibold tracking-tight">{BrandName}</p>
-          <p className="caps muted mt-1 normal-case text-brass-400">Simulator demo · no real money</p>
-          <nav className="mt-6 flex flex-col gap-1">
-            {navItems.map((item) => (
-              <Link
-                key={item.href}
-                href={item.href}
-                aria-current={pathname === item.href ? "page" : undefined}
-                className={cn(
-                  "rounded-md px-3 py-2 text-sm transition-colors hover:bg-ink-800",
-                  pathname === item.href
-                    ? "bg-ink-800 text-white shadow-[inset_2px_0_0_0_var(--brand)]"
-                    : "text-slate-400"
-                )}
-              >
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          <p className="label mt-1 text-brass-400">{DemoTagline}</p>
+          <PrimaryNav items={navItems} pathname={pathname} variant="rail" />
+          <AboutDemoLink className="mt-6 rounded-md px-3 py-1.5 text-xs text-content-muted transition-colors hover:bg-ink-800 hover:text-content" />
         </aside>
         <div className="flex min-w-0 flex-1 flex-col">
-          <header className="flex items-center justify-between border-b border-line px-5 py-3">
-            <nav className="flex gap-4 md:hidden" aria-label="Primary">
-              {navItems.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className={cn("text-sm", pathname === item.href ? "text-white" : "text-slate-400")}
-                >
-                  {item.label}
+          <header className="border-b border-line px-5 py-3">
+            <div className="flex items-center justify-between gap-3">
+              {/* On small screens the sidebar is gone, so the brand lives here. */}
+              <p className="display min-w-0 truncate text-lg font-semibold tracking-tight md:hidden">
+                <Link href={Routes.dashboard} className="block truncate">{BrandName}</Link>
+              </p>
+              <div className="hidden flex-1 text-sm text-content-muted md:block">
+                {user ? (
+                  <>
+                    {user.fullName} · <span className="mono">{user.email}</span>
+                  </>
+                ) : (
+                  "..."
+                )}
+              </div>
+              <div className="flex shrink-0 items-center gap-2">
+                <Link href={Routes.notifications} aria-label={"Notifications" + (unreadCount > 0 ? ", " + unreadCount + " unread" : "")} className="relative rounded-md border border-line px-3 py-1.5 text-sm text-content-soft hover:bg-ink-700">
+                  <Bell size={16} aria-hidden="true" />{unreadCount > 0 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-brass-500 px-1.5 text-[11px] font-bold text-ink-950">{unreadCount}</span>}
                 </Link>
-              ))}
-            </nav>
-            <div className="muted hidden text-sm md:block">
-              {user ? (
-                <>
-                  {user.fullName} · <span className="mono">{user.email}</span>
-                </>
-              ) : (
-                "..."
-              )}
+                <button
+                  onClick={() => void logout()}
+                  className="rounded-md border border-line px-3 py-1.5 text-sm text-content-soft hover:bg-ink-700"
+                >
+                  Log out
+                </button>
+              </div>
             </div>
-            <Link href={Routes.notifications} aria-label={"Notifications" + (unreadCount > 0 ? ", " + unreadCount + " unread" : "")} className="relative rounded-md border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700">
-              <Bell size={16} aria-hidden="true" />{unreadCount > 0 && <span className="absolute -right-1.5 -top-1.5 rounded-full bg-brass-500 px-1.5 text-[11px] font-bold text-white">{unreadCount}</span>}
-            </Link>
-            <button
-              onClick={() => void logout()}
-              className="rounded-md border border-line px-3 py-1.5 text-sm text-slate-300 hover:bg-ink-700"
-            >
-              Log out
-            </button>
+            {/* Scrollable secondary nav under the brand bar - no overflow at
+                360px even with the Operations item added for admins. */}
+            <PrimaryNav items={navItems} pathname={pathname} variant="bar" />
           </header>
           <main id="main" className="flex-1 p-5">
             {children}

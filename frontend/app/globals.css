@@ -46,9 +46,17 @@ body {
     letter-spacing: -0.01em;
   }
 
-  /* Small caps labels: table headers, stat labels, eyebrow text. */
+  /* Small caps labels: eyebrows, stat headers, uppercase tags. */
   .caps {
     @apply text-[11px] uppercase;
+    letter-spacing: 0.08em;
+  }
+
+  /* Sentence-case micro labels: form field labels, table headers, captions.
+     Shared letter-spacing with .caps, but never uppercased - a `.caps
+     ...normal-case` pair is a mistake, not a style. */
+  .label {
+    @apply text-[11px] font-medium;
     letter-spacing: 0.08em;
   }
 }

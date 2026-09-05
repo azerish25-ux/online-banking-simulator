@@ -1,11 +1,11 @@
 "use client";
 
-import { ArrowLeft, ArrowRight } from "lucide-react";
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
+import { Pager } from "../../components/ui/pager";
 import { EmptyState } from "../../components/ui/empty-state";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/feedback/toast";
@@ -72,22 +72,7 @@ export default function NotificationsPage() {
               ))}
             </ul>
           </Card>
-          <div className="mt-3 flex items-center justify-between text-sm">
-            <span className="muted">Page {pageIndex + 1} of {Math.max(1, totalPages)}</span>
-            <div className="flex gap-2">
-              <Button variant="secondary" size="sm" disabled={pageIndex === 0} onClick={() => setPageIndex((i) => i - 1)}>
-                <ArrowLeft size={14} aria-hidden="true" /> Prev
-              </Button>
-              <Button
-                variant="secondary"
-                size="sm"
-                disabled={pageIndex + 1 >= totalPages}
-                onClick={() => setPageIndex((i) => i + 1)}
-              >
-                Next <ArrowRight size={14} aria-hidden="true" />
-              </Button>
-            </div>
-          </div>
+          <Pager page={pageIndex} totalPages={Math.max(1, totalPages)} onChange={setPageIndex} />
         </>
       )}
     </AppShell>

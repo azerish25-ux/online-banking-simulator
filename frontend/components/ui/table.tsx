@@ -10,7 +10,7 @@ export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTab
 }
 
 export function THead(props: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className="border-b border-line text-slate-400" {...props} />;
+  return <thead className="border-b border-line text-content-muted" {...props} />;
 }
 
 export function TRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
@@ -18,7 +18,7 @@ export function TRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
 }
 
 export function TH(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th scope="col" className="caps px-4 py-2.5 font-medium normal-case" {...props} />;
+  return <th scope="col" className="label px-4 py-2.5" {...props} />;
 }
 
 export function TD(props: React.TdHTMLAttributes<HTMLTableCellElement>) {
