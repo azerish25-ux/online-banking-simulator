@@ -116,9 +116,8 @@ public class InterestService {
       tx.setCurrency("USD");
       tx.setKind(TxKind.INTEREST);
       transactions.save(tx);
-      AuditLog interest = new AuditLog(account.getUserId(), "INTEREST_POSTED", "Transaction", tx.getId().toString());
-      interest.setMetadata(AuditLog.metadata("amount", amountPosted.toPlainString(), "account", account.getIban(), "month", month.toString()));
-      audits.save(interest);
+      audits.save(AuditLog.of(account.getUserId(), "INTEREST_POSTED", "Transaction", tx.getId().toString(),
+          "amount", amountPosted.toPlainString(), "account", account.getIban(), "month", month.toString()));
       users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(
           owner.getId(), owner.getEmail(), "INTEREST_POSTED", "Monthly interest posted",
           (account.getType() == AccountType.SAVINGS ? "Earned " : "Charged ")

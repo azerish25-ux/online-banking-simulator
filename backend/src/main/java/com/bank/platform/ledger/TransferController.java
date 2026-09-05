@@ -120,33 +120,16 @@ public class TransferController {
       @PathVariable UUID id,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-    StatementService.Statement statement = statements.customerStatement(authentication.getName(), id, from, to);
-    var account = statement.account();
-    // Only settled rows appear in a statement - HELD/CANCELLED intents never
-    // moved money, so they must not read as movements (matches the PDF).
-    List<Transaction> rows = statement.rows().stream()
-        .filter(tx -> tx.getStatus() == TxStatus.POSTED)
-        .toList();
-    Map<UUID, String> ibans = statements.ibanMap(rows);
-
-    StringBuilder csv = new StringBuilder("id,created_at,from_iban,to_iban,amount,currency,memo,status\n");
-    for (Transaction tx : rows) {
-      csv.append(tx.getId()).append(',')
-          .append(tx.getCreatedAt()).append(',')
-          .append(cell(tx.getFromAccountId() == null ? "" : ibans.getOrDefault(tx.getFromAccountId(), ""))).append(',')
-          .append(cell(tx.getToAccountId() == null ? "" : ibans.getOrDefault(tx.getToAccountId(), ""))).append(',')
-          .append(tx.getAmount().toPlainString()).append(',')
-          .append(tx.getCurrency()).append(',')
-          .append(cell(tx.getMemo() == null ? "" : tx.getMemo())).append(',')
-          .append(tx.getStatus().name()).append('\n');
-    }
-
-    String filename = "statement-" + account.getIban() + "-" + LocalDate.now() + ".csv";
+    // Row selection, IBAN resolution, the POSTED filter and the formula-safe
+    // escaping all live in StatementService next to the PDF renderer, so the
+    // two exports cannot drift on what a statement means.
+    StatementService.CsvStatement csv =
+        statements.customerCsv(authentication.getName(), id, from, to);
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION,
-            ContentDisposition.attachment().filename(filename).build().toString())
+            ContentDisposition.attachment().filename(csv.filename()).build().toString())
         .contentType(MediaType.parseMediaType("text/csv"))
-        .body(csv.toString());
+        .body(csv.content());
   }
 
   @GetMapping("/accounts/{id}/statement.pdf")
@@ -165,20 +148,4 @@ public class TransferController {
         .body(pdf);
   }
 
-  /**
-   * CSV-escapes one cell. Cells are always quoted; user-controlled values that
-   * start with a spreadsheet formula character (= + - @ or a tab) are prefixed
-   * with a single quote so opening the export in Excel/Sheets cannot execute a
-   * formula smuggled through a memo.
-   */
-  private String cell(String value) {
-    String safe = value == null ? "" : value;
-    if (!safe.isEmpty()) {
-      char first = safe.charAt(0);
-      if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
-        safe = "'" + safe;
-      }
-    }
-    return '"' + safe.replace("\"", "\"\"") + '"';
-  }
 }

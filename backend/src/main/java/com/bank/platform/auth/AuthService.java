@@ -49,9 +49,8 @@ public class AuthService {
     }
     User user = users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
     accounts.save(new Account(user.getId(), Iban.uniqueOrThrow(accounts::existsByIban, 5), AccountType.CHECKING));
-    AuditLog registered = new AuditLog(user.getId(), "USER_REGISTERED", "User", user.getId().toString());
-    registered.setMetadata(AuditLog.metadata("email", user.getEmail()));
-    audits.save(registered);
+    audits.save(AuditLog.of(user.getId(), "USER_REGISTERED", "User", user.getId().toString(),
+        "email", user.getEmail()));
     return user;
   }
 
@@ -120,9 +119,8 @@ public class AuthService {
   }
 
   private AuditLog metadataAudit(User user, String action) {
-    AuditLog log = new AuditLog(user.getId(), action, "User", user.getId().toString());
-    log.setMetadata(AuditLog.metadata("email", user.getEmail()));
-    return log;
+    return AuditLog.of(user.getId(), action, "User", user.getId().toString(),
+        "email", user.getEmail());
   }
 
   private User userOf(String email) {

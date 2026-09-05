@@ -78,9 +78,8 @@ public class AccountService {
       account.setCreditLimit(new java.math.BigDecimal("1000.00"));
     }
     accounts.save(account);
-    AuditLog opened = new AuditLog(user.getId(), "ACCOUNT_OPENED", "Account", account.getId().toString());
-    opened.setMetadata(AuditLog.metadata("iban", account.getIban(), "type", account.getType().name()));
-    audits.save(opened);
+    audits.save(AuditLog.of(user.getId(), "ACCOUNT_OPENED", "Account", account.getId().toString(),
+        "iban", account.getIban(), "type", account.getType().name()));
     notifications.notify(user.getId(), user.getEmail(), "ACCOUNT_OPENED", "Account opened",
         clean.charAt(0) + clean.substring(1).toLowerCase() + " account " + account.getIban() + " is ready.");
     return account;

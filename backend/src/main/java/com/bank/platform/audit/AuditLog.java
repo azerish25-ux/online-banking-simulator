@@ -49,6 +49,16 @@ public class AuditLog {
     this.entityId = entityId;
   }
 
+  /** Builds an audit row with its JSON context in one step (see {@link #metadata}). */
+  public static AuditLog of(
+      UUID actorId, String action, String entity, String entityId, String... metadataPairs) {
+    AuditLog log = new AuditLog(actorId, action, entity, entityId);
+    if (metadataPairs.length > 0) {
+      log.setMetadata(metadata(metadataPairs));
+    }
+    return log;
+  }
+
   @PrePersist
   void prePersist() {
     if (createdAt == null) createdAt = Instant.now();

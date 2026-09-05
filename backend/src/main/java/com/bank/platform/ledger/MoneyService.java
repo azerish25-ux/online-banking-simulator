@@ -167,7 +167,7 @@ public class MoneyService {
     tx.setFromAccountId(from.getId());
     tx.setToAccountId(to.getId());
     tx.setAmount(scaled);
-    tx.setCurrency(normalizeCurrency(currency));
+    tx.setCurrency(Currencies.normalize(currency));
     tx.setKind(TxKind.TRANSFER);
     tx.setMemo(memo);
     tx.setIdempotencyKey(cleanKey);
@@ -215,17 +215,6 @@ public class MoneyService {
       throw new AccountNotFoundException(accountId);
     }
     return account;
-  }
-
-  private String normalizeCurrency(String currency) {
-    if (currency == null || currency.isBlank()) {
-      return "USD";
-    }
-    String normalized = currency.trim().toUpperCase();
-    if (!"USD".equals(normalized)) {
-      throw new TransferValidationException("Only USD is supported (single-currency ledger)");
-    }
-    return normalized;
   }
 
   /**

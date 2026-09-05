@@ -50,6 +50,52 @@ public class StatementService {
 
   public record Statement(Account account, List<Transaction> rows, Instant from, Instant to) {}
 
+  /** A ready-to-stream CSV export: the server-chosen filename and its body. */
+  public record CsvStatement(String filename, String content) {}
+
+  @Transactional(readOnly = true)
+  public CsvStatement customerCsv(String email, UUID accountId, LocalDate from, LocalDate to) {
+    Statement statement = customerStatement(email, accountId, from, to);
+    // Only settled rows appear in a statement - HELD/CANCELLED intents never
+    // moved money, so they must not read as movements (matches the PDF).
+    List<Transaction> posted = statement.rows().stream()
+        .filter(tx -> tx.getStatus() == TxStatus.POSTED)
+        .toList();
+    Map<UUID, String> ibans = ibanMap(posted);
+
+    StringBuilder csv = new StringBuilder("id,created_at,from_iban,to_iban,amount,currency,memo,status\n");
+    for (Transaction tx : posted) {
+      csv.append(tx.getId()).append(',')
+          .append(tx.getCreatedAt()).append(',')
+          .append(cell(tx.getFromAccountId() == null ? "" : ibans.getOrDefault(tx.getFromAccountId(), ""))).append(',')
+          .append(cell(tx.getToAccountId() == null ? "" : ibans.getOrDefault(tx.getToAccountId(), ""))).append(',')
+          .append(tx.getAmount().toPlainString()).append(',')
+          .append(tx.getCurrency()).append(',')
+          .append(cell(tx.getMemo() == null ? "" : tx.getMemo())).append(',')
+          .append(tx.getStatus().name()).append('\n');
+    }
+    String filename = "statement-" + statement.account().getIban() + "-"
+        + LocalDate.now(ZoneOffset.UTC) + ".csv";
+    return new CsvStatement(filename, csv.toString());
+  }
+
+  /**
+   * CSV-escapes one cell. Cells are always quoted; user-controlled values that
+   * start with a spreadsheet formula character (= + - @ or a tab/CR) are
+   * prefixed with a single quote so opening the export in Excel/Sheets cannot
+   * execute a formula smuggled through a memo.
+   */
+  private static String cell(String value) {
+    String safe = value == null ? "" : value;
+    if (!safe.isEmpty()) {
+      char first = safe.charAt(0);
+      if (first == '=' || first == '+' || first == '-' || first == '@' || first == '\t' || first == '\r') {
+        safe = "'" + safe;
+      }
+    }
+    return '\"' + safe.replace("\"", "\"\"") + '\"';
+  }
+
   @Transactional(readOnly = true)
   public Statement customerStatement(String email, UUID accountId, LocalDate from, LocalDate to) {
     Account account = accounts.accountDetail(email, accountId);
