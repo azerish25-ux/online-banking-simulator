@@ -8,6 +8,7 @@ import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;
 import jakarta.persistence.PreUpdate;
 import jakarta.persistence.Table;
+import jakarta.persistence.Version;
 import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
@@ -42,6 +43,16 @@ public class Account {
 
   @Column(name = "last_interest_at")
   private Instant lastInterestAt;
+
+  /**
+   * Optimistic lock (see V16): a write whose read snapshot is stale throws
+   * instead of silently overwriting a newer balance. Money movements lock
+   * the row first, so they never hit this; it exists to make any future
+   * unlocked read-modify-write fail loudly instead of corrupting the ledger.
+   */
+  @Version
+  @Column(name = "version", nullable = false)
+  private long version;
 
   @Column(name = "updated_at")
   private Instant updatedAt;

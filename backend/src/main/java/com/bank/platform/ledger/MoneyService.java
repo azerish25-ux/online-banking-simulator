@@ -101,6 +101,15 @@ public class MoneyService {
    * stable ID order (deadlock-safe), debited and credited, all in one
    * transaction. An idempotent replay returns the original row - money never
    * moves twice for one key, held or not.
+   *
+   * <p>Both accounts are resolved to their IDs only (never loaded as managed
+   * entities) before the instant path: {@link #post} must be the first reader
+   * of the two rows inside the transaction, because the pessimistic-lock read
+   * in {@link LedgerMovementService#move} does not refresh an entity that is
+   * already in the persistence context - a pre-load here would hand `move` a
+   * stale snapshot that its save then writes over the newer committed balance.
+   * The HELD path loads the entities afterwards: no money moves there, so an
+   * unlocked read cannot corrupt anything.
    */
   @CacheEvict(value = {"summaries", "public-stats"}, allEntries = true)
   @Transactional
@@ -115,13 +124,18 @@ public class MoneyService {
     BigDecimal scaled = requireSettleable(amount);
 
     User sender = userOf(email);
-    Account fromRef = accounts.findById(fromAccountId).orElseThrow(() -> new AccountNotFoundException(fromAccountId));
-    if (!fromRef.getUserId().equals(sender.getId())) {
-      throw new AccountNotFoundException(fromAccountId);
+    // Scalar resolution only - no managed Account enters this transaction yet.
+    // A foreign account stays indistinguishable from a missing one (404), so
+    // account existence is never disclosed to outsiders (same as before). The
+    // owner id returned here is a check, NOT the source id: fromAccountId is.
+    UUID fromId = fromAccountId;
+    UUID actualOwner = accounts.findOwnerIdById(fromId).orElse(null);
+    if (!sender.getId().equals(actualOwner)) {
+      throw new AccountNotFoundException(fromId);
     }
-    Account toRef = accounts.findByIban(toIban.trim().toUpperCase())
+    UUID toId = accounts.findIdByIban(toIban.trim().toUpperCase())
         .orElseThrow(() -> new AccountNotFoundException(toIban));
-    if (fromRef.getId().equals(toRef.getId())) {
+    if (fromId.equals(toId)) {
       throw new TransferValidationException("Cannot transfer to the same account");
     }
 
@@ -131,14 +145,14 @@ public class MoneyService {
       // Keys live in the sender's own namespace (DB unique on from + key), so
       // a foreign key can never surface another user's row - the lookup below
       // simply finds nothing and the request proceeds as its own transfer.
-      Optional<Transaction> stored = transactions.findByFromAccountIdAndIdempotencyKey(fromRef.getId(), cleanKey);
+      Optional<Transaction> stored = transactions.findByFromAccountIdAndIdempotencyKey(fromId, cleanKey);
       if (stored.isPresent()) {
         Transaction existing = stored.get();
         // The key identifies the logical transfer: same originator and same
         // destination → an idempotent replay returns the original row,
         // whatever the retried payload says. The row's amount is the source
         // of truth - money never moves twice for one key.
-        if (toRef.getId().equals(existing.getToAccountId())) {
+        if (toId.equals(existing.getToAccountId())) {
           return existing;
         }
         // Our key pointed at a different transfer: never replay it silently.
@@ -148,18 +162,33 @@ public class MoneyService {
     }
 
     if (scaled.compareTo(reviewThreshold) >= 0) {
+      // HELD intent: no money moves, so loading the entities here is safe -
+      // nothing writes these rows later in this transaction.
+      Account fromRef = accounts.findById(fromAccountId)
+          .orElseThrow(() -> new AccountNotFoundException(fromAccountId));
+      Account toRef = accounts.findByIban(toIban.trim().toUpperCase())
+          .orElseThrow(() -> new AccountNotFoundException(toIban));
       return heldTransfers.holdForReview(sender, fromRef, toRef, scaled, currency, memo, cleanKey, keyed);
     }
-    return post(sender, fromRef, toRef, scaled, currency, memo, cleanKey, keyed);
+    return post(sender, fromId, toId, scaled, currency, memo, cleanKey, keyed);
   }
 
-  /** Instant settlement path for transfers below the review threshold. */
-  private Transaction post(User sender, Account fromRef, Account toRef, BigDecimal scaled,
+  /**
+   * Instant settlement path for transfers below the review threshold.
+   *
+   * <p>The caller resolves both accounts to IDs only, so the locking read in
+   * {@link LedgerMovementService#move} is also the first (and only) read of
+   * the two rows in this transaction - the row state it locks is the state it
+   * loads. Loading either account here beforehand would hand `move` a managed
+   * entity whose stale balance the save then writes over a newer committed
+   * value once real row-lock contention (PostgreSQL) forces the lock to wait.
+   */
+  private Transaction post(User sender, UUID fromId, UUID toId, BigDecimal scaled,
       String currency, String memo, String cleanKey, boolean keyed) {
     // The movement core takes the pessimistic write locks (always in ID order
     // so concurrent opposite-direction transfers cannot deadlock) and enforces
     // the affordability rule while both rows are locked.
-    LedgerMovementService.Moved moved = movement.move(fromRef.getId(), toRef.getId(), scaled);
+    LedgerMovementService.Moved moved = movement.move(fromId, toId, scaled);
     Account from = moved.from();
     Account to = moved.to();
 

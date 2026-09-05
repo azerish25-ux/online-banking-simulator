@@ -12,6 +12,19 @@ made the product feel generated rather than built.
 
 ### Correctness
 
+- **Money can no longer be created or destroyed under concurrent transfers on
+  real PostgreSQL** - the deepest bug this audit found, and one the H2 suite
+  could not see. `MoneyService.transfer` loaded both accounts *before* the
+  ledger's `SELECT ... FOR UPDATE`, and Hibernate does not refresh an entity
+  already in the persistence context: under real row-lock contention the lock
+  was taken on a stale snapshot whose save then overwrote a newer committed
+  balance. 24 parallel opposite transfers on Postgres produced 2030 where
+  2000 belonged (caught by `TransferConcurrencyIT` on the Postgres service;
+  green on H2 by timing luck). The instant path now resolves both accounts to
+  IDs only, so the locking read in `LedgerMovementService#move` is also the
+  first read - the row it locks is the row it loads - and `accounts` gained
+  an optimistic-lock `version` (V16) so any future unlocked stale write fails
+  loudly with 409 instead of silently corrupting a balance.
 - **A review-threshold transfer no longer toasts "Transfer posted".** The
   success effect compared a bare `status`, which resolved to the legacy
   `window.status` DOM global instead of the response - so every held wire

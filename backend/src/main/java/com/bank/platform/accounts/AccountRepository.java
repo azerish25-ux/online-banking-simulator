@@ -20,6 +20,20 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
 
   Optional<Account> findByIban(String iban);
 
+  /**
+   * Scalars only - never returns a managed {@link Account} into the caller's
+   * persistence context. Money flows must resolve the two account IDs this
+   * way and let {@link #findByIdForUpdate} be the first entity read of the
+   * rows: if an Account were loaded here first, the later FOR UPDATE would
+   * lock the row but keep the stale in-context state, and the save would
+   * overwrite a newer committed balance (see LedgerMovementService).
+   */
+  @Query("select a.userId from Account a where a.id = :id")
+  Optional<UUID> findOwnerIdById(UUID id);
+
+  @Query("select a.id from Account a where a.iban = :iban")
+  Optional<UUID> findIdByIban(String iban);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select a from Account a where a.id = :id")
   Optional<Account> findByIdForUpdate(UUID id);

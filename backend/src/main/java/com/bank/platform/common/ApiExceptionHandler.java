@@ -17,6 +17,7 @@ import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
@@ -136,6 +137,17 @@ public class ApiExceptionHandler {
   public ResponseEntity<Map<String, Object>> conflict(DataIntegrityViolationException ex) {
     return problem(HttpStatus.CONFLICT, "Conflict",
         "The request conflicts with existing data; try again with different values");
+  }
+
+  /**
+   * A row changed after it was read (optimistic lock on accounts - see V16).
+   * The other writer won; the request is safe to retry against fresh state.
+   * Reaching this is always better than silently overwriting a newer balance.
+   */
+  @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
+  public ResponseEntity<Map<String, Object>> staleWrite(ObjectOptimisticLockingFailureException ex) {
+    return problem(HttpStatus.CONFLICT, "Conflict",
+        "The resource changed concurrently; retry the request");
   }
 
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)

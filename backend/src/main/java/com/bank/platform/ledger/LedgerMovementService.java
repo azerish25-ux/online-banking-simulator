@@ -33,6 +33,17 @@ public class LedgerMovementService {
    * Locks both account rows in stable ID order (deadlock-safe so concurrent
    * opposite-direction transfers cannot deadlock), validates the pair and the
    * sender's affordability, applies the debit/credit and persists both rows.
+   *
+   * <p>This must be the FIRST entity read of both rows in the calling
+   * transaction. The lock is a JPQL {@code FOR UPDATE}, and Hibernate does
+   * not refresh an entity already present in the persistence context: if a
+   * caller loaded either account first, the row would be locked through a
+   * stale snapshot and {@code accounts.save} would write that stale balance
+   * over a newer committed one as soon as real row-lock contention makes the
+   * lock wait - money silently created or destroyed (PostgreSQL exposes this;
+   * H2's weaker locking hides it). Account {@code @Version} (V16) turns any
+   * such future violation into a loud conflict instead of corruption, but
+   * callers must still follow the first-read discipline.
    */
   public Moved move(UUID fromId, UUID toId, BigDecimal amount) {
     UUID firstId = fromId.compareTo(toId) < 0 ? fromId : toId;
