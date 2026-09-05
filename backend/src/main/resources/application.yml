@@ -56,7 +56,9 @@ management:
         include: health,info
   endpoint:
     health:
-      show-details: always
+      # /actuator/health is public; never leak DB/disk details to anonymous
+      # callers. The app's own /api/health is the canonical liveness probe.
+      show-details: never
 info:
   app:
     name: Online Banking Simulator
