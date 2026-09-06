@@ -14,14 +14,26 @@ import { Select } from "../../components/ui/select";
 import { useResultToast } from "../../components/feedback/use-result-toast";
 import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { useAccounts, useBeneficiaries, useTransfer, type TransferInput } from "../../lib/queries";
-import { accountLabel, usd } from "../../lib/format";
+import { accountLabel, usdReview } from "../../lib/format";
 import { Routes } from "../../lib/routes";
+
+type ReviewSnapshot = {
+  fromAccountId: string;
+  toIban: string;
+  amount: string;
+  memo?: string;
+};
 
 export default function TransfersPage() {
   const accounts = useAccounts();
   const beneficiaries = useBeneficiaries();
   const transfer = useTransfer();
   const [receipt, setReceipt] = React.useState<{ id: string; toIban: string; amount: string; status: string } | null>(null);
+  // F11 explicit state machine: the form is DRAFT until the user asks to
+  // review; REVIEW freezes the payload; submitting sends exactly the reviewed
+  // snapshot - never silently re-read live form values. Editing a field exits
+  // review back to DRAFT (and the intent-change effect resets the key).
+  const [review, setReview] = React.useState<ReviewSnapshot | null>(null);
   const { register, handleSubmit, setValue, watch, reset, formState } = useForm<Form>({
     resolver: zodResolver(schema),
     defaultValues: { fromAccountId: "", toIban: "", amount: "", memo: "" }
@@ -30,7 +42,17 @@ export default function TransfersPage() {
   const watchTo = watch("toIban");
   const watchAmount = watch("amount");
   const chosenBeneficiary = watchTo;
+  const reviewedBeneficiary = (beneficiaries.data ?? []).find((b) => b.iban === watchTo);
   const { resetIdempotencyKey } = transfer;
+
+  // Editing after review returns to DRAFT: the snapshot no longer matches the
+  // form, so the confirm button must not be reachable with stale values.
+  React.useEffect(() => {
+    if (!review) return;
+    if (watchFrom !== review.fromAccountId || watchTo !== review.toIban || watchAmount !== review.amount) {
+      setReview(null);
+    }
+  }, [watchFrom, watchTo, watchAmount, review]);
 
   // Editing the transfer is a new intent: the outstanding idempotency key
   // (which exists to make retries of THIS transfer safe) no longer applies.
@@ -72,7 +94,9 @@ export default function TransfersPage() {
           ? { message: "Transfer submitted for review - it is sent once an operator approves it.", tone: "info" }
           : { message: "Transfer posted." },
       run: (d) => {
-        setReceipt({ id: d.id, toIban: d.toIban, amount: d.amount, status: d.status });
+        // A transfer always has a destination; the schema marks toIban
+        // nullable because deposits/charges omit it, so narrow for the receipt.
+        setReceipt({ id: d.id, toIban: d.toIban ?? "", amount: d.amount, status: d.status });
         reset({ fromAccountId: lastIntent.current.from, toIban: "", amount: "", memo: "" });
       }
     }
@@ -80,7 +104,23 @@ export default function TransfersPage() {
 
   function onSubmit(values: Form) {
     setReceipt(null);
-    transfer.mutate(values as TransferInput);
+    // First click validates and opens REVIEW; the second (Confirm & send)
+    // submits through confirmSend with the frozen snapshot.
+    setReview({
+      fromAccountId: values.fromAccountId ?? "",
+      toIban: values.toIban ?? "",
+      amount: values.amount,
+      memo: values.memo || undefined
+    });
+  }
+
+  function confirmSend() {
+    if (!review) return;
+    setReceipt(null);
+    // Bind the operation identity to the REVIEWED payload: the lastIntent
+    // tracking that resets the key on edits already mirrors these values
+    // (editing exits review), so the snapshot and the form agree here.
+    transfer.mutate(review as TransferInput);
   }
 
   return (
@@ -100,7 +140,7 @@ export default function TransfersPage() {
         <Card className="max-w-xl">
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <Field label="From account" error={formState.errors.fromAccountId?.message}>
-              <Select aria-label="From account" {...register("fromAccountId")}>
+              <Select {...register("fromAccountId")}>
                 {(accounts.data ?? []).map((a) => (
                   <option key={a.id} value={a.id}>{accountLabel(a, a.balance)}</option>
                 ))}
@@ -123,10 +163,64 @@ export default function TransfersPage() {
             <Field label="Memo (optional)" error={formState.errors.memo?.message}>
               <Input placeholder="Rent, dinner..." maxLength={140} {...register("memo")} />
             </Field>
-            <Button type="submit" disabled={transfer.isPending}>
-              {transfer.isPending ? "Sending..." : "Send transfer"}
-            </Button>
+            {!review && (
+              <Button type="submit" disabled={transfer.isPending}>
+                Review transfer
+              </Button>
+            )}
           </form>
+
+          {review && (
+            <div
+              role="region"
+              aria-label="Review your transfer"
+              className="mt-4 rounded-md border border-brass-500/60 bg-brass-500/5 p-4"
+            >
+              <p className="text-base font-semibold tracking-tight">Review your transfer</p>
+              <dl className="mt-3 space-y-2 text-sm">
+                <div className="flex justify-between gap-4">
+                  <dt className="label text-content-muted">From</dt>
+                  <dd className="text-right">
+                    {(() => {
+                      const account = (accounts.data ?? []).find((a) => a.id === review.fromAccountId);
+                      return account ? accountLabel(account, account.balance) : "-";
+                    })()}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="label text-content-muted">To</dt>
+                  <dd className="text-right">
+                    <span className="mono">{review.toIban}</span>
+                    {reviewedBeneficiary && reviewedBeneficiary.iban === review.toIban ? (
+                      <span className="muted block text-xs">
+                        {reviewedBeneficiary.nickname} (saved beneficiary)
+                      </span>
+                    ) : null}
+                  </dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="label text-content-muted">Amount (USD)</dt>
+                  <dd className="text-right font-semibold tabular-nums">{usdReview(review.amount)}</dd>
+                </div>
+                <div className="flex justify-between gap-4">
+                  <dt className="label text-content-muted">Memo</dt>
+                  <dd className="text-right">{review.memo || "-"}</dd>
+                </div>
+              </dl>
+              <p className="muted mt-3 text-xs">
+                Confirm to submit exactly this. Amounts of $10,000 or more go to the review
+                desk first - nothing leaves your account until an operator approves.
+              </p>
+              <div className="mt-3 flex justify-end gap-2">
+                <Button type="button" variant="secondary" onClick={() => setReview(null)}>
+                  Edit
+                </Button>
+                <Button type="button" onClick={confirmSend} disabled={transfer.isPending}>
+                  {transfer.isPending ? "Sending..." : "Confirm & send"}
+                </Button>
+              </div>
+            </div>
+          )}
         </Card>
 
         <div>
@@ -162,7 +256,7 @@ export default function TransfersPage() {
                 <TxStatusBadge status={receipt.status} />
               </div>
               <CardDescription>
-                {usd(receipt.amount)} → <span className="mono">{receipt.toIban}</span>
+                {usdReview(receipt.amount)} → <span className="mono">{receipt.toIban}</span>
               </CardDescription>
               {receipt.status === "HELD" && (
                 <p className="muted mt-2 text-sm">
@@ -170,6 +264,14 @@ export default function TransfersPage() {
                 </p>
               )}
               <p className="mono muted mt-2 text-xs">id {receipt.id}</p>
+              <p className="mt-3">
+                <Link
+                  href={Routes.transferReceipt(receipt.id)}
+                  className="text-sm text-brass-300 hover:underline"
+                >
+                  Open permanent receipt ↗
+                </Link>
+              </p>
             </Card>
           )}
         </div>

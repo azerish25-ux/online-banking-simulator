@@ -41,6 +41,17 @@ public class Account {
   @Column(name = "credit_limit", nullable = false, precision = 19, scale = 4)
   private BigDecimal creditLimit = BigDecimal.ZERO;
 
+  /**
+   * Outstanding drawn principal on a LOAN (F16), tracked separately from the
+   * interest that has accrued on it. Draws consume principal headroom up to
+   * the credit limit; interest charges deepen the balance WITHOUT touching
+   * this, so a maxed loan is never silently forgiven interest. Repayments
+   * extinguish interest first, then principal, and never push a loan balance
+   * positive. Zero for every other account type.
+   */
+  @Column(nullable = false, precision = 19, scale = 4)
+  private BigDecimal principal = BigDecimal.ZERO;
+
   @Column(name = "last_interest_at")
   private Instant lastInterestAt;
 
@@ -88,6 +99,8 @@ public class Account {
   public void setStatus(AccountStatus v) { status = v; }
   public BigDecimal getCreditLimit() { return creditLimit; }
   public void setCreditLimit(BigDecimal v) { creditLimit = v; }
+  public BigDecimal getPrincipal() { return principal; }
+  public void setPrincipal(BigDecimal v) { principal = v; }
   public Instant getLastInterestAt() { return lastInterestAt; }
   public void setLastInterestAt(Instant v) { lastInterestAt = v; }
 }

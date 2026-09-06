@@ -1,7 +1,7 @@
 package com.bank.platform.security;
 
 import com.bank.platform.common.ApiExceptionHandler;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -20,6 +20,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter.ReferrerPolicy;
+import org.springframework.security.web.header.writers.StaticHeadersWriter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -46,7 +47,10 @@ public class SecurityConfig {
             .frameOptions(HeadersConfigurer.FrameOptionsConfig::deny)
             .referrerPolicy(referrer -> referrer.policy(
                 ReferrerPolicy.NO_REFERRER))
-            .permissionsPolicy(permissions -> permissions.policy("camera=(), microphone=(), geolocation=()")))
+            // Spring Security's PermissionsPolicyConfig DSL was removed; the
+            // header itself is static, so write it directly.
+            .addHeaderWriter(new StaticHeadersWriter(
+                "Permissions-Policy", "camera=(), microphone=(), geolocation=()")))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/api/health", "/api/public/stats", "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/mfa/verify", "/actuator/health", "/actuator/info", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
             .permitAll()

@@ -1,5 +1,37 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { ACCESS_TOKEN_COOKIE_MAX_AGE, ApiError, SESSION_EXPIRED_EVENT, api, authedFetch, clearToken, expireSession, getToken, setToken, tokenCookie } from "./api";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { ACCESS_TOKEN_COOKIE_MAX_AGE, ApiError, SESSION_EXPIRED_EVENT, api, authedFetch, broadcastLogout, clearToken, expireSession, getToken, setToken, subscribeAuthChannel, tokenCookie } from "./api";
+
+/**
+ * jsdom has no BroadcastChannel, so two "tabs" are simulated with a tiny
+ * in-memory bus that delivers postMessage to every other open instance with
+ * the same channel name - exactly the browser contract api.ts relies on for
+ * cross-tab session coordination (F22).
+ */
+type FakeMessageEvent = { data: unknown };
+
+class FakeBroadcastChannel {
+  static channels: FakeBroadcastChannel[] = [];
+  name: string;
+  onmessage: ((event: FakeMessageEvent) => void) | null = null;
+  private closed = false;
+
+  constructor(name: string) {
+    this.name = name;
+    FakeBroadcastChannel.channels.push(this);
+  }
+
+  postMessage(data: unknown) {
+    for (const other of FakeBroadcastChannel.channels) {
+      if (other !== this && other.name === this.name && !other.closed) {
+        other.onmessage?.({ data });
+      }
+    }
+  }
+
+  close() {
+    this.closed = true;
+  }
+}
 
 function mockFetchOnce(body: unknown, status = 200) {
   global.fetch = vi.fn(async () => new Response(JSON.stringify(body), { status })) as never;
@@ -8,6 +40,12 @@ function mockFetchOnce(body: unknown, status = 200) {
 beforeEach(() => {
   document.cookie = "bank_token=; max-age=0";
   global.fetch = vi.fn() as never;
+  FakeBroadcastChannel.channels = [];
+  vi.stubGlobal("BroadcastChannel", FakeBroadcastChannel);
+});
+
+afterEach(() => {
+  vi.unstubAllGlobals();
 });
 
 describe("token cookie", () => {
@@ -117,6 +155,75 @@ describe("silent refresh", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ title: "Bad", detail: "nope" }), { status: 401 }));
     await expect(api("/v1/auth/login", { method: "POST", body: "{}" })).rejects.toThrow("nope");
     expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+  });
+});
+
+describe("cross-tab session channel (F22)", () => {
+  it("a deliberate logout in one tab reaches a sibling tab's listener", () => {
+    const peer = vi.fn();
+    const unsubscribe = subscribeAuthChannel(peer);
+    broadcastLogout();
+    expect(peer).toHaveBeenCalledTimes(1);
+    expect(peer).toHaveBeenCalledWith({ type: "logout" });
+    unsubscribe();
+  });
+
+  it("expireSession clears the local token, fires locally, and tells sibling tabs", () => {
+    setToken("tok");
+    const local = vi.fn();
+    const peer = vi.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, local);
+    const unsubscribe = subscribeAuthChannel(peer);
+    expireSession();
+    expect(getToken()).toBeNull();
+    expect(local).toHaveBeenCalledTimes(1);
+    expect(peer).toHaveBeenCalledWith({ type: "expired" });
+    window.removeEventListener(SESSION_EXPIRED_EVENT, local);
+    unsubscribe();
+  });
+
+  it("ignores messages that are not the three declared session announcements", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeAuthChannel(listener);
+    const tab = new FakeBroadcastChannel("simulator:auth");
+    tab.postMessage({ type: "refreshed" });
+    tab.postMessage({ type: "logout" });
+    tab.postMessage({ type: "expired" });
+    // Not one of the declared AuthMessage types (or plain garbage).
+    tab.postMessage({ type: "navigate" });
+    tab.postMessage("logout");
+    tab.postMessage(undefined);
+    expect(listener).toHaveBeenCalledTimes(3);
+    unsubscribe();
+  });
+});
+
+describe("TOTP credential rejections keep the session (F02)", () => {
+  it("a wrong TOTP code after a successful refresh surfaces the 401 without expiring", async () => {
+    setToken("expired-token");
+    (global.fetch as ReturnType<typeof vi.fn>) = vi.fn()
+      // Enable attempt with an (in fact still valid) access token the server
+      // rejects for another reason is indistinguishable from expiry at the
+      // client, so the silent refresh runs once...
+      .mockResolvedValueOnce(new Response(JSON.stringify({ title: "Unauthorized", detail: "Invalid code" }), { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: "fresh" }), { status: 200 }))
+      // ...and the retried submission is refused for the SAME business reason.
+      // That is a definitive rejection of a HEALTHY session: the user must
+      // see "Invalid code", not be logged out.
+      .mockResolvedValueOnce(new Response(JSON.stringify({ title: "Unauthorized", detail: "Invalid code" }), { status: 401 }));
+    const listener = vi.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, listener);
+    const err = await api("/v1/auth/totp/enable", {
+      method: "POST",
+      body: JSON.stringify({ code: "000000" })
+    }).catch((e) => e);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).status).toBe(401);
+    expect((err as ApiError).message).toBe("Invalid code");
+    // The rotated session is alive - never expired on a credential rejection.
+    expect(getToken()).toBe("fresh");
+    expect(listener).not.toHaveBeenCalled();
+    window.removeEventListener(SESSION_EXPIRED_EVENT, listener);
   });
 });
 

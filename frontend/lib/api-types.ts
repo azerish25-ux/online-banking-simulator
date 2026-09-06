@@ -2,21 +2,23 @@
 
 type Schemas = components["schemas"];
 
-// The generator marks every field optional (the spec lacks `required`).
-// Our API always returns these fields, so Required<> keeps one source of
-// truth without non-null assertions at every call site.
-export type Account = Required<Schemas["AccountResponse"]>;
-export type Tx = Required<Schemas["TransactionResponse"]>;
-export type Beneficiary = Required<Schemas["BeneficiaryResponse"]>;
-export type NotificationItem = Required<Schemas["NotificationResponse"]>;
-export type CardItem = Required<Schemas["CardResponse"]>;
-export type IssuedCard = Required<Schemas["IssuedCardResponse"]>;
-export type AdminUser = Required<Schemas["UserResponse"]>;
-export type Audit = Required<Schemas["AuditResponse"]>;
-export type MonthPoint = Required<Schemas["MonthSummary"]>;
-export type DayTotal = Required<Schemas["DayTotal"]>;
-export type User = Required<Schemas["UserResponse"]>;
-export type AuthResponse = Omit<Required<Schemas["AuthResponse"]>, "user"> & { user: User };
+// The OpenAPI schema is authoritative: the backend marks every response
+// field `required` (and the genuinely nullable ones `nullable`), so the
+// generated types need no blanket Required<> repair. These aliases only give
+// the schemas shorter, domain-flavoured names.
+export type Account = Schemas["AccountResponse"];
+export type Tx = Schemas["TransactionResponse"];
+export type Beneficiary = Schemas["BeneficiaryResponse"];
+export type NotificationItem = Schemas["NotificationResponse"];
+export type CardItem = Schemas["CardResponse"];
+export type IssuedCard = Schemas["IssuedCardResponse"];
+export type AdminUser = Schemas["UserResponse"];
+export type Audit = Schemas["AuditResponse"];
+export type MonthPoint = Schemas["MonthSummary"];
+export type DayTotal = Schemas["DayTotal"];
+export type User = Schemas["UserResponse"];
+export type AuthResponse = Schemas["AuthResponse"];
+export type MfaRequiredResponse = Schemas["MfaRequiredResponse"];
 
 // Spring Data page envelope (framework-stable shape, not domain drift).
 export type Page<T> = {
@@ -24,6 +26,15 @@ export type Page<T> = {
   totalPages: number;
   number: number;
   totalElements: number;
+};
+
+// Cursor-paged history envelope (F26): the transactions feed pages by an
+// opaque keyset cursor, not by page numbers. nextCursor is null on the last
+// page; omit/blank the cursor to restart at the newest page.
+export type HistoryPage<T> = {
+  items: T[];
+  total: number;
+  nextCursor: string | null;
 };
 
 // Public landing numbers - intentionally outside the OpenAPI spec (marketing

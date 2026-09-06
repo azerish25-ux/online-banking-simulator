@@ -6,4 +6,8 @@ public class TransactionNotFoundException extends RuntimeException {
   public TransactionNotFoundException(UUID id) {
     super("Transaction " + id + " not found");
   }
+
+  public TransactionNotFoundException(String message) {
+    super(message);
+  }
 }

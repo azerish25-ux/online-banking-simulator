@@ -50,7 +50,6 @@ vi.mock("next/link", () => {
   };
 });
 
-// eslint-disable-next-line import/order
 import { api } from "../../lib/api";
 
 const user = { id: "u1", email: "a@b.co", fullName: "Alice", role: "CUSTOMER", totpEnabled: false };
@@ -91,8 +90,11 @@ describe("dashboard loan card", () => {
     expect(screen.queryByText("-$600.00")).not.toBeInTheDocument();
 
     // Semantics intact: the net-position figure still subtracts the debt
-    // (1,250 - 600 = 650) rather than treating it as a credit.
-    expect(screen.getByText("Net position across accounts")).toBeInTheDocument();
+    // (1,250 - 600 = 650) rather than treating it as a credit, and the label
+    // names the scope and the loan treatment.
+    expect(
+      screen.getByText("Net position across all your accounts - loans count as debt")
+    ).toBeInTheDocument();
     expect(screen.getByText("$650.00")).toBeInTheDocument();
   });
 

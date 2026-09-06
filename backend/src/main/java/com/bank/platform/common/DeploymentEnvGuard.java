@@ -27,13 +27,16 @@ public class DeploymentEnvGuard implements ApplicationRunner {
 
   private final String deploymentEnv;
   private final Map<String, String> devDefaults = new LinkedHashMap<>();
+  private final String totpMasterKey;
 
   public DeploymentEnvGuard(
       @Value("${app.deployment-env:dev}") String deploymentEnv,
       @Value("${app.jwt.secret}") String jwtSecret,
       @Value("${app.admin.password:change-me-admin-123}") String adminPassword,
-      @Value("${spring.datasource.password:}") String dbPassword) {
+      @Value("${spring.datasource.password:}") String dbPassword,
+      @Value("${app.totp.master-key:}") String totpMasterKey) {
     this.deploymentEnv = deploymentEnv == null ? "dev" : deploymentEnv.trim().toLowerCase();
+    this.totpMasterKey = totpMasterKey == null ? "" : totpMasterKey.trim();
     // Keys are the env vars operators override; values are the documented dev defaults.
     devDefaults.put("JWT_SECRET", jwtSecret);
     devDefaults.put("APP_ADMIN_PASSWORD", adminPassword);
@@ -47,12 +50,18 @@ public class DeploymentEnvGuard implements ApplicationRunner {
       String composeJwt = "change-me-in-production-0123456789abcdef-0123456789abcdef";
       String devAdmin = "change-me-admin-123";
       String devDb = "bankapp_secret_change_me";
+      String devTotpKey = "dev-totp-master-key-change-me";
 
       Map<String, Boolean> insecure = new LinkedHashMap<>();
       insecure.put("JWT_SECRET (dev default)", devDefaults.get("JWT_SECRET").equals(devJwt));
       insecure.put("JWT_SECRET (compose default)", devDefaults.get("JWT_SECRET").equals(composeJwt));
       insecure.put("APP_ADMIN_PASSWORD", devDefaults.get("APP_ADMIN_PASSWORD").equals(devAdmin));
       insecure.put("PG_PASSWORD", devDefaults.get("PG_PASSWORD").equals(devDb));
+      // F30 fail-closed: production must supply a real TOTP master key, and a
+      // missing or placeholder value is a startup error, never a silent fall
+      // back to plaintext-at-rest seeds.
+      insecure.put("APP_TOTP_MASTER_KEY (missing or placeholder)",
+          totpMasterKey.isEmpty() || devTotpKey.equals(totpMasterKey));
 
       String offenders = insecure.entrySet().stream()
           .filter(Map.Entry::getValue)
@@ -76,6 +85,10 @@ public class DeploymentEnvGuard implements ApplicationRunner {
       log.warn("Dev-only credentials in use (JWT/admin/DB). Set APP_ADMIN_PASSWORD, JWT_SECRET "
           + "and PG_PASSWORD for anything beyond a local demo, and app.deployment-env=production "
           + "to make the guard refuse these defaults.");
+    }
+    if (totpMasterKey.isEmpty()) {
+      log.warn("TOTP secrets are stored WITHOUT encryption (no APP_TOTP_MASTER_KEY). "
+          + "Set the key for anything beyond a local demo; production refuses to start without it.");
     }
   }
 }

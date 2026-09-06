@@ -62,7 +62,7 @@ export function OpenAccountDialog({
       <form onSubmit={(e) => { e.preventDefault(); submit(); }} className="space-y-4">
         {failure && <InlineAlert>{failure}</InlineAlert>}
         <Field label="Account type">
-          <Select aria-label="Account type" value={type} onChange={(e) => setType(e.target.value)}>
+          <Select value={type} onChange={(e) => setType(e.target.value)}>
             <option value="CHECKING">Checking - everyday money</option>
             <option value="SAVINGS">Savings - earns monthly interest</option>
             <option value="LOAN" disabled={hasLoan}>Loan - borrow up to $1,000 by sending money from it</option>
@@ -72,7 +72,7 @@ export function OpenAccountDialog({
           )}
         </Field>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="secondary" disabled={openAccount.isPending} onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={openAccount.isPending}>
             {openAccount.isPending ? "Opening..." : "Open"}
           </Button>

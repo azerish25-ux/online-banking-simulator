@@ -1,10 +1,12 @@
 package com.bank.platform.common;
 
 import com.bank.platform.accounts.AccountNotFoundException;
+import com.bank.platform.auth.AuthThrottledException;
 import com.bank.platform.auth.EmailTakenException;
 import com.bank.platform.auth.TooManyTotpAttemptsException;
 import com.bank.platform.beneficiaries.BeneficiaryExistsException;
 import com.bank.platform.beneficiaries.BeneficiaryNotFoundException;
+import com.bank.platform.ledger.IdempotencyConflictException;
 import com.bank.platform.ledger.InsufficientFundsException;
 import com.bank.platform.ledger.TransactionNotFoundException;
 import com.bank.platform.ledger.TransferValidationException;
@@ -37,35 +39,35 @@ public class ApiExceptionHandler {
   private static final Logger log = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
   @ExceptionHandler(HttpMessageNotReadableException.class)
-  public ResponseEntity<Map<String, Object>> unreadable(HttpMessageNotReadableException ex) {
+  public ResponseEntity<ApiProblem> unreadable(HttpMessageNotReadableException ex) {
     Throwable cause = ex.getMostSpecificCause();
     return problem(HttpStatus.BAD_REQUEST, "Malformed Request",
         cause == null ? "Malformed request" : cause.getMessage());
   }
 
   @ExceptionHandler(MethodArgumentTypeMismatchException.class)
-  public ResponseEntity<Map<String, Object>> typeMismatch(MethodArgumentTypeMismatchException ex) {
+  public ResponseEntity<ApiProblem> typeMismatch(MethodArgumentTypeMismatchException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Bad Request",
         "Parameter \u0027" + ex.getName() + "\u0027 has an invalid value");
   }
 
   @ExceptionHandler(ConstraintViolationException.class)
-  public ResponseEntity<Map<String, Object>> constraint(ConstraintViolationException ex) {
+  public ResponseEntity<ApiProblem> constraint(ConstraintViolationException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Validation Failed", ex.getMessage());
   }
 
   @ExceptionHandler(NoResourceFoundException.class)
-  public ResponseEntity<Map<String, Object>> noRoute(NoResourceFoundException ex) {
+  public ResponseEntity<ApiProblem> noRoute(NoResourceFoundException ex) {
     return problem(HttpStatus.NOT_FOUND, "Not Found", "No such endpoint");
   }
 
   @ExceptionHandler(IllegalArgumentException.class)
-  public ResponseEntity<Map<String, Object>> badRequest(IllegalArgumentException ex) {
+  public ResponseEntity<ApiProblem> badRequest(IllegalArgumentException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Bad Request", ex.getMessage());
   }
 
   @ExceptionHandler(MethodArgumentNotValidException.class)
-  public ResponseEntity<Map<String, Object>> validation(MethodArgumentNotValidException ex) {
+  public ResponseEntity<ApiProblem> validation(MethodArgumentNotValidException ex) {
     String detail = ex.getBindingResult().getFieldErrors().stream()
         .map(e -> e.getField() + ": " + e.getDefaultMessage())
         .collect(Collectors.joining("; "));
@@ -73,12 +75,12 @@ public class ApiExceptionHandler {
   }
 
   @ExceptionHandler(EmailTakenException.class)
-  public ResponseEntity<Map<String, Object>> conflict(EmailTakenException ex) {
+  public ResponseEntity<ApiProblem> conflict(EmailTakenException ex) {
     return problem(HttpStatus.CONFLICT, "Email Taken", ex.getMessage());
   }
 
   @ExceptionHandler(BadCredentialsException.class)
-  public ResponseEntity<Map<String, Object>> unauthorized(BadCredentialsException ex) {
+  public ResponseEntity<ApiProblem> unauthorized(BadCredentialsException ex) {
     return problem(HttpStatus.UNAUTHORIZED, "Unauthorized", ex.getMessage());
   }
 
@@ -87,45 +89,65 @@ public class ApiExceptionHandler {
    * 429 with Retry-After, same RFC-7807 shape as every other error.
    */
   @ExceptionHandler(TooManyTotpAttemptsException.class)
-  public ResponseEntity<Map<String, Object>> totpThrottled(TooManyTotpAttemptsException ex) {
+  public ResponseEntity<ApiProblem> totpThrottled(TooManyTotpAttemptsException ex) {
     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
         .header("Retry-After", "60")
         .body(ApiExceptionHandler.body(
             HttpStatus.TOO_MANY_REQUESTS, "Too Many Attempts", ex.getMessage()));
   }
 
+  /** An account burned its password-login failure budget (F03). */
+  @ExceptionHandler(AuthThrottledException.class)
+  public ResponseEntity<ApiProblem> authThrottled(AuthThrottledException ex) {
+    return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
+        .header("Retry-After", "900")
+        .body(ApiExceptionHandler.body(
+            HttpStatus.TOO_MANY_REQUESTS, "Too Many Attempts", ex.getMessage()));
+  }
+
   @ExceptionHandler(BeneficiaryExistsException.class)
-  public ResponseEntity<Map<String, Object>> beneficiaryConflict(BeneficiaryExistsException ex) {
+  public ResponseEntity<ApiProblem> beneficiaryConflict(BeneficiaryExistsException ex) {
     return problem(HttpStatus.CONFLICT, "Beneficiary Exists", ex.getMessage());
   }
 
   @ExceptionHandler(TransactionNotFoundException.class)
-  public ResponseEntity<Map<String, Object>> transactionNotFound(TransactionNotFoundException ex) {
+  public ResponseEntity<ApiProblem> transactionNotFound(TransactionNotFoundException ex) {
     return problem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 
   @ExceptionHandler(BeneficiaryNotFoundException.class)
-  public ResponseEntity<Map<String, Object>> beneficiaryNotFound(BeneficiaryNotFoundException ex) {
+  public ResponseEntity<ApiProblem> beneficiaryNotFound(BeneficiaryNotFoundException ex) {
     return problem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 
   @ExceptionHandler(AccountNotFoundException.class)
-  public ResponseEntity<Map<String, Object>> notFound(AccountNotFoundException ex) {
+  public ResponseEntity<ApiProblem> notFound(AccountNotFoundException ex) {
     return problem(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 
   @ExceptionHandler(InsufficientFundsException.class)
-  public ResponseEntity<Map<String, Object>> unprocessable(InsufficientFundsException ex) {
-    return problem(HttpStatus.UNPROCESSABLE_ENTITY, "Insufficient Funds", ex.getMessage());
+  public ResponseEntity<ApiProblem> unprocessable(InsufficientFundsException ex) {
+    return problem(HttpStatus.UNPROCESSABLE_CONTENT, "Insufficient Funds", ex.getMessage());
   }
 
   @ExceptionHandler(TransferValidationException.class)
-  public ResponseEntity<Map<String, Object>> transferValidation(TransferValidationException ex) {
+  public ResponseEntity<ApiProblem> transferValidation(TransferValidationException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Transfer Rejected", ex.getMessage());
   }
 
+  /**
+   * One key presented with two different intents (F06): the key already names
+   * an operation, and the new payload is not the one it names. 409 so the
+   * client treats it as "resolve the original operation", not as a retryable
+   * or rejected submit.
+   */
+  @ExceptionHandler(IdempotencyConflictException.class)
+  public ResponseEntity<ApiProblem> idempotencyConflict(IdempotencyConflictException ex) {
+    return problem(HttpStatus.CONFLICT, "Idempotency Conflict", ex.getMessage());
+  }
+
   @ExceptionHandler(AccessDeniedException.class)
-  public ResponseEntity<Map<String, Object>> forbidden(AccessDeniedException ex) {
+  public ResponseEntity<ApiProblem> forbidden(AccessDeniedException ex) {
     return problem(HttpStatus.FORBIDDEN, "Forbidden", ex.getMessage());
   }
 
@@ -134,7 +156,7 @@ public class ApiExceptionHandler {
    * must not surface as a 500 with internals - they are conflicts.
    */
   @ExceptionHandler(DataIntegrityViolationException.class)
-  public ResponseEntity<Map<String, Object>> conflict(DataIntegrityViolationException ex) {
+  public ResponseEntity<ApiProblem> conflict(DataIntegrityViolationException ex) {
     return problem(HttpStatus.CONFLICT, "Conflict",
         "The request conflicts with existing data; try again with different values");
   }
@@ -145,24 +167,24 @@ public class ApiExceptionHandler {
    * Reaching this is always better than silently overwriting a newer balance.
    */
   @ExceptionHandler(ObjectOptimisticLockingFailureException.class)
-  public ResponseEntity<Map<String, Object>> staleWrite(ObjectOptimisticLockingFailureException ex) {
+  public ResponseEntity<ApiProblem> staleWrite(ObjectOptimisticLockingFailureException ex) {
     return problem(HttpStatus.CONFLICT, "Conflict",
         "The resource changed concurrently; retry the request");
   }
 
   @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
-  public ResponseEntity<Map<String, Object>> methodNotAllowed(HttpRequestMethodNotSupportedException ex) {
+  public ResponseEntity<ApiProblem> methodNotAllowed(HttpRequestMethodNotSupportedException ex) {
     return problem(HttpStatus.METHOD_NOT_ALLOWED, "Method Not Allowed", "Method not supported for this endpoint");
   }
 
   @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
-  public ResponseEntity<Map<String, Object>> unsupportedMedia(HttpMediaTypeNotSupportedException ex) {
+  public ResponseEntity<ApiProblem> unsupportedMedia(HttpMediaTypeNotSupportedException ex) {
     return problem(HttpStatus.UNSUPPORTED_MEDIA_TYPE, "Unsupported Media Type",
         "Content-Type must be application/json");
   }
 
   @ExceptionHandler(MissingServletRequestParameterException.class)
-  public ResponseEntity<Map<String, Object>> missingParameter(MissingServletRequestParameterException ex) {
+  public ResponseEntity<ApiProblem> missingParameter(MissingServletRequestParameterException ex) {
     return problem(HttpStatus.BAD_REQUEST, "Bad Request",
         "Missing required parameter '" + ex.getParameterName() + "'");
   }
@@ -174,7 +196,7 @@ public class ApiExceptionHandler {
    * request's trace id so operators can actually investigate it.
    */
   @ExceptionHandler(Exception.class)
-  public ResponseEntity<Map<String, Object>> unexpected(Exception ex) {
+  public ResponseEntity<ApiProblem> unexpected(Exception ex) {
     log.error("Unhandled exception (requestId={})", MDC.get(TraceFilter.TRACE_ID), ex);
     return problem(HttpStatus.INTERNAL_SERVER_ERROR, "Internal Error", null);
   }
@@ -185,21 +207,21 @@ public class ApiExceptionHandler {
    * entry point use it so the problem shape - including the type URI -
    * cannot drift between responses.
    */
-  public static Map<String, Object> body(HttpStatus status, String title, String detail) {
-    return Map.of(
-        "type", "/problems/" + status.value(),
-        "title", title,
-        "status", status.value(),
-        "detail", detail == null ? title : detail,
-        "timestamp", Instant.now().toString());
+  public static ApiProblem body(HttpStatus status, String title, String detail) {
+    return new ApiProblem(
+        "/problems/" + status.value(),
+        title,
+        status.value(),
+        detail == null ? title : detail,
+        Instant.now().toString());
   }
 
-  public static ResponseEntity<Map<String, Object>> response(
+  public static ResponseEntity<ApiProblem> response(
       HttpStatus status, String title, String detail) {
     return ResponseEntity.status(status).body(body(status, title, detail));
   }
 
-  private ResponseEntity<Map<String, Object>> problem(HttpStatus status, String title, String detail) {
+  private ResponseEntity<ApiProblem> problem(HttpStatus status, String title, String detail) {
     return response(status, title, detail);
   }
 }

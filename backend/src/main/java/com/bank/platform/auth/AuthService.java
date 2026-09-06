@@ -6,6 +6,10 @@ import com.bank.platform.accounts.AccountType;
 import com.bank.platform.accounts.Iban;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
+import com.bank.platform.common.LedgerCacheInvalidation;
+import java.time.Clock;
+import java.time.Duration;
+import java.util.UUID;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -15,6 +19,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class AuthService {
 
+  private static final Duration ENROLLMENT_LIFETIME = Duration.ofMinutes(10);
+
   private final UserRepository users;
   private final AccountRepository accounts;
   private final AuditLogRepository audits;
@@ -22,6 +28,13 @@ public class AuthService {
   private final TotpService totp;
   private final TotpThrottle totpThrottle;
   private final RefreshTokenRepository refreshTokens;
+  private final TotpSecretCustody custody;
+  private final LoginChallengeRepository challenges;
+  private final LoginChallengeService challengeService;
+  private final TotpEnrollmentRepository enrollments;
+  private final AccountLoginThrottle loginThrottle;
+  private final Clock clock;
+  private final LedgerCacheInvalidation invalidation;
 
   public AuthService(
       UserRepository users,
@@ -30,7 +43,14 @@ public class AuthService {
       PasswordEncoder passwords,
       TotpService totp,
       TotpThrottle totpThrottle,
-      RefreshTokenRepository refreshTokens) {
+      RefreshTokenRepository refreshTokens,
+      TotpSecretCustody custody,
+      LoginChallengeRepository challenges,
+      LoginChallengeService challengeService,
+      TotpEnrollmentRepository enrollments,
+      AccountLoginThrottle loginThrottle,
+      Clock clock,
+      LedgerCacheInvalidation invalidation) {
     this.users = users;
     this.accounts = accounts;
     this.audits = audits;
@@ -38,84 +58,237 @@ public class AuthService {
     this.totp = totp;
     this.totpThrottle = totpThrottle;
     this.refreshTokens = refreshTokens;
+    this.custody = custody;
+    this.challenges = challenges;
+    this.challengeService = challengeService;
+    this.enrollments = enrollments;
+    this.loginThrottle = loginThrottle;
+    this.clock = clock;
+    this.invalidation = invalidation;
   }
 
   @Transactional
-  @org.springframework.cache.annotation.CacheEvict(value = "public-stats", allEntries = true)
   public User register(String email, String rawPassword, String fullName) {
     String normalized = email.trim().toLowerCase();
     if (users.existsByEmail(normalized)) {
       throw new EmailTakenException(normalized);
     }
-    User user = users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
+    User user =    users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
     accounts.save(new Account(user.getId(), Iban.uniqueOrThrow(accounts::existsByIban, 5), AccountType.CHECKING));
     audits.save(AuditLog.of(user.getId(), "USER_REGISTERED", "User", user.getId().toString(),
         "email", user.getEmail()));
+    invalidation.clearSynchronized("public-stats");
     return user;
   }
 
   @Transactional(readOnly = true)
   public User login(String email, String rawPassword) {
     String normalized = email.trim().toLowerCase();
+    // Account-level budget on top of the per-IP limiter (F03). Keyed on the
+    // normalized email whether or not it exists, so the answer never reveals
+    // whether an account is real.
+    loginThrottle.verifyAvailable(normalized);
     User user = users.findByEmail(normalized)
-        .orElseThrow(() -> new BadCredentialsException("Invalid email or password"));
+        .orElseThrow(() -> {
+          loginThrottle.recordFailure(normalized);
+          return new BadCredentialsException("Invalid email or password");
+        });
     if (!passwords.matches(rawPassword, user.getPasswordHash())) {
+      loginThrottle.recordFailure(normalized);
       throw new BadCredentialsException("Invalid email or password");
     }
+    loginThrottle.recordSuccess(normalized);
     return user;
   }
 
   /**
-   * Rotates the TOTP secret. Audited; if 2FA was already active, changing the
-   * secret also revokes every refresh token so the account re-authenticates
-   * with the new factor rather than sailing on old sessions.
+   * F30 verification of a persisted login challenge (see {@link #verifyMfaChallenge}).
+   */
+  @Transactional
+  public User verifyMfaChallenge(UUID challengeId, String code) {
+    LoginChallenge challenge = challenges.findById(challengeId)
+        .orElseThrow(() -> new BadCredentialsException("Invalid MFA token"));
+    if (challenge.isConsumed()) {
+      throw new BadCredentialsException("Invalid MFA token");
+    }
+    if (!challenge.getExpiresAt().isAfter(clock.instant())) {
+      throw new BadCredentialsException("Invalid MFA token");
+    }
+    if (challenge.getFailedAttempts() >= LoginChallengeService.MAX_ATTEMPTS) {
+      throw new TooManyTotpAttemptsException();
+    }
+    User user = users.findById(challenge.getUserId())
+        .orElseThrow(() -> new BadCredentialsException("Invalid MFA token"));
+    totpThrottle.verifyAvailable(user.getEmail());
+    if (!user.isTotpEnabled() || !totp.verify(secretOf(user), code)) {
+      challengeService.recordFailure(challengeId);
+      totpThrottle.recordFailure(user.getEmail());
+      throw new BadCredentialsException("Invalid code");
+    }
+    if (challenges.consume(challengeId, clock.instant()) == 0) {
+      throw new BadCredentialsException("Invalid MFA token");
+    }
+    totpThrottle.recordSuccess(user.getEmail());
+    return user;
+  }
+
+  // -------------------------------------------------------------------------
+  // F02: the TOTP lifecycle. Starting a setup NEVER touches the active factor:
+  // a fresh secret lives in a pending enrollment and is promoted only after
+  // the new authenticator verifies. Replacing or disabling an ACTIVE factor
+  // requires a recent password plus a code from the EXISTING factor - never
+  // mere possession of a bearer token. Promotion/disabling bumps the security
+  // version and revokes refresh tokens, so old credentials die immediately.
+  // -------------------------------------------------------------------------
+
+  /**
+   * Begins (or restarts) a pending enrollment for a NEW secret. Cancelling or
+   * abandoning it leaves any active factor untouched.
    */
   @Transactional
   public String startTotpSetup(String email) {
     User user = userOf(email);
+    enrollments.purgeFinished(user.getId(), clock.instant());
     String secret = totp.newSecret();
-    user.setTotpSecret(secret);
-    users.save(user);
-    audits.save(metadataAudit(user, "TOTP_SETUP"));
-    if (user.isTotpEnabled()) {
-      refreshTokens.revokeAllByUserId(user.getId());
-    }
+    String stored = storeForCustody(user.getId(), secret);
+    enrollments.save(new TotpEnrollment(user.getId(), stored,
+        custody.isActive() ? 1 : 0, clock.instant().plus(ENROLLMENT_LIFETIME)));
+    audits.save(metadataAudit(user, "TOTP_SETUP_STARTED"));
     return secret;
   }
 
+  /**
+   * Verifies the pending enrollment and promotes it. When an active factor
+   * exists this is a REPLACEMENT and additionally requires the current
+   * password plus a valid code from the EXISTING authenticator - an ordinary
+   * session alone can never swap a victim's factor.
+   */
   @Transactional
-  public User enableTotp(String email, String code) {
+  public User enableTotp(String email, String code, String currentPassword, String currentCode) {
     User user = userOf(email);
-    // A session holder must not be able to brute-force the six-digit code at
-    // network speed to enable 2FA with their own (or a victim's) session.
+    TotpEnrollment pending = enrollments.findUsable(user.getId(), clock.instant()).stream()
+        .findFirst()
+        .orElseThrow(() -> new BadCredentialsException("No pending TOTP setup"));
     totpThrottle.verifyAvailable(email);
-    if (user.getTotpSecret() == null || !totp.verify(user.getTotpSecret(), code)) {
+
+    boolean replacing = user.isTotpEnabled();
+    if (replacing) {
+      // Reauthentication for a factor change (OWASP MFA cheat sheet): the
+      // caller must know the password AND still hold the existing factor.
+      if (!passwords.matches(nullToEmpty(currentPassword), user.getPasswordHash())) {
+        throw new BadCredentialsException("Invalid credentials");
+      }
+      if (!totp.verify(secretOf(user), currentCode)) {
+        totpThrottle.recordFailure(email);
+        throw new BadCredentialsException("Invalid code");
+      }
+    }
+    String pendingSecret = loadForCustody(user.getId(), pending);
+    if (!totp.verify(pendingSecret, code)) {
       totpThrottle.recordFailure(email);
       throw new BadCredentialsException("Invalid code");
     }
     totpThrottle.recordSuccess(email);
+
+    storeSecret(user, pendingSecret);
     user.setTotpEnabled(true);
+    // Immediate revocation: bump the version so every previously minted access
+    // token fails validation, and revoke refresh rows so nothing can silently
+    // mint successors.
+    user.setSecurityVersion(user.getSecurityVersion() + 1);
     users.save(user);
-    audits.save(metadataAudit(user, "TOTP_ENABLED"));
+    pending.setConsumed(true);
+    enrollments.save(pending);
+    audits.save(metadataAudit(user, replacing ? "TOTP_REPLACED" : "TOTP_ENABLED"));
     refreshTokens.revokeAllByUserId(user.getId());
     return user;
   }
 
+  /** Abandons the pending enrollment; an active factor (if any) is unchanged. */
   @Transactional
-  public User disableTotp(String email, String code) {
+  public void cancelTotpSetup(String email) {
+    User user = userOf(email);
+    for (TotpEnrollment pending : enrollments.findUsable(user.getId(), clock.instant())) {
+      pending.setConsumed(true);
+      enrollments.save(pending);
+    }
+    enrollments.purgeFinished(user.getId(), clock.instant());
+    audits.save(metadataAudit(user, "TOTP_SETUP_CANCELLED"));
+  }
+
+  /**
+   * Disables MFA. Like a replacement, this requires the current password AND a
+   * valid code from the active authenticator (recent reauthentication + factor
+   * proof); a stolen bearer token alone cannot remove the factor.
+   */
+  @Transactional
+  public User disableTotp(String email, String password, String code) {
     User user = userOf(email);
     totpThrottle.verifyAvailable(email);
-    if (!user.isTotpEnabled() || user.getTotpSecret() == null || !totp.verify(user.getTotpSecret(), code)) {
+    if (!user.isTotpEnabled()) {
+      throw new BadCredentialsException("MFA is not enabled");
+    }
+    if (!passwords.matches(nullToEmpty(password), user.getPasswordHash())) {
+      throw new BadCredentialsException("Invalid credentials");
+    }
+    if (!totp.verify(secretOf(user), code)) {
       totpThrottle.recordFailure(email);
       throw new BadCredentialsException("Invalid code");
     }
     totpThrottle.recordSuccess(email);
     user.setTotpEnabled(false);
-    user.setTotpSecret(null);
+    clearSecret(user);
+    user.setSecurityVersion(user.getSecurityVersion() + 1);
     users.save(user);
     audits.save(metadataAudit(user, "TOTP_DISABLED"));
     refreshTokens.revokeAllByUserId(user.getId());
     return user;
+  }
+
+  // --- secret custody helpers (F30) ------------------------------------------
+
+  String secretOf(User user) {
+    if (user.getTotpKeyVersion() >= 1) {
+      return custody.decrypt(user.getId(), user.getTotpSecretCiphertext());
+    }
+    return user.getTotpSecret();
+  }
+
+  private String storeForCustody(UUID userId, String plaintext) {
+    return custody.isActive() ? custody.encrypt(userId, plaintext) : plaintext;
+  }
+
+  private String loadForCustody(UUID userId, TotpEnrollment enrollment) {
+    if (enrollment.getPendingKeyVersion() >= 1) {
+      return custody.decrypt(userId, enrollment.getPendingSecret());
+    }
+    return enrollment.getPendingSecret();
+  }
+
+  private void storeSecret(User user, String plaintext) {
+    if (plaintext == null) {
+      clearSecret(user);
+      return;
+    }
+    if (custody.isActive()) {
+      user.setTotpSecretCiphertext(custody.encrypt(user.getId(), plaintext));
+      user.setTotpKeyVersion(1);
+      user.setTotpSecret(null);
+    } else {
+      user.setTotpSecret(plaintext);
+      user.setTotpKeyVersion(0);
+      user.setTotpSecretCiphertext(null);
+    }
+  }
+
+  private void clearSecret(User user) {
+    user.setTotpSecret(null);
+    user.setTotpSecretCiphertext(null);
+    user.setTotpKeyVersion(0);
+  }
+
+  private static String nullToEmpty(String value) {
+    return value == null ? "" : value;
   }
 
   private AuditLog metadataAudit(User user, String action) {

@@ -10,6 +10,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -53,10 +54,18 @@ public class AccountController {
     return AccountMapper.toResponse(accounts.accountDetail(authentication.getName(), id));
   }
 
+  /**
+   * Every user-submitted funding must carry an idempotency key (F06); the
+   * service enforces it (the header is read here and forwarded). An identical
+   * replay returns the account's current state; reusing the key for a
+   * different amount is a 409 conflict.
+   */
   @PostMapping("/{id}/deposit")
   public AccountResponse deposit(
-      Authentication authentication, @PathVariable UUID id, @Valid @RequestBody DepositRequest request) {
-    return AccountMapper.toResponse(money.deposit(authentication.getName(), id, new BigDecimal(request.amount())));
+      Authentication authentication, @PathVariable UUID id, @Valid @RequestBody DepositRequest request,
+      @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+    return AccountMapper.toResponse(
+        money.deposit(authentication.getName(), id, new BigDecimal(request.amount()), idempotencyKey));
   }
 
 }

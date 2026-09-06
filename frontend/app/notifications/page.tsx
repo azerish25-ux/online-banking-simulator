@@ -4,15 +4,14 @@ import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardTitle } from "../../components/ui/card";
+import { Card } from "../../components/ui/card";
 import { Pager } from "../../components/ui/pager";
 import { EmptyState } from "../../components/ui/empty-state";
+import { LoadFailed } from "../../components/ui/load-failed";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/feedback/toast";
 import { useMarkAllRead, useMarkNotificationRead, useNotifications } from "../../lib/queries";
 import { fmtDate } from "../../lib/format";
-
-const PAGE_SIZE = 10;
 
 export default function NotificationsPage() {
   const { push } = useToast();
@@ -45,7 +44,13 @@ export default function NotificationsPage() {
           {markAllRead.isPending ? "Marking..." : "Mark all read"}
         </Button>
       </div>
-      {notifications.isLoading ? (
+      {notifications.isError && notifications.data == null ? (
+        <LoadFailed
+          title="Couldn't load notifications"
+          description="Nothing changed on your side - the request failed. Try again."
+          onRetry={() => notifications.refetch()}
+        />
+      ) : notifications.isLoading && notifications.data == null ? (
         <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
       ) : items.length === 0 ? (
         <EmptyState title="All quiet" description="Transfers and interest post here." />

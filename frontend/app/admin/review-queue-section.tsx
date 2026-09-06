@@ -5,9 +5,13 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { Pager } from "../../components/ui/pager";
+import { LoadFailed } from "../../components/ui/load-failed";
+import { Skeleton } from "../../components/ui/skeleton";
+import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { useResultToast } from "../../components/feedback/use-result-toast";
 import { useAdminReviewQueue, useDeclineTransaction, useReviewTransaction } from "../../lib/queries";
 import { fmtDate, maskIban, usd } from "../../lib/format";
+import type { Tx } from "../../lib/api-types";
 
 /**
  * Operator queue: HELD rows are intents - approving settles the transfer,
@@ -23,7 +27,12 @@ export function ReviewQueueSection() {
   const rows = queue.data?.content ?? [];
   const totalPages = queue.data?.totalPages ?? 1;
   const openCount = queue.data?.totalElements ?? rows.length;
-  const busy = review.isPending || decline.isPending;
+  const [declineCandidate, setDeclineCandidate] = React.useState<Tx | null>(null);
+  // Per-row busy: one pending decision disables THAT row's buttons only - an
+  // unrelated row stays actionable (F11). TanStack exposes the in-flight id.
+  const reviewBusyId = review.isPending ? review.variables : undefined;
+  const declineBusyId = decline.isPending ? decline.variables : undefined;
+  const busy = (id: string) => reviewBusyId === id || declineBusyId === id;
 
   // Clearing the last row of a page steps back so the operator is not left
   // staring at an empty page while older items still await review.
@@ -35,22 +44,32 @@ export function ReviewQueueSection() {
     rowsAtPageStart.current = rows.length;
   }, [rows.length, queuePage]);
 
-  // Result → toast wiring lives in the shared owner. Approve (HELD row) and
-  // acknowledge (already-credited flagged row) settle through the same review
-  // mutation, and their success copy differs by the clicked action, not by
-  // the response - so the button records what it asked for in a ref (same
-  // pattern as the transfer page's last intent), read at toast time.
-  const lastReviewAction = React.useRef<"approve" | "acknowledge">("approve");
+  // Result → toast wiring lives in the shared owner. Success copy derives
+  // from the AUTHORITATIVE response (F11): approve and acknowledge settle
+  // through the same review mutation, and what actually happened - the row's
+  // returned kind/status - decides the words, never which button was clicked.
+  // If another operator already settled the case, the response still says the
+  // true outcome and the queue refreshes underneath.
   useResultToast(review, {
     success: {
-      toast: () => ({
-        message:
-          lastReviewAction.current === "acknowledge" ? "Flag acknowledged." : "Approved - transfer settled."
-      })
+      toast: (settled) => {
+        const flaggedDeposit = settled.kind === "DEPOSIT" || !settled.fromIban;
+        if (flaggedDeposit) {
+          return { message: "Flag acknowledged - the deposit was credited when it arrived." };
+        }
+        return settled.status === "POSTED"
+          ? { message: "Approved - transfer settled." }
+          : { message: "Review recorded - case is now " + String(settled.status) + "." };
+      }
     }
   });
   useResultToast(decline, {
-    success: { toast: { message: "Declined - no money moved." } }
+    success: {
+      toast: () => ({
+        message: "Declined - no money moved."
+      }),
+      run: () => setDeclineCandidate(null)
+    }
   });
 
   return (
@@ -59,7 +78,15 @@ export function ReviewQueueSection() {
         <CardTitle>Review queue</CardTitle>
         <Badge tone={openCount > 0 ? "danger" : "success"}>{openCount} open</Badge>
       </div>
-      {rows.length === 0 ? (
+      {queue.isError && queue.data == null ? (
+        <LoadFailed
+          title="Couldn't load the review queue"
+          description="Nothing changed on the cases - the request failed. Try again."
+          onRetry={() => queue.refetch()}
+        />
+      ) : queue.isLoading && queue.data == null ? (
+        <div className="space-y-2"><Skeleton className="h-14" /><Skeleton className="h-14" /></div>
+      ) : rows.length === 0 ? (
         <CardDescription>No flagged activity awaiting review.</CardDescription>
       ) : (
         <ul className="space-y-2">
@@ -86,18 +113,15 @@ export function ReviewQueueSection() {
                       <Button
                         size="sm"
                         variant="danger"
-                        disabled={busy}
-                        onClick={() => decline.mutate(t.id)}
+                        disabled={busy(t.id)}
+                        onClick={() => setDeclineCandidate(t)}
                       >
                         Decline
                       </Button>
                       <Button
                         size="sm"
-                        disabled={busy}
-                        onClick={() => {
-                          lastReviewAction.current = "approve";
-                          review.mutate(t.id);
-                        }}
+                        disabled={busy(t.id)}
+                        onClick={() => review.mutate(t.id)}
                       >
                         Approve
                       </Button>
@@ -106,19 +130,22 @@ export function ReviewQueueSection() {
                     <Button
                       size="sm"
                       variant="secondary"
-                      disabled={busy}
-                      onClick={() => {
-                        lastReviewAction.current = "acknowledge";
-                        review.mutate(t.id);
-                      }}
+                      disabled={busy(t.id)}
+                      onClick={() => review.mutate(t.id)}
                     >
                       Acknowledge
                     </Button>
                   )}
                 </div>
+                {t.memo ? (
+                  <p className="muted mt-1 text-sm">
+                    <span className="label text-content-muted">Memo:</span> {t.memo}
+                  </p>
+                ) : null}
                 {isHeld && (
                   <p className="muted mt-1 text-xs">
-                    Sender funds are re-checked on approval; declining cancels the intent.
+                    Sender funds are re-checked on approval; declining cancels the intent and
+                    nothing ever moves.
                   </p>
                 )}
               </li>
@@ -126,6 +153,28 @@ export function ReviewQueueSection() {
           })}
         </ul>
       )}
+
+      <ConfirmDialog
+        open={declineCandidate != null}
+        title="Decline this transfer?"
+        confirmLabel="Decline transfer"
+        busy={decline.isPending}
+        body={
+          declineCandidate ? (
+            <>
+              {usd(declineCandidate.amount)} from{" "}
+              <span className="mono">{maskIban(declineCandidate.fromIban ?? "")}</span> will be
+              cancelled - it never settles and no money moves. The sender is notified of the
+              decision.
+            </>
+          ) : null
+        }
+        onClose={() => setDeclineCandidate(null)}
+        onConfirm={() => {
+          if (!declineCandidate) return;
+          decline.mutate(declineCandidate.id);
+        }}
+      />
       {openCount > 0 && (
         <div className="mt-3">
           <Pager page={queuePage} totalPages={totalPages} onChange={setQueuePage} />

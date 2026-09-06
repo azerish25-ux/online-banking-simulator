@@ -2,6 +2,7 @@ package com.bank.platform.ledger;
 
 import com.bank.platform.ledger.TransferDtos.MonthSummary;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -25,17 +26,31 @@ import org.springframework.transaction.annotation.Transactional;
 public class MonthlySummaryCache {
 
   private final TransactionRepository transactions;
+  private final Clock clock;
 
-  public MonthlySummaryCache(TransactionRepository transactions) {
+  public MonthlySummaryCache(TransactionRepository transactions, Clock clock) {
     this.transactions = transactions;
+    this.clock = clock;
   }
 
-  /** Monthly inflow/outflow (oldest first, zero-filled). Cached; evicted on any money mutation. */
-  @Cacheable(value = "summaries", key = "#accountId + ':' + #months")
+  /**
+   * Monthly inflow/outflow (oldest first, zero-filled) for the {@code window}
+   * months ending at (and including) {@code asOf}.
+   *
+   * <p>The cache key (F07) names the account, the WINDOW SIZE and the
+   * explicit AS-OF MONTH, so two requests that anchor in different months can
+   * never share one cached list: advancing the business clock across a month
+   * end with NO financial mutation must produce the new window, and a stale
+   * "as of last month" value must not be served for the current month.
+   */
+  @Cacheable(value = "summaries",
+      key = "#accountId.toString() + '|' + #months + '|' + #asOf")
   @Transactional(readOnly = true)
-  public List<MonthSummary> byAccount(UUID accountId, int months) {
+  public List<MonthSummary> byAccount(UUID accountId, int months, YearMonth asOf) {
     int window = Math.min(Math.max(months, 1), 24);
-    YearMonth current = YearMonth.now(ZoneOffset.UTC);
+    // The window anchors on the passed as-of month (the caller derives it from
+    // the injected business clock), not on a wall-clock call inside here.
+    YearMonth current = asOf;
     Instant since = current.minusMonths(window - 1).atDay(1).atStartOfDay(ZoneOffset.UTC).toInstant();
     Map<YearMonth, BigDecimal[]> buckets = new LinkedHashMap<>();
     for (int i = window - 1; i >= 0; i--) {
@@ -46,7 +61,10 @@ public class MonthlySummaryCache {
     // other money-movement read (statements, daily totals, public stats)
     // applies the same POSTED filter; the summary must not be the outlier.
     for (Transaction tx : transactions.findSettledByAccountSince(accountId, TxStatus.POSTED, since)) {
-      YearMonth key = YearMonth.from(tx.getCreatedAt().atZone(ZoneOffset.UTC));
+      // Bucket on the posting month (F04): an approval that lands after a
+      // month boundary belongs to the month the money moved, not the month it
+      // was requested.
+      YearMonth key = YearMonth.from(tx.getPostedAt().atZone(ZoneOffset.UTC));
       BigDecimal[] slot = buckets.get(key);
       if (slot == null) {
         continue;

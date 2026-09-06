@@ -37,6 +37,16 @@ public class Transaction {
   @Column(name = "idempotency_key", length = 64)
   private String idempotencyKey;
 
+  /**
+   * Canonical SHA-256 of the operation intent (F06): source, destination,
+   * exact normalized amount, currency and normalized memo. An idempotent
+   * replay carries the same hash and returns the original row; a reuse of the
+   * key for a *different* intent hashes differently and is a conflict, never
+   * a silent replay of older money.
+   */
+  @Column(name = "request_hash", length = 64)
+  private String requestHash;
+
   @Column(nullable = false, length = 32)
   @Enumerated(EnumType.STRING)
   private TxStatus status = TxStatus.POSTED;
@@ -56,6 +66,16 @@ public class Transaction {
 
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
+
+  /**
+   * When money actually moved (F04). Only POSTED rows carry one: HELD and
+   * CANCELLED rows are intents and keep it null. Reporting (statements,
+   * monthly summaries, daily totals, public stats) cuts and buckets on this,
+   * never on {@link #createdAt}, so an approval that lands after a month
+   * boundary posts into the month it settled in.
+   */
+  @Column(name = "posted_at")
+  private Instant postedAt;
 
   // Monotonic insert sequence (DB identity, see V14). Listings tie-break equal
   // created_at values on this column so "newest first" is total: the random
@@ -77,12 +97,17 @@ public class Transaction {
   public BigDecimal getAmount() { return amount; }
   public String getCurrency() { return currency; }
   public String getIdempotencyKey() { return idempotencyKey; }
+  public String getRequestHash() { return requestHash; }
+  public void setRequestHash(String v) { requestHash = v; }
   public TxStatus getStatus() { return status; }
   public void setStatus(TxStatus v) { status = v; }
   public TxKind getKind() { return kind; }
   public void setKind(TxKind v) { kind = v; }
   public String getMemo() { return memo; }
   public Instant getCreatedAt() { return createdAt; }
+  public void setCreatedAt(Instant v) { createdAt = v; }
+  public Instant getPostedAt() { return postedAt; }
+  public void setPostedAt(Instant v) { postedAt = v; }
   public Long getSeq() { return seq; }
 
   public void setFromAccountId(UUID v) { fromAccountId = v; }

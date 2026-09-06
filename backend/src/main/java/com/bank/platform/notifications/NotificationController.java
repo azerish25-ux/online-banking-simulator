@@ -1,10 +1,12 @@
 package com.bank.platform.notifications;
 
 import com.bank.platform.auth.User;
+import com.bank.platform.common.ApiProblem;
+import java.util.Map;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.common.ApiExceptionHandler;
 import java.time.Instant;
-import java.util.Map;
+
 import java.util.UUID;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -78,7 +80,7 @@ public class NotificationController {
   }
 
   @ExceptionHandler(NotificationNotFoundException.class)
-  public ResponseEntity<Map<String, Object>> notFound(NotificationNotFoundException ex) {
+  public ResponseEntity<ApiProblem> notFound(NotificationNotFoundException ex) {
     return ApiExceptionHandler.response(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 }

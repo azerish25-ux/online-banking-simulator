@@ -7,6 +7,7 @@ export const Routes = {
   register: "/register",
   dashboard: "/dashboard",
   transfers: "/transfers",
+  transferReceipt: (id: string) => "/transfers/receipt/" + id,
   activity: "/activity",
   beneficiaries: "/beneficiaries",
   notifications: "/notifications",

@@ -2,7 +2,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import * as React from "react";
-import AccountDetailPage from "../../app/accounts/[id]/page";
+import { AccountDetailPageContent } from "../../app/accounts/[id]/page";
 import { ToastProvider } from "../feedback/toast";
 
 vi.mock("../../lib/api", () => {
@@ -50,7 +50,6 @@ vi.mock("next/link", () => {
   };
 });
 
-// eslint-disable-next-line import/order
 import { api } from "../../lib/api";
 
 const VIEWED = "DE00000000000000000001";
@@ -60,7 +59,7 @@ const user = { id: "u1", email: "a@b.co", fullName: "Alice", role: "CUSTOMER", t
 const account = { id: "acc-1", iban: VIEWED, type: "CHECKING", balance: "50.0000", status: "ACTIVE" };
 
 const page = {
-  content: [
+  items: [
     {
       id: "t-in",
       fromIban: OTHER,
@@ -71,6 +70,7 @@ const page = {
       kind: "TRANSFER",
       status: "POSTED",
       createdAt: "2026-09-01T12:00:00Z",
+      postedAt: "2026-09-01T12:00:00Z",
       flagged: false,
       reviewed: true
     },
@@ -84,12 +84,13 @@ const page = {
       kind: "TRANSFER",
       status: "POSTED",
       createdAt: "2026-09-02T12:00:00Z",
+      postedAt: "2026-09-02T12:00:00Z",
       flagged: false,
       reviewed: true
     }
   ],
-  totalPages: 1,
-  number: 0
+  total: 2,
+  nextCursor: null
 };
 
 afterEach(() => {
@@ -112,7 +113,7 @@ describe("account recent-activity amounts", () => {
     render(
       <QueryClientProvider client={client}>
         <ToastProvider>
-          <AccountDetailPage params={{ id: "acc-1" }} />
+          <AccountDetailPageContent id="acc-1" />
         </ToastProvider>
       </QueryClientProvider>
     );

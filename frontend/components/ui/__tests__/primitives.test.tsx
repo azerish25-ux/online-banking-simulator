@@ -1,11 +1,15 @@
+import * as React from "react";
 import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { Badge } from "../badge";
 import { Button } from "../button";
 import { Field, Input } from "../input";
+import { Select } from "../select";
 import { Modal } from "../modal";
 import { PasswordInput } from "../password-input";
+import { Table, THead, TRow, TH, TD } from "../table";
+import { TxStatusBadge } from "../tx-status-badge";
 import { SpendingChart } from "../../charts/spending-chart";
 
 afterEach(cleanup);
@@ -64,6 +68,62 @@ describe("Field", () => {
     expect(screen.getByText("Simulated rail.")).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
   });
+
+  it("associates the control with its hint via aria-describedby (F18)", () => {
+    render(
+      <Field label="Amount" hint="Simulated rail.">
+        <Input />
+      </Field>
+    );
+    const input = screen.getByLabelText("Amount");
+    const describedBy = input.getAttribute("aria-describedby");
+    expect(describedBy).toBeTruthy();
+    const hint = document.getElementById(describedBy as string);
+    expect(hint).toHaveTextContent("Simulated rail.");
+  });
+
+  it("merges a caller aria-describedby and marks the control invalid on error (F18)", () => {
+    render(
+      <Field label="IBAN" error="Not a valid IBAN.">
+        <Input aria-describedby="helper-1" />
+      </Field>
+    );
+    const input = screen.getByLabelText("IBAN");
+    expect(input).toHaveAttribute("aria-invalid", "true");
+    const describedBy = input.getAttribute("aria-describedby") ?? "";
+    expect(describedBy).toContain("helper-1");
+    const errorId = describedBy.split(" ").find((id) => id !== "helper-1");
+    expect(document.getElementById(errorId as string)).toHaveTextContent("Not a valid IBAN.");
+  });
+
+  it("honors an explicit controlId without cloning the child (F18)", () => {
+    const id = "amount-control";
+    render(
+      <Field label="Amount" controlId={id}>
+        <input id={id} aria-label="Amount control" />
+      </Field>
+    );
+    const control = screen.getByLabelText("Amount control");
+    expect(screen.getByLabelText("Amount")).toBe(control);
+  });
+
+  it("wires the first element child even when siblings make children an array (F18 regression)", () => {
+    // JSX turns `oneControl + siblingParagraph` into an array child; the
+    // control must still receive the id the label points at (open-account
+    // dialog: a Select next to a conditionally-rendered loan hint).
+    const hasLoan = true;
+    render(
+      <Field label="Account type">
+        <Select aria-label="account-type-select" />
+        {hasLoan && <p>You already have a loan open.</p>}
+      </Field>
+    );
+    const select = screen.getByLabelText("account-type-select");
+    const label = screen.getByText("Account type");
+    expect(label.getAttribute("for")).toBeTruthy();
+    expect(select.id).toBe(label.getAttribute("for"));
+    expect(screen.getByText("You already have a loan open.")).toBeInTheDocument();
+  });
 });
 
 describe("Modal", () => {
@@ -76,6 +136,37 @@ describe("Modal", () => {
     const dialog = screen.getByRole("dialog", { name: "Open account" });
     expect(dialog).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Close dialog" })).toHaveFocus();
+  });
+
+  it("locks background scroll while open and restores it on close (F09)", () => {
+    const { rerender } = render(
+      <Modal open onClose={() => {}} title="Deposit funds"><p>content</p></Modal>
+    );
+    expect(document.body.style.overflow).toBe("hidden");
+    rerender(<Modal open={false} onClose={() => {}} title="Deposit funds"><p>content</p></Modal>);
+    expect(document.body.style.overflow).toBe("");
+  });
+
+  it("never steals focus from a typed control when the onClose identity changes (F09)", async () => {
+    // The input's value lives in the harness, so every keystroke re-renders
+    // it and re-creates the inline onClose. A focus lifecycle keyed on the
+    // callback identity would yank focus back to the close button after each
+    // character; it must be keyed on `open` alone.
+    function Harness() {
+      const [text, setText] = React.useState("");
+      return (
+        <Modal open onClose={() => setText((t) => t)} title="Deposit funds">
+          <input aria-label="Amount" value={text} onChange={(e) => setText(e.target.value)} />
+        </Modal>
+      );
+    }
+    render(<Harness />);
+    const input = screen.getByLabelText("Amount");
+    const user = userEvent.setup();
+    await user.click(input);
+    await user.type(input, "1234.50");
+    expect(input).toHaveFocus();
+    expect(input).toHaveValue("1234.50");
   });
 
   it("calls onClose on Escape", async () => {
@@ -115,6 +206,48 @@ describe("Modal", () => {
     // Shift+Tab from the close button wraps to the last focusable inside.
     await user.tab({ shift: true });
     expect(screen.getByRole("button", { name: "Second inside" })).toHaveFocus();
+  });
+});
+
+describe("Table", () => {
+  it("merges caller alignment with the base cell padding (F18)", () => {
+    render(
+      <Table>
+        <THead className="sr-only">
+          <TRow>
+            <TH>When</TH>
+            <TH className="text-right">Amount</TH>
+          </TRow>
+        </THead>
+        <tbody>
+          <TRow>
+            <TD>Today</TD>
+            <TD className="text-right font-semibold tabular-nums">$10.00</TD>
+          </TRow>
+        </tbody>
+      </Table>
+    );
+    const amountHead = screen.getByRole("columnheader", { name: "Amount" });
+    expect(amountHead.className).toContain("px-4 py-2.5");
+    expect(amountHead.className).toContain("text-right");
+    const head = screen.getByText("When").closest("thead");
+    expect(head?.className).toContain("sr-only");
+    const amountCell = screen.getByText("$10.00");
+    expect(amountCell.className).toContain("px-4 py-2.5");
+    expect(amountCell.className).toContain("tabular-nums");
+  });
+});
+
+describe("TxStatusBadge", () => {
+  it("labels an unknown server value explicitly instead of assuming POSTED (F11)", () => {
+    render(<TxStatusBadge />);
+    expect(screen.getByText("UNKNOWN")).toBeInTheDocument();
+    expect(screen.queryByText("POSTED")).toBeNull();
+  });
+
+  it("surfaces an unrecognized server value rather than hiding it", () => {
+    render(<TxStatusBadge status="MYSTERY" />);
+    expect(screen.getByText("UNKNOWN · MYSTERY")).toBeInTheDocument();
   });
 });
 

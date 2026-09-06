@@ -6,10 +6,214 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Fourth pass - make the artifacts trustworthy, then make the surfaces feel
-built rather than generated. The statement bug and the deposit-rail dead end
-are product bugs a customer would hit; the rest is the design system actually
-being one.
+### Full local Playwright sweep (F22/F23 witnesses + five real fixes)
+
+- The whole browser suite now runs against an ephemeral stack (second backend
+  on a free port against a disposable PostgreSQL DB, second frontend on a free
+  port whose `BACKEND_URL` is baked at build time, `E2E_BASE_URL` env hook in
+  `playwright.config.ts`): **19/19 passed** on the real app - banking journey,
+  operator console, TOTP round trip, statement exports, WCAG 2.2 contrast, and
+  the two deferred real-tab witnesses.
+- F22 witness: `two-tab.spec.ts` - two real tabs share one session, survive a
+  full reload past access-token expiry via the silent refresh, and logging out
+  in one tab evicts the peer through the auth BroadcastChannel.
+- F23 witness: `headers.spec.ts` - live pages carry the full header set, the
+  CSP's per-request nonce is the one applied to the document's own scripts,
+  production `script-src` has no unsafe-eval/unsafe-inline, and static assets
+  carry the header set without a nonce CSP.
+- Fixes the sweep surfaced: `Field` now labels a control that sits beside a
+  sibling hint (multi-child JSX is an array; the open-account select was
+  unlabelled); dynamic client pages unwrap Next 15+/16 async `params` with
+  `React.use()` (`/accounts/[id]` and the new `/transfers/receipt/[id]` crashed
+  at render); the TOTP setup pane renders again after `/totp/setup`; and
+  `/totp/enable` + `/totp/disable` now reissue a credential pair under the new
+  security version (promotion revokes every old session - without reissuing,
+  the very next call after enabling 2FA died and the app evicted to login),
+  with the client adopting an `accessToken` from any successful response body.
+- e2e specs brought back in line with the shipped contract: the a11y seed
+  sends the mandatory `Idempotency-Key` on deposits, operator.spec drives the
+  review step and Decline confirmation, banking.spec disambiguates its POSTED
+  badge assertion.
+
+Leftover close-out - receipts, states, and operator queue language.
+
+### Durable receipts (F11)
+
+- Transfers are now a two-step flow: the first submit validates and freezes a
+  REVIEW of the exact source/destination/amount/memo; editing returns to the
+  draft; Confirm & send submits exactly the reviewed payload.
+- New authorized lookup `GET /api/v1/transfers/{id}` (both legs of an
+  operation may read it; unrelated parties and unknown ids get the same 404)
+  backs a durable bookmarkable receipt route `/transfers/receipt/{id}` that
+  always shows the current authoritative status and posting time.
+- Operator queue: decision copy comes from the authoritative response, one
+  pending decision no longer disables unrelated rows, declining needs a
+  confirmation, and held rows show their memo.
+
+### Truthful states & copy (F10/F19)
+
+- Notifications, beneficiaries, and the admin review queue / daily totals /
+  audit sections now distinguish loading, empty, and failed-with-retry - a
+  failed fetch never reads as an empty list.
+- Landing/about copy audited (demo seams already honest; no fabricated
+  customers, certifications, or throughput claims found).
+
+### F30 real-PostgreSQL leg
+
+- Challenge single-use consumption, persisted budgets, and account lockout
+  are now also verified against real PostgreSQL (disposable database).
+
+Fifth pass - commit-safe notifications and repair of the interaction
+primitives before the design polish.
+
+### Commit-safe email outbox (F25)
+
+- Email delivery is now an outbox INTENT committed with the operation that
+  produced it: a rolled-back deposit sends nothing, a committed operation's
+  mail cannot be lost to a crash. A scheduled worker claims rows after commit
+  (atomic PENDING→DELIVERING flip; concurrent workers deliver each row exactly
+  once), retries with bounded backoff, dead-letters redacted one-line errors,
+  and operators list/requeue dead letters (`GET/POST /api/v1/admin/email-outbox`).
+  Delivery dedupes on a unique `delivery_key` (V25, PG-verified).
+
+### Frontend primitives & truthful states (F09/F10/F11/F18/F19 kernels)
+
+- Modal focus lifecycle is keyed on `open` alone (latest-callback ref), so
+  typing in a controlled input never yanks focus to the close button; scroll
+  locks while open; money dialogs keep Cancel disabled while pending.
+- `Field` has an explicit control-ID contract and wires `aria-invalid` plus
+  hint/error `aria-describedby`; table cells keep their padding when callers
+  add alignment classes.
+- Dashboard, activity and account detail distinguish loading / empty /
+  failed-with-retry / stale / 404 instead of rendering errors as empty states;
+  an unknown transaction status renders explicit UNKNOWN, never assumed POSTED.
+- Dashboard totals name their scope and currency; the spending chart draws no
+  fake bars for zero months (labelled baseline instead).
+
+### Docs & ops (F27/F29)
+
+- security-review/devops-ci/architecture/README corrected to implementation
+  evidence with the tested source state (starting commit + working tree).
+- `start-all.ps1` discovers PostgreSQL (no hard-coded install path), waits for
+  both services with deadlines, captures logs, and exits non-zero with the
+  relevant log tail.
+
+### Read model & API contract (F05/F07/F14/F17/F20/F21/F26/F28)
+
+- **Statements are one immutable snapshot (F05).** A statement (CSV or PDF) is
+  composed in a single repeatable-read transaction into one immutable
+  snapshot - identity, window, as-of, opening figure, posted rows, closing
+  figure, IBAN map - and both renderers are pure over it, so the row list and
+  the balance figures can never come from two different moments again. Past
+  periods show true window closes, never today's balance.
+- **The read-model cache is honest (F07).** Caffeine is configured under the
+  supported Spring cache namespace with typed defaults, the summary cache
+  keys on normalized month windows + as-of, and invalidation is
+  transaction-aware (clears for same-tx visibility and again at completion so
+  a concurrent pre-commit repopulation cannot outlive the commit) across
+  every money path.
+- **History pages by keyset cursor, not OFFSET (F26).** `GET /transactions`
+  returns `{items, total, nextCursor}` and takes an opaque `cursor` over the
+  immutable DB-assigned `seq`; rows inserted between page reads never
+  duplicate or skip, equal timestamps page exactly once, and the feed is
+  documented as live history (a cursor is a position - refresh starts at the
+  newest page). Frontend `useTransactions`/`queryKeys` and the activity pager
+  follow the cursor chain.
+- **Public stats classify transfers by kind + posted status (F28).** Loan
+  interest charges carry a from side and used to inflate the hero's transfer
+  count/volume; only POSTED rows the rail labelled TRANSFER count now.
+- **Legacy kinds are reclassified on evidence, never by memo guessing (F21).**
+  V24 corrects V8's memo-substring classifications from audit provenance and
+  row structure, archives every decision in `transaction_kind_review` (with
+  original classification, reason, memo excerpt) for operator review, and
+  labels unprovable rows UNCERTAIN - balances, memos and identifiers never
+  change. `GET /api/v1/admin/kind-review` surfaces the quarantine.
+- **PDF statements render real Unicode (F20).** The PDF embeds a
+  licensed broad-coverage font (OFL DejaVu Sans, license bundled) instead of
+  substituting missing glyphs: Persian/Arabic, accents and long memos render
+  correctly with measured wrapping, page numbers and as-of metadata; RTL runs
+  keep a faithful text layer.
+- **Amount formatting is exact (F17).** Frontend formatting now does exact
+  4-decimal-unit arithmetic (no float cents drift), rejects invalid amounts
+  instead of showing `$0.00`, and normalizes negative zero; receipts keep
+  sub-cent precision.
+- **The API contract names reality (F14).** Login documents both outcomes
+  with their real codes (200 session / 202 MFA challenge); every error is one
+  typed RFC-7807 `ApiProblem`; response schemas carry explicit `required`
+  lists with genuinely nullable fields (`fromIban`/`toIban`/`memo`/`postedAt`)
+  and real enums for kind/status/role/type; the public stats route advertises
+  no bearer security. The client dropped its blanket `Required<...>` type
+  repairs and validates the login branch and error envelope with zod at
+  runtime.
+
+### Financial core (F04/F06/F15/F16)
+
+- **Posting time is real.** `transactions` now record request time
+  (`created_at`) and posting time (`posted_at`) separately (V19). A
+  review-threshold transfer is only REQUESTED at submission and POSTS when an
+  operator approves it; below-threshold transfers and deposits post at
+  submission. Statements, monthly summaries, daily totals and public stats
+  all bucket on `posted_at`, and every money path reads from one injected
+  business clock, so a month-boundary approval lands in the month it settled
+  in. HELD/CANCELLED rows stay NULL and a DB CHECK keeps POSTED rows honest.
+- **Deposits are idempotent like transfers (F06).** Every deposit and every
+  transfer requires an `Idempotency-Key`, scoped to its originator and
+  fingerprinted with a canonical SHA-256 request hash. Replaying the same
+  intent returns the original result; reusing a key for different money is
+  now a **409 conflict**, never a silent replay. `GET /api/v1/operations?key=`
+  resolves the caller's own operation by key. The deposit dialog keeps one
+  key per funding intent - persisted across reloads, reset on intent
+  change/logout - so the retry contract holds in the UI too.
+- **The ledger has a reconciled journal (F15).** `journal_entries` and
+  `journal_lines` are append-only (PostgreSQL triggers refuse UPDATE/DELETE
+  even for the application role) and record one balanced entry per posted
+  operation - a customer line mirrored by a named counteraccount. Money can
+  no longer move without a balancing record, and a duplicate journal for one
+  operation is refused by the database. The V22 cutover gave every
+  pre-journal account a single labelled `OPENING_BALANCE` entry that
+  reproduces its balance, so the whole history reconciles to the journal;
+  legacy rows were preserved untouched. Operators can check drift via
+  `GET /api/v1/admin/reconciliation` - reported, never auto-repaired.
+- **Interest is bounded, resumable, and no longer forgives debt (F16).**
+  Accrual runs in per-account transactions guarded by a unique
+  `(account, period)` row, so overlapping scheduler/admin runs cannot
+  double-post and an interrupted batch resumes. Savings earn actual/365 daily
+  interest on each day's closing balance from journal postings; loans pay
+  simple monthly interest on tracked principal only - no compounding, and a
+  loan at its limit is charged, not forgiven. Repayments extinguish interest
+  before principal and are capped at the amount owed.
+- **Verified against real PostgreSQL on disposable databases**: journal
+  append-only + duplicate rejection + drift reporting, the V21→head cutover,
+  and the transfer-concurrency proofs (8/8 ITs green), plus the full H2 gate
+  (backend 152 tests, frontend 82 tests) and the OpenAPI contract for the two
+  new endpoints.
+
+### Supported dependency alignment (F13)
+
+- **The runtime lines are back inside current support windows.** Next.js 14 →
+  **16.3** (Active LTS) with React 18 → **19.2** and the React 19 types;
+  Spring Boot 3.2 → **4.1.1** (the open-source-supported line - every 3.x
+  branch reached end of OSS support on 2026-06-30); Node 20 → **24 LTS** in
+  CI, the Dockerfile, and docs. Java stays 17 (still fully supported by Boot
+  4). Each upgrade was chosen from the official support pages at execution
+  time, not from the audit's then-current versions.
+- **The frontend lint gate moved with the framework.** `next lint` was removed
+  in Next 16, so linting runs the ESLint CLI against a flat
+  `eslint.config.mjs` (eslint-config-next 16's flat rule sets, ESLint 9 - the
+  React plugin's latest does not support ESLint 10 yet), and `next build` no
+  longer lints.
+- **Boot 4's modular starters and Jackson 3.** `spring-boot-starter-webmvc`,
+  `-flyway`, and the `-webmvc-test`/`-security-test` test starters replace the
+  monolith starters; the app's JSON engine is Jackson 3 (`tools.jackson`), the
+  Boot 4 default, with springdoc 2.5 → 3.1. Tests were ported to the relocated
+  `@AutoConfigureMockMvc` (`org.springframework.boot.webmvc.test...`) and the
+  generated OpenAPI contract regenerated (the path/schema surface is
+  unchanged; springdoc 3 now also reflects bean-validation constraints).
+- **Test toolchain to maintained versions**: Vitest 2.1 → 5 with
+  `@vitejs/plugin-react` (Vite 8 refuses `jsx: preserve`), jest-dom 7,
+  @testing-library/react 16. `npm audit` reports **0 vulnerabilities** on the
+  installed tree (the previous Vitest 2 → Vite 5 → esbuild chain carried a
+  reachable dev-server advisory).
 
 ### Correctness
 

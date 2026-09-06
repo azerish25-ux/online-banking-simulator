@@ -39,20 +39,13 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
   Optional<Account> findByIdForUpdate(UUID id);
 
   /**
-   * Interest candidates: the types that accrue, still active, not yet accrued
-   * this month. Rows are locked (FOR UPDATE) so two overlapping accrual runs
-   * cannot both read the same snapshot: the second run blocks, then re-checks
-   * the WHERE clause on the first run's committed rows and skips them.
+   * Accrual candidates (F16): the types that accrue and are still active, in
+   * deterministic id order so overlapping runs walk the same sequence. Each
+   * account is then locked individually and its per-account unit of work
+   * arbitrated by the (account, period) accrual-row uniqueness.
    */
-  @Lock(LockModeType.PESSIMISTIC_WRITE)
-  @Query("""
-      select a from Account a
-      where a.type in :types
-        and a.status = :status
-        and (a.lastInterestAt is null or a.lastInterestAt < :monthStart)
-      """)
-  List<Account> findInterestCandidates(
+  @Query("select a from Account a where a.type in :types and a.status = :status order by a.id")
+  List<Account> findAccrualCandidates(
       @Param("types") Collection<AccountType> types,
-      @Param("status") AccountStatus status,
-      @Param("monthStart") Instant monthStart);
+      @Param("status") AccountStatus status);
 }

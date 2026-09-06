@@ -5,7 +5,9 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
+import { LoadFailed } from "../../components/ui/load-failed";
 import { Pager } from "../../components/ui/pager";
+import { Skeleton } from "../../components/ui/skeleton";
 import { useAdminAudits } from "../../lib/queries";
 import { fmtDate, maskIban, usd } from "../../lib/format";
 import type { Audit } from "../../lib/api-types";
@@ -52,7 +54,15 @@ export function AuditSection() {
           <Button type="submit" variant="secondary" size="sm">Filter</Button>
         </form>
       </div>
-      {rows.length === 0 ? (
+      {audits.isError && audits.data == null ? (
+        <LoadFailed
+          title="Couldn't load the audit log"
+          description="The request failed. Try again."
+          onRetry={() => audits.refetch()}
+        />
+      ) : audits.isLoading && audits.data == null ? (
+        <div className="mt-3 space-y-1.5"><Skeleton className="h-8" /><Skeleton className="h-8" /></div>
+      ) : rows.length === 0 ? (
         <CardDescription>No audit rows for that filter.</CardDescription>
       ) : (
         <>

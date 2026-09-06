@@ -9,13 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.support.ApiTestClient;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -54,6 +54,7 @@ class MoneyFlowTest {
     // Fund Alice with $500.
     mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
             .header("Authorization", "Bearer " + aliceToken)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"500.00"}"""))
@@ -74,13 +75,15 @@ class MoneyFlowTest {
     String txId = objectMapper.readValue(first.getResponse().getContentAsString(), JsonNode.class)
         .get("id").asText();
 
-    // Replay with the same key: same row, balances untouched.
+    // Replay with the same key and the SAME intent (F06): same row, balances
+    // untouched. A changed payload under a used key is a conflict - see
+    // IdempotencyScopingTest.changedIntentUnderSameKeyIsAConflict.
     MvcResult replay = mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + aliceToken)
             .header("Idempotency-Key", "key-123")
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                {"toIban":"%s","amount":"999.00","memo":"Mutated replay"}""".formatted(bobIban)))
+                {"toIban":"%s","amount":"120.00","memo":"Rent"}""".formatted(bobIban)))
         .andExpect(status().isCreated())
         .andExpect(jsonPath("$.id").value(txId))
         .andExpect(jsonPath("$.amount").value("120.0000"))
@@ -97,6 +100,7 @@ class MoneyFlowTest {
     // Overdraft is rejected with 422 and changes nothing.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + aliceToken)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"10000.00"}""".formatted(bobIban)))
@@ -105,6 +109,7 @@ class MoneyFlowTest {
     // Self-transfer is rejected with 400.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + aliceToken)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"1.00"}""".formatted(aliceIban)))
@@ -115,7 +120,7 @@ class MoneyFlowTest {
             .param("accountId", aliceId)
             .param("size", "10"))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[0].toIban").value(bobIban));
+        .andExpect(jsonPath("$.items[0].toIban").value(bobIban));
 
     // Bob cannot peek at Alice's account: indistinguishable from a missing one.
     mvc.perform(get("/api/v1/accounts/" + aliceId).header("Authorization", "Bearer " + bobToken))
@@ -132,12 +137,14 @@ class MoneyFlowTest {
     // reach `new BigDecimal(null)` in the controller and 500.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","currency":"USD"}""".formatted(other)))
         .andExpect(status().isBadRequest());
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{}"))
         .andExpect(status().isBadRequest());
@@ -153,6 +160,7 @@ class MoneyFlowTest {
     // Sub-cent values at the ledger's own 4-decimal scale are fine.
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"0.0006"}"""))
@@ -160,6 +168,7 @@ class MoneyFlowTest {
         .andExpect(jsonPath("$.balance").value("0.0006"));
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"0.0004"}""".formatted(other)))
@@ -170,7 +179,7 @@ class MoneyFlowTest {
     // the service; the service itself must ALSO refuse them with a clean
     // validation error instead of surfacing a constraint violation as a 500.
     assertThrows(TransferValidationException.class, () -> money.deposit(
-        email, java.util.UUID.fromString(accountId), new BigDecimal("0.00005")));
+        email, java.util.UUID.fromString(accountId), new BigDecimal("0.00005"), null));
     assertThrows(TransferValidationException.class, () -> money.transfer(
         email, java.util.UUID.fromString(accountId), other,
         new BigDecimal("0.00005"), null, "sub-cent guard", null));
@@ -193,12 +202,14 @@ class MoneyFlowTest {
 
     mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
             .header("Authorization", "Bearer " + aliceToken)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"500.00"}"""))
         .andExpect(status().isOk());
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + aliceToken)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"120.00"}""".formatted(bobIban)))
@@ -218,12 +229,14 @@ class MoneyFlowTest {
     String accountId = accountId(token);
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"100000.01"}"""))
         .andExpect(status().isBadRequest());
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"15000.00"}"""))
@@ -232,23 +245,23 @@ class MoneyFlowTest {
             .header("Authorization", "Bearer " + token)
             .param("accountId", accountId))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content[0].flagged").value(true));
+        .andExpect(jsonPath("$.items[0].flagged").value(true));
   }
 
   @Test
-  void absurdPageDepthIsClampedNotAnOverflow500() throws Exception {
+  void malformedCursorIsA400NotAnOverflow500() throws Exception {
     String token = register("hugepage@example.com", "Huge Page");
     String accountId = accountId(token);
     client.deposit(token, accountId, "10.00");
-    // page=Integer.MAX_VALUE used to overflow the int OFFSET into SQL and 500;
-    // it must come back as an empty page instead.
+    // The old offset pager clamped page=Integer.MAX_VALUE so its int OFFSET
+    // never overflowed into a SQL 500. Keyset paging has no depth to
+    // overflow; the honest boundary is a malformed cursor, which is a 400.
     mvc.perform(get("/api/v1/transactions")
             .header("Authorization", "Bearer " + token)
             .param("accountId", accountId)
-            .param("page", String.valueOf(Integer.MAX_VALUE))
+            .param("cursor", "not-a-cursor")
             .param("size", "100"))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.content.length()").value(0));
+        .andExpect(status().isBadRequest());
   }
 
   @Test
@@ -258,35 +271,45 @@ class MoneyFlowTest {
     for (int i = 1; i <= 25; i++) {
       mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
               .header("Authorization", "Bearer " + token)
+              .header("Idempotency-Key", "dep-" + System.nanoTime())
               .contentType(MediaType.APPLICATION_JSON)
               .content("""
                   {"amount":"1.00"}"""))
           .andExpect(status().isOk());
     }
-    checkPage(token, accountId, 0, 10);
-    checkPage(token, accountId, 1, 10);
-    checkPage(token, accountId, 2, 5);
-  }
-
-  private void checkPage(String token, String accountId, int page, int size) throws Exception {
-    MvcResult result = mvc.perform(get("/api/v1/transactions")
-            .header("Authorization", "Bearer " + token)
-            .param("accountId", accountId)
-            .param("page", String.valueOf(page))
-            .param("size", String.valueOf(size)))
-        .andExpect(status().isOk())
-        .andExpect(jsonPath("$.totalElements").value(25))
-        .andExpect(jsonPath("$.content.length()").value(size))
-        .andReturn();
-    JsonNode content = objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class)
-        .get("content");
-    org.junit.jupiter.api.Assertions.assertEquals(size, content.size());
-    String previous = "9999-99-99";
-    for (JsonNode row : content) {
-      String created = row.get("createdAt").asText();
-      org.junit.jupiter.api.Assertions.assertTrue(created.compareTo(previous) <= 0, "page must be newest-first");
-      previous = created;
-    }
+    // Keyset walk: fetch every page via nextCursor until it goes null. The
+    // union of identities across the three pages must be exactly the 25
+    // deposits, each once, newest-first - an OFFSET pager would duplicate or
+    // skip here the moment anything else touched the ledger mid-walk.
+    java.util.List<String> seen = new java.util.ArrayList<>();
+    String cursor = null;
+    int pages = 0;
+    do {
+      var builder = get("/api/v1/transactions")
+          .header("Authorization", "Bearer " + token)
+          .param("accountId", accountId)
+          .param("size", "10");
+      if (cursor != null) {
+        builder.param("cursor", cursor);
+      }
+      MvcResult result = mvc.perform(builder)
+          .andExpect(status().isOk())
+          .andExpect(jsonPath("$.total").value(25))
+          .andReturn();
+      JsonNode page = objectMapper.readValue(result.getResponse().getContentAsString(), JsonNode.class);
+      JsonNode items = page.get("items");
+      int expected = Math.min(10, 25 - seen.size());
+      org.junit.jupiter.api.Assertions.assertEquals(expected, items.size(), "page " + pages + " size");
+      for (JsonNode row : items) {
+        org.junit.jupiter.api.Assertions.assertTrue(seen.add(row.get("id").asText()),
+            "no duplicate across pages at row " + row.get("id").asText());
+      }
+      cursor = page.has("nextCursor") && !page.get("nextCursor").isNull()
+          ? page.get("nextCursor").asText() : null;
+      pages++;
+    } while (cursor != null);
+    org.junit.jupiter.api.Assertions.assertEquals(3, pages);
+    org.junit.jupiter.api.Assertions.assertEquals(25, seen.size(), "exact union of identities");
   }
 
   @Test

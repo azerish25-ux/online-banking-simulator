@@ -11,13 +11,9 @@ import { Field, Input } from "../../components/ui/input";
 import { PasswordInput } from "../../components/ui/password-input";
 import { useToast } from "../../components/feedback/toast";
 import { api, setToken } from "../../lib/api";
-import type { AuthResponse } from "../../lib/api-types";
+import { authSessionSchema, mfaChallengeSchema } from "../../lib/guards";
 import { stashMfaToken } from "../../lib/mfa";
 import { Routes } from "../../lib/routes";
-
-// A successful password check returns AuthResponse; when the account has
-// TOTP enabled the server answers 202 with a purpose-bound MFA challenge.
-type LoginOutcome = AuthResponse | { mfaToken: string };
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,19 +22,24 @@ export default function LoginPage() {
 
   async function onSubmit(values: Form) {
     try {
-      const data = await api<LoginOutcome>("/v1/auth/login", { method: "POST", body: JSON.stringify(values) });
-      if ("mfaToken" in data) {
-        if (data.mfaToken) {
-          stashMfaToken(data.mfaToken);
-          router.push(Routes.loginMfa);
-        } else {
-          push("Login challenge is missing - try again.", "error");
-        }
+      // Two explicit outcomes (contract: 200 AuthResponse, 202 MfaRequired):
+      // the body discriminates them, and both shapes are validated before the
+      // session is branched - an unexpected body is an error, not a guess.
+      const data = await api<unknown>("/v1/auth/login", { method: "POST", body: JSON.stringify(values) });
+      const mfa = mfaChallengeSchema.safeParse(data);
+      if (mfa.success) {
+        stashMfaToken(mfa.data.mfaToken);
+        router.push(Routes.loginMfa);
         return;
       }
-      setToken(data.accessToken);
-      push("Welcome back.", "success");
-      router.push(Routes.dashboard);
+      const session = authSessionSchema.safeParse(data);
+      if (session.success) {
+        setToken(session.data.accessToken);
+        push("Welcome back.", "success");
+        router.push(Routes.dashboard);
+        return;
+      }
+      push("Unexpected login response - try again.", "error");
     } catch (err) {
       push(err instanceof Error ? err.message : "Login failed", "error");
     }

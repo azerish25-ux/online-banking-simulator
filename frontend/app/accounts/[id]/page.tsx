@@ -9,6 +9,7 @@ import { Button } from "../../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../../components/ui/card";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { EmptyState } from "../../../components/ui/empty-state";
+import { LoadFailed } from "../../../components/ui/load-failed";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../../components/ui/table";
 import type { CardItem, IssuedCard } from "../../../lib/api-types";
@@ -18,17 +19,21 @@ import { useAccount, useCards, useIssueCard, useSetCardStatus, useTransactions }
 import { decimalToCents, fmtDate, signedUsd, usd, usdFromCents } from "../../../lib/format";
 import { Routes } from "../../../lib/routes";
 
-export default function AccountDetailPage({ params }: { params: { id: string } }) {
+export function AccountDetailPageContent({ id }: { id: string }) {
   const { push } = useToast();
-  const account = useAccount(params.id);
-  const recent = useTransactions(params.id, 0, 8);
+  const account = useAccount(id);
+  // 404/410 mean the account truly does not exist or was closed; any other
+  // failure (offline, 429, 500) is a load problem with a retry - it must NOT
+  // masquerade as "Account not found" (F10).
+  const accountNotFound = account.isError && (account.error?.status === 404 || account.error?.status === 410);
+  const recent = useTransactions(id, "", 8);
   const isLoan = account.data?.type === "LOAN";
   // A drawn loan (negative balance) is debt: the hero presents it as a rose
   // "amount you owe" figure, exactly like the dashboard card.
   const isOutstandingLoan =
     account.data != null && isLoan && decimalToCents(account.data.balance) < 0n;
   // LOAN accounts can never hold cards; the query stays idle for them.
-  const cards = useCards(isLoan ? "" : params.id);
+  const cards = useCards(isLoan ? "" : id);
   const issue = useIssueCard();
   const setCardStatus = useSetCardStatus();
   const [issued, setIssued] = React.useState<IssuedCard | null>(null);
@@ -68,13 +73,19 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
   return (
     <AppShell>
       <p className="text-sm"><Link href={Routes.dashboard} className="text-brass-300 hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Overview</Link></p>
-      {account.isError ? (
-        // A bad or foreign account link must say so, not shimmer forever:
-        // the API answers 404/400 and the query never resolves to data.
+      {accountNotFound ? (
         <div className="mt-3">
           <EmptyState
             title="Account not found"
             description="This link looks wrong, or the account is no longer available. Head back to your overview and pick an account from there."
+          />
+        </div>
+      ) : account.isError ? (
+        <div className="mt-3">
+          <LoadFailed
+            title="Couldn't load this account"
+            description="The request failed - your money is safe. Try again in a moment."
+            onRetry={() => account.refetch()}
           />
         </div>
       ) : account.data == null ? (
@@ -106,7 +117,7 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
               <div className="mb-3 flex items-center justify-between">
                 <CardTitle>Virtual cards</CardTitle>
                 {isLoan ? null : (
-                  <Button size="sm" onClick={() => issue.mutate(params.id)} disabled={issue.isPending}>
+                  <Button size="sm" onClick={() => issue.mutate(id)} disabled={issue.isPending}>
                     {issue.isPending ? "Issuing..." : "Issue card"}
                   </Button>
                 )}
@@ -141,14 +152,23 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
 
             <Card>
               <CardTitle>Recent activity</CardTitle>
-              {(recent.data?.content ?? []).length === 0 ? (
+              {recent.isLoading && recent.data == null ? (
+                <div className="mt-3 space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+              ) : recent.isError && recent.data == null ? (
+                <div className="mt-3">
+                  <LoadFailed
+                    title="Couldn't load recent activity"
+                    onRetry={() => recent.refetch()}
+                  />
+                </div>
+              ) : (recent.data?.items ?? []).length === 0 ? (
                 <CardDescription>No transactions yet.</CardDescription>
               ) : (
                 <div className="mt-3">
                   <Table>
                     <THead><TRow><TH>When</TH><TH>Memo</TH><TH className="text-right">Amount</TH></TRow></THead>
                     <tbody>
-                      {(recent.data?.content ?? []).map((t) => (
+                      {(recent.data?.items ?? []).map((t) => (
                         <TRow key={t.id}>
                           <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
                           <TD className="max-w-40 truncate">{t.memo ?? (t.fromIban ? "Transfer" : "Deposit")}</TD>
@@ -189,4 +209,13 @@ export default function AccountDetailPage({ params }: { params: { id: string } }
       />
     </AppShell>
   );
+}
+
+
+export default function AccountDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
+  // Next 15+ pages receive `params` as a Promise - unwrap it, then hand the
+  // id to the content component (kept separate so tests can render it
+  // directly without a Suspense boundary).
+  const { id } = React.use(paramsPromise);
+  return <AccountDetailPageContent id={id} />;
 }

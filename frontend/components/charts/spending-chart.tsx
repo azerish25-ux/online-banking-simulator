@@ -32,16 +32,25 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           strokeDasharray="2 4"
         />
       ))}
+      {/* The solid baseline is the zero axis: a $0 month shows its label with
+          no bar at all rather than a fake nonzero sliver (F19). */}
+      <line
+        x1={pad} x2={W - pad}
+        y1={H - pad} y2={H - pad}
+        className="stroke-content-muted"
+        strokeWidth="1"
+        strokeOpacity="0.55"
+      />
       {data.map((d, i) => {
         const x = pad + group * i + group / 2;
         const inH = scale(parseFloat(d.inflow));
         const outH = scale(parseFloat(d.outflow));
         return (
           <g key={d.month}>
-            <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(1, inH)} rx={1.5} className="fill-brass-400">
+            <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-brass-400">
               <title>{"In " + d.month + ": " + usd(d.inflow)}</title>
             </rect>
-            <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(1, outH)} rx={1.5} className="fill-outflow">
+            <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(0, outH)} rx={1.5} className="fill-outflow">
               <title>{"Out " + d.month + ": " + usd(d.outflow)}</title>
             </rect>
             <text x={x} y={H - 8} textAnchor="middle" fontSize={11} className="fill-content-muted"

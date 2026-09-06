@@ -5,14 +5,14 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.UUID;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
@@ -71,9 +71,9 @@ class QueueOrderDeterminismTest {
 
   private void insertTx(UUID id, String fromAcc, String toAcc, String amount, Instant createdAt) {
     jdbc.update("INSERT INTO transactions (id, from_account_id, to_account_id, amount, currency, "
-            + "kind, status, flagged, reviewed, created_at) VALUES (?,?,?,?,?,?,?,?,?,?)",
+            + "kind, status, flagged, reviewed, created_at, posted_at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
         id.toString(), fromAcc, toAcc, amount, "USD", "TRANSFER", "POSTED", false, false,
-        Timestamp.from(createdAt));
+        Timestamp.from(createdAt), Timestamp.from(createdAt));
   }
 
   private String login() throws Exception {

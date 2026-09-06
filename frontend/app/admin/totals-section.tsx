@@ -1,6 +1,7 @@
 "use client";
 
 import { Card, CardTitle } from "../../components/ui/card";
+import { LoadFailed } from "../../components/ui/load-failed";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useAdminDailyTotals } from "../../lib/queries";
@@ -14,7 +15,12 @@ export function TotalsSection() {
     <Card>
       <CardTitle>Daily totals · last 14 days</CardTitle>
       <div className="mt-3">
-        {totals.isLoading ? (
+        {totals.isError && totals.data == null ? (
+          <LoadFailed
+            title="Couldn't load daily totals"
+            onRetry={() => totals.refetch()}
+          />
+        ) : totals.isLoading && totals.data == null ? (
           <div className="space-y-2"><Skeleton className="h-8" /><Skeleton className="h-8" /></div>
         ) : (
           <Table>

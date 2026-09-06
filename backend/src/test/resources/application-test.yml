@@ -19,3 +19,8 @@ app:
   auth:
     rate-limit:
       per-minute: 1000
+  notifications:
+    outbox:
+      # Tests drive the worker explicitly (deliverDue); a 5s poll would race
+      # assertions about PENDING/DELIVERING rows.
+      delivery-enabled: false

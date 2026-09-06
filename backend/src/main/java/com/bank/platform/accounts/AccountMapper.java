@@ -9,8 +9,8 @@ public final class AccountMapper {
     return new AccountResponse(
         account.getId(),
         account.getIban(),
-        account.getType().name(),
+        account.getType(),
         account.getBalance().toPlainString(),
-        account.getStatus().name());
+        account.getStatus());
   }
 }

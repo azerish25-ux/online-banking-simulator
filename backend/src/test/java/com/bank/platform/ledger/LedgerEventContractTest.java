@@ -12,13 +12,13 @@ import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.notifications.Notification;
 import com.bank.platform.notifications.NotificationRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.util.List;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -218,6 +218,7 @@ class LedgerEventContractTest {
   private void deposit(String token, String accountId, String amount) throws Exception {
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"%s"}""".formatted(amount)))
@@ -227,6 +228,7 @@ class LedgerEventContractTest {
   private String transfer(String token, String toIban, String amount) throws Exception {
     MvcResult result = mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"%s"}""".formatted(toIban, amount)))

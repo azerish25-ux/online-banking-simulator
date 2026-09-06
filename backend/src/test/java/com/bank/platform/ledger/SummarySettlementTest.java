@@ -7,12 +7,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bank.platform.support.ApiTestClient;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -54,6 +54,7 @@ class SummarySettlementTest {
     // A five-figure transfer is HELD: recorded as an intent, no money moved.
     MvcResult held = mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"12000.00\"}".formatted(bobIban)))
         .andExpect(status().isCreated())
@@ -88,6 +89,7 @@ class SummarySettlementTest {
 
     MvcResult held = mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"12000.00\"}".formatted(bobIban)))
         .andExpect(status().isCreated())

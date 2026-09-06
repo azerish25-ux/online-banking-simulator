@@ -3,16 +3,20 @@ package com.bank.platform.notifications;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * In-app notifications plus an email stub. The stub logs instead of sending;
- * swap {@link EmailSender} for an SMTP/Ses implementation when keys exist.
+ * In-app notifications plus the outbox INTENT for external delivery. The
+ * email stub is never called here (F25): {@link #notify} records the in-app
+ * row and commits a {@code email_outbox} row in the caller's transaction, and
+ * {@link EmailOutboxWorker} calls the provider only after that commit. A
+ * rolled-back operation therefore never sends mail, and a committed
+ * operation cannot lose its mail to a crash before delivery.
  */
 @Service
 public class NotificationService {
@@ -32,28 +36,35 @@ public class NotificationService {
   }
 
   private final NotificationRepository notifications;
+  private final EmailOutboxRepository outbox;
   private final long retentionDays;
-  private final EmailSender emails;
 
-  public NotificationService(NotificationRepository notifications, EmailSender emails,
+  public NotificationService(NotificationRepository notifications, EmailOutboxRepository outbox,
       @Value("${app.notifications.retention-days:90}") long retentionDays) {
     this.notifications = notifications;
-    this.emails = emails;
+    this.outbox = outbox;
     this.retentionDays = retentionDays;
   }
 
+  /**
+   * Records the in-app notification AND commits the external-delivery intent
+   * in the caller's transaction. The delivery identity is
+   * type + recipient + notification, so re-queuing the same logical event
+   * (an idempotent replay) inserts once.
+   */
   @Transactional
   public Notification notify(UUID userId, String email, String type, String title, String body) {
     Notification saved = notifications.save(new Notification(userId, type, title, body));
     if (email != null) {
-      try {
-        emails.send(email, title, body);
-      } catch (RuntimeException ex) {
-        LoggerFactory.getLogger(NotificationService.class)
-            .warn("Email stub failed for {}: {}", email, ex.getMessage());
-      }
+      outbox.save(new EmailOutbox(userId, email, saved.getId(),
+          deliveryKey(type, userId, saved.getId()), title, body));
     }
     return saved;
+  }
+
+  /** Delivery identity for the outbox; the unique key dedupes re-enqueues. */
+  static String deliveryKey(String type, UUID userId, UUID notificationId) {
+    return type + ":" + userId + ":" + notificationId;
   }
 
   @Transactional(readOnly = true)
@@ -69,11 +80,15 @@ public class NotificationService {
   @Scheduled(cron = "0 0 4 * * *")
   @Transactional
   public long purgeOld() {
-    long removed = notifications.deleteByCreatedAtBefore(
-        java.time.Instant.now().minusSeconds(retentionDays * 24 * 3600));
+    java.time.Instant cutoff = java.time.Instant.now().minusSeconds(retentionDays * 24 * 3600);
+    long removed = notifications.deleteByCreatedAtBefore(cutoff);
+    // Delivered mail is housekeeping too; FAILED (dead-letter) rows stay for
+    // operator review until requeued or the retention window swallows them
+    // with everything else an operator explicitly purges.
+    removed += outbox.deleteSentBefore(cutoff);
     if (removed > 0) {
-      org.slf4j.LoggerFactory.getLogger(NotificationService.class)
-          .info("Purged {} notifications older than {} days", removed, retentionDays);
+      LoggerFactory.getLogger(NotificationService.class)
+          .info("Purged {} notifications/emails older than {} days", removed, retentionDays);
     }
     return removed;
   }

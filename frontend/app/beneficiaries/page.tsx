@@ -8,6 +8,7 @@ import { AppShell } from "../../components/layout/app-shell";
 import { Button } from "../../components/ui/button";
 import { Card, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
+import { LoadFailed } from "../../components/ui/load-failed";
 import { Field, Input } from "../../components/ui/input";
 import { InlineAlert } from "../../components/ui/inline-alert";
 import { Modal } from "../../components/ui/modal";
@@ -84,7 +85,13 @@ export default function BeneficiariesPage() {
         </Card>
 
         <div>
-          {beneficiaries.isLoading || items == null ? (
+          {beneficiaries.isError && items == null ? (
+            <LoadFailed
+              title="Couldn't load your beneficiaries"
+              description="The saved list failed to load - you can still type an IBAN manually when sending."
+              onRetry={() => beneficiaries.refetch()}
+            />
+          ) : beneficiaries.isLoading || items == null ? (
             <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
           ) : items.length === 0 ? (
             <EmptyState title="No beneficiaries" description="Save one to send money in one tap." />
@@ -114,8 +121,8 @@ export default function BeneficiariesPage() {
           </div>
         )}
         <div className="mt-4 flex justify-end gap-2">
-          <Button variant="secondary" onClick={() => setConfirm(null)}>Cancel</Button>
-          <Button variant="danger" onClick={remove}>Remove</Button>
+          <Button variant="secondary" disabled={removeBeneficiary.isPending} onClick={() => setConfirm(null)}>Cancel</Button>
+          <Button variant="danger" disabled={removeBeneficiary.isPending} onClick={remove}>Remove</Button>
         </div>
       </Modal>
     </AppShell>

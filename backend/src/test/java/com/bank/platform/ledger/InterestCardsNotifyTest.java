@@ -7,12 +7,22 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
@@ -25,9 +35,26 @@ import org.springframework.transaction.annotation.Transactional;
 @Transactional
 class InterestCardsNotifyTest {
 
+  /** Shared mutable business clock: money moves mid-June, interest prices June. */
+  private static final SettableClock CLOCK = new SettableClock();
+
+  @TestConfiguration
+  static class FixedClockConfig {
+    @Bean
+    @Primary
+    Clock testClock() {
+      return CLOCK;
+    }
+  }
+
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper objectMapper;
   @Autowired InterestService interestService;
+
+  @BeforeEach
+  void freezeMidJune() {
+    CLOCK.set(Instant.parse("2026-06-15T10:00:00Z"));
+  }
 
   @Test
   void savingsEarnLoanChargesAndSecondRunIsNoOp() throws Exception {
@@ -36,63 +63,74 @@ class InterestCardsNotifyTest {
     String loanId = openAccount(token, "LOAN");
 
     deposit(token, savingsId, "1200.00");
-    // Spend the loan into overdraft: -200.
+    // Spend the loan into overdraft: -200 (principal 200).
     String savingsIban = accountIban(token, savingsId);
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"200.00","fromAccountId":"%s"}"""
                 .formatted(savingsIban, loanId)))
         .andExpect(status().isCreated());
 
-    // Beyond the 1000 limit is rejected.
+    // Beyond the 1000 principal limit is rejected.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"900.00","fromAccountId":"%s"}"""
                 .formatted(savingsIban, loanId)))
         .andExpect(status().isUnprocessableEntity());
 
+    // July 1st, 03:00 - the accrual run prices June.
+    CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
     assertEquals(2, interestService.accrueMonthly().get("accrued"));
-    // Savings: 1200 deposit + 200 transfer in, then 1400*0.04/12 interest.
-    // Loan: -200 overdraft, then -200*0.12/12 charge.
-    expectBalance(token, savingsId, "1404.6667");
+    // Savings: 1400 held from June 15-30 (16 closing days) at 4% actual/365.
+    // Loan: simple 1% monthly on the $200 principal - $2.00.
+    expectBalance(token, savingsId, dailyInterest("1400.00", 16));
     expectBalance(token, loanId, "-202.0000");
     assertEquals(0, interestService.accrueMonthly().get("accrued"));
-    expectBalance(token, savingsId, "1404.6667");
+    expectBalance(token, savingsId, dailyInterest("1400.00", 16));
   }
 
   @Test
-  void loanAtFullLimitCapsTheChargeAndNeverBreaksTheRun() throws Exception {
+  void loanAtFullLimitIsChargedNotForgivenAndNeverBreaksTheRun() throws Exception {
     String token = register("p8d@example.com", "P Eight D");
     String savingsId = openAccount(token, "SAVINGS");
     String loanId = openAccount(token, "LOAN");
 
     deposit(token, savingsId, "1200.00");
     String savingsIban = accountIban(token, savingsId);
-    // Draw the loan right up to its $1000 limit: -999.00 borrowed.
+    // Draw the loan right up to its $1000 limit: $999 principal.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"999.00","fromAccountId":"%s"}"""
                 .formatted(savingsIban, loanId)))
         .andExpect(status().isCreated());
 
-    // The 1% monthly charge (-9.99) would push the loan past its limit and
-    // previously aborted the whole run with a constraint violation. Now the
-    // charge is capped at the remaining $1.00 headroom.
+    CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
+    // The 1% monthly charge ($9.99 on the $999 principal) is NOT forgiven at
+    // the full limit: the debt deepens past -credit_limit - the point of F16.
     assertEquals(2, interestService.accrueMonthly().get("accrued"));
-    // Loan: -999.00 - 1.00 = -1000.00 (exactly at the limit, never beyond).
-    // Savings: (1200 + 999) * 0.04/12 = 7.33 interest.
-    expectBalance(token, loanId, "-1000.0000");
-    expectBalance(token, savingsId, "2206.3300");
+    expectBalance(token, loanId, "-1008.9900");
+    expectBalance(token, savingsId, dailyInterest("2199.00", 16));
 
     // A second run is a no-op (nothing accrued twice), including the maxed loan.
     assertEquals(0, interestService.accrueMonthly().get("accrued"));
-    expectBalance(token, loanId, "-1000.0000");
+    expectBalance(token, loanId, "-1008.9900");
+  }
+
+  /** The policy formula stated independently: closing × 4%/365 per eligible day. */
+  private static String dailyInterest(String closing, int days) {
+    BigDecimal daily = new BigDecimal("0.04").divide(BigDecimal.valueOf(365), 12, RoundingMode.HALF_EVEN);
+    BigDecimal interest = new BigDecimal(closing).multiply(daily).multiply(BigDecimal.valueOf(days))
+        .setScale(4, RoundingMode.HALF_EVEN);
+    return new BigDecimal(closing).add(interest).toPlainString();
   }
 
   @Test
@@ -133,6 +171,7 @@ class InterestCardsNotifyTest {
     deposit(alice, aliceId, "50.00");
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"5.00"}""".formatted(bobIban)))
@@ -200,6 +239,7 @@ class InterestCardsNotifyTest {
   private void deposit(String token, String accountId, String amount) throws Exception {
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"%s"}""".formatted(amount)))
@@ -235,5 +275,29 @@ class InterestCardsNotifyTest {
       }
     }
     throw new IllegalStateException("account not found");
+  }
+
+  /** A clock a test can wind forward - reset in @BeforeEach. */
+  private static final class SettableClock extends Clock {
+    private Instant instant = Instant.parse("2026-06-15T10:00:00Z");
+
+    void set(Instant value) {
+      instant = value;
+    }
+
+    @Override
+    public ZoneId getZone() {
+      return ZoneOffset.UTC;
+    }
+
+    @Override
+    public Clock withZone(ZoneId zone) {
+      return this;
+    }
+
+    @Override
+    public Instant instant() {
+      return instant;
+    }
   }
 }

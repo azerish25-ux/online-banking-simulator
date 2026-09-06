@@ -4,10 +4,10 @@ import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
+import com.bank.platform.common.LedgerCacheInvalidation;
 import com.bank.platform.notifications.NotificationService;
 import java.util.List;
 import java.util.UUID;
-import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,14 +25,17 @@ public class AccountService {
   private final AccountRepository accounts;
   private final AuditLogRepository audits;
   private final NotificationService notifications;
+  private final LedgerCacheInvalidation invalidation;
 
   public AccountService(
       UserRepository users,
       AccountRepository accounts,
       AuditLogRepository audits,
-      NotificationService notifications) {
+      NotificationService notifications,
+      LedgerCacheInvalidation invalidation) {
     this.users = users;
     this.accounts = accounts;
+    this.invalidation = invalidation;
     this.audits = audits;
     this.notifications = notifications;
   }
@@ -56,7 +59,6 @@ public class AccountService {
     return account;
   }
 
-  @CacheEvict(value = {"public-stats"}, allEntries = true)
   @Transactional
   public Account openAccount(String email, String type) {
     String clean = type == null ? "" : type.trim().toUpperCase();
@@ -82,6 +84,7 @@ public class AccountService {
         "iban", account.getIban(), "type", account.getType().name()));
     notifications.notify(user.getId(), user.getEmail(), "ACCOUNT_OPENED", "Account opened",
         clean.charAt(0) + clean.substring(1).toLowerCase() + " account " + account.getIban() + " is ready.");
+    invalidation.clearSynchronized("public-stats");
     return account;
   }
 

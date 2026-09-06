@@ -45,11 +45,21 @@ test("review-threshold transfer is held for review, never reported as posted", a
   await page.goto("/transfers");
   await page.getByLabel("Recipient IBAN").fill(savingsIban);
   await page.getByLabel("Amount (USD)").fill("10000.00");
-  await page.getByRole("button", { name: /Send transfer/ }).click();
+  // F11: submit opens REVIEW; Confirm & send actually submits.
+  await page.getByRole("button", { name: /Review transfer/ }).click();
+  await expect(page.getByRole("region", { name: "Review your transfer" })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm & send" }).click();
 
   await expect(page.getByRole("heading", { name: "Transfer submitted for review" })).toBeVisible();
   await expect(page.getByText(/sent once an operator approves it/)).toBeVisible();
   await expect(page.getByText("$10,000.00 →")).toBeVisible();
+
+  // The durable receipt route shows the authoritative HELD state.
+  await page.getByRole("link", { name: /Open permanent receipt/ }).click();
+  await expect(page).toHaveURL(/\/transfers\/receipt\//);
+  await expect(page.getByRole("heading", { name: "Transfer receipt" })).toBeVisible();
+  await expect(page.getByText(/awaiting operator review/)).toBeVisible();
+  await expect(page.getByText(/Not yet - no money has moved/)).toBeVisible();
 });
 
 test("full money loop in the browser", async ({ page }) => {
@@ -85,14 +95,30 @@ test("full money loop in the browser", async ({ page }) => {
   await page.getByLabel("Recipient IBAN").fill(savingsIban.trim());
   await page.getByLabel("Amount (USD)").fill("120.00");
   await page.getByLabel("Memo (optional)").fill("e2e rent");
-  await page.getByRole("button", { name: /Send transfer/ }).click();
+  // F11: submit opens REVIEW; Confirm & send actually submits.
+  await page.getByRole("button", { name: /Review transfer/ }).click();
+  await expect(page.getByRole("region", { name: "Review your transfer" })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm & send" }).click();
 
   await expect(page.getByRole("heading", { name: "Transfer posted" })).toBeVisible();
   await expect(page.getByText("$120.00 →")).toBeVisible();
+  const receiptHref = await page
+    .getByRole("link", { name: /Open permanent receipt/ })
+    .getAttribute("href");
+  expect(receiptHref).toMatch(/\/transfers\/receipt\//);
 
   // The transfer lands on the dashboard feed with its memo.
   await page.goto("/dashboard");
   await expect(page.getByText("e2e rent")).toBeVisible();
+
+  // The durable receipt route answers later (bookmark reload) with the
+  // authoritative POSTED state and posting time - never component state.
+  await page.goto(receiptHref as string);
+  await expect(page.getByRole("heading", { name: "Transfer receipt" })).toBeVisible();
+  await expect(page.getByText("Settled - the money moved")).toBeVisible();
+  // The status badge (uppercase-styled span next to the title) - the first
+  // POSTED match; the receipt's "Posted" field label also renders uppercase.
+  await expect(page.locator("main").getByText("POSTED", { exact: true }).first()).toBeVisible();
 });
 
 test("an over-cap deposit rejection renders inline in the dialog, not as a corner toast", async ({ page }) => {

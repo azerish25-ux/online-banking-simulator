@@ -17,7 +17,6 @@ import { expect, test, type Page } from "@playwright/test";
  * the toast can still see the pre-deposit balance).
  */
 
-const BASE = process.env.API_BASE ?? "http://localhost:8080/api";
 const ADMIN_EMAIL = process.env.APP_ADMIN_EMAIL ?? "admin@bank.local";
 const ADMIN_PASSWORD = process.env.APP_ADMIN_PASSWORD ?? "change-me-admin-123";
 const tag = Date.now();
@@ -105,7 +104,10 @@ async function placeHeldTransfer(page: Page, toIban: string, memo: string): Prom
   await page.getByLabel("Recipient IBAN").fill(toIban);
   await page.getByLabel("Amount (USD)").fill("10000");
   await page.getByLabel("Memo (optional)").fill(memo);
-  await page.getByRole("button", { name: /Send transfer/ }).click();
+  // F11: submit opens REVIEW; Confirm & send actually submits.
+  await page.getByRole("button", { name: /Review transfer/ }).click();
+  await expect(page.getByRole("region", { name: "Review your transfer" })).toBeVisible();
+  await page.getByRole("button", { name: "Confirm & send" }).click();
   await expect(page.getByRole("heading", { name: "Transfer submitted for review" })).toBeVisible({
     timeout: 10_000
   });
@@ -174,7 +176,10 @@ test("operator approve and decline of a HELD transfer is reflected everywhere", 
   await loginOperator(page);
   const declinedQueueRow = queueRowFor(page, checkingTail, savingsTail);
   await expect(declinedQueueRow).toContainText("$10,000.00", { timeout: 10_000 });
+  // F11: Decline needs an explicit confirmation before the decision lands.
   await declinedQueueRow.getByRole("button", { name: "Decline" }).click();
+  await expect(page.getByRole("heading", { name: "Decline this transfer?" })).toBeVisible();
+  await page.getByRole("button", { name: "Decline transfer" }).click();
   await expect(page.getByText("Declined - no money moved.")).toBeVisible();
   await expect(declinedQueueRow).toHaveCount(0, { timeout: 10_000 });
 

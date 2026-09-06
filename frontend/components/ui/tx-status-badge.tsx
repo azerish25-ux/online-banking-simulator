@@ -4,7 +4,10 @@ import { Badge } from "./badge";
  * Renders a transaction's lifecycle status for customers. A HELD row is an
  * intent awaiting operator review (money has not moved); CANCELLED rows never
  * settled; POSTED rows actually moved money - the flag on a POSTED deposit is
- * an internal-review marker, not a customer-facing state.
+ * an internal-review marker, not a customer-facing state. An UNKNOWN value is
+ * an explicit unsupported/unavailable state, never a silently assumed success
+ * (F11): a server value this client does not understand must not render as
+ * POSTED.
  */
 export function TxStatusBadge({ status }: { status?: string | null }) {
   switch (status) {
@@ -15,6 +18,6 @@ export function TxStatusBadge({ status }: { status?: string | null }) {
     case "POSTED":
       return <Badge tone="success">POSTED</Badge>;
     default:
-      return <Badge tone="neutral">{(status ?? "POSTED").toUpperCase()}</Badge>;
+      return <Badge tone="neutral">{status ? "UNKNOWN · " + status.toUpperCase() : "UNKNOWN"}</Badge>;
   }
 }

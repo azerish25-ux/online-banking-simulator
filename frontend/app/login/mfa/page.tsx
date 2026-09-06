@@ -7,7 +7,7 @@ import { AuthShell } from "../../../components/layout/auth-shell";
 import { Button } from "../../../components/ui/button";
 import { Field, Input } from "../../../components/ui/input";
 import { useToast } from "../../../components/feedback/toast";
-import { api, setToken } from "../../../lib/api";
+import { api, setToken, ApiError } from "../../../lib/api";
 import type { AuthResponse } from "../../../lib/api-types";
 import { clearMfaToken, peekMfaToken } from "../../../lib/mfa";
 import { Routes } from "../../../lib/routes";
@@ -37,6 +37,16 @@ export default function MfaChallengePage() {
       push("Welcome back.", "success");
       router.push(Routes.dashboard);
     } catch (err) {
+      // F30: the server burns attempts on wrong codes and locks the budget
+      // (429 Retry-After) once exhausted. This challenge can no longer
+      // succeed - pretending otherwise with endless retries is dishonest - so
+      // send the user back for a fresh challenge after a clear explanation.
+      if (err instanceof ApiError && err.status === 429) {
+        clearMfaToken();
+        push("Too many incorrect attempts. Log in again for a fresh challenge.", "error");
+        router.push(Routes.login);
+        return;
+      }
       push(err instanceof Error ? err.message : "Verification failed", "error");
       setBusy(false);
     }

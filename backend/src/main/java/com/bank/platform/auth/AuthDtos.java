@@ -23,10 +23,11 @@ public final class AuthDtos {
       @Email @NotBlank String email,
       @NotBlank @PasswordBytes(max = PASSWORD_MAX_BYTES) String password) {}
 
-  public record UserResponse(UUID id, String email, String fullName, String role, boolean totpEnabled) {
+  /** Role is the domain enum, serialized by name (legal values in the contract). */
+  public record UserResponse(UUID id, String email, String fullName, Role role, boolean totpEnabled) {
     public static UserResponse from(User user) {
       return new UserResponse(
-          user.getId(), user.getEmail(), user.getFullName(), user.getRole().name(), user.isTotpEnabled());
+          user.getId(), user.getEmail(), user.getFullName(), user.getRole(), user.isTotpEnabled());
     }
   }
 
@@ -38,7 +39,18 @@ public final class AuthDtos {
 
   public record MfaVerifyRequest(@NotBlank String mfaToken, @NotBlank String code) {}
 
-  public record TotpCodeRequest(@NotBlank String code) {}
+  /**
+   * Enabling a NEW factor only needs the new code. REPLACING an active factor
+   * additionally requires the current password and a code from the existing
+   * authenticator (F02 reauthentication boundary).
+   */
+  public record TotpEnableRequest(
+      @NotBlank String code,
+      String currentPassword,
+      String currentCode) {}
+
+  /** Disabling an active factor requires password + current factor code (F02). */
+  public record TotpDisableRequest(@NotBlank String password, @NotBlank String code) {}
 
   public record TotpSetupResponse(String secret, String qrDataUri) {}
 }

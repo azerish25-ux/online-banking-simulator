@@ -18,9 +18,11 @@ public final class TransactionMapper {
         tx.getAmount().toPlainString(),
         tx.getCurrency(),
         tx.getMemo(),
-        tx.getKind().name(),
-        tx.getStatus().name(),
-        tx.getCreatedAt().toString(), tx.isFlagged(), tx.isReviewed());
+        tx.getKind(),
+        tx.getStatus(),
+        tx.getCreatedAt().toString(),
+        tx.getPostedAt() == null ? null : tx.getPostedAt().toString(),
+        tx.isFlagged(), tx.isReviewed());
   }
 
   public static TransferResponse toTransferResponse(Transaction tx, Map<UUID, String> ibans) {
@@ -31,7 +33,9 @@ public final class TransactionMapper {
         tx.getAmount().toPlainString(),
         tx.getCurrency(),
         tx.getMemo(),
-        tx.getStatus().name(),
-        tx.getCreatedAt().toString(), tx.isFlagged());
+        tx.getStatus(),
+        tx.getCreatedAt().toString(),
+        tx.getPostedAt() == null ? null : tx.getPostedAt().toString(),
+        tx.isFlagged());
   }
 }

@@ -1,7 +1,7 @@
 package com.bank.platform.audit;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.json.JsonMapper;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.GeneratedValue;
@@ -78,7 +78,7 @@ public class AuditLog {
    * quotes, backslashes or control characters are escaped instead of producing
    * malformed JSON.
    */
-  private static final ObjectMapper JSON = new ObjectMapper();
+  private static final JsonMapper JSON = JsonMapper.builder().build();
 
   public static String metadata(String... pairs) {
     Map<String, String> map = new LinkedHashMap<>();

@@ -56,9 +56,23 @@ public class LedgerMovementService {
     requireActive(from);
     requireActive(to);
     assertAffordable(from, amount);
+    boolean toLoan = to.getType() == AccountType.LOAN;
+    if (toLoan) {
+      // A credit to a LOAN is a repayment, never a new deposit balance: it
+      // is capped at the amount owed and repays interest before principal.
+      assertLoanRepayment(to, amount);
+    }
 
     from.setBalance(from.getBalance().subtract(amount));
-    to.setBalance(to.getBalance().add(amount));
+    if (toLoan) {
+      applyLoanCredit(to, amount);
+    } else {
+      to.setBalance(to.getBalance().add(amount));
+    }
+    // A draw from a LOAN is new principal - capped by assertAffordable above.
+    if (from.getType() == AccountType.LOAN) {
+      from.setPrincipal(from.getPrincipal().add(amount));
+    }
     accounts.save(from);
     accounts.save(to);
     return new Moved(from, to);
@@ -72,13 +86,67 @@ public class LedgerMovementService {
 
   /**
    * The authoritative check that a debit stays inside the account type's
-   * floor: a LOAN account may draw down to the negation of its credit limit,
-   * every other account type must stay non-negative.
+   * floor: a LOAN may only draw against PRINCIPAL headroom (the credit limit
+   * minus what is already drawn) - accrued interest never creates borrowing
+   * capacity, and a loan at its limit is not silently forgiven interest, it
+   * simply cannot borrow more (F16). Every other account type must stay
+   * non-negative.
    */
   public void assertAffordable(Account from, BigDecimal amount) {
-    BigDecimal floor = from.getType() == AccountType.LOAN ? from.getCreditLimit().negate() : BigDecimal.ZERO;
-    if (from.getBalance().subtract(amount).compareTo(floor) < 0) {
+    if (from.getType() == AccountType.LOAN) {
+      BigDecimal headroom = from.getCreditLimit().subtract(from.getPrincipal());
+      if (amount.compareTo(headroom) > 0) {
+        throw new InsufficientFundsException();
+      }
+      return;
+    }
+    if (from.getBalance().subtract(amount).compareTo(BigDecimal.ZERO) < 0) {
       throw new InsufficientFundsException();
     }
   }
+
+  /**
+   * A repayment (credit into a LOAN) may not exceed the amount owed, so a
+   * loan balance never goes positive. Interest is extinguished before
+   * principal (F16 repayment policy).
+   */
+  private void assertLoanRepayment(Account loan, BigDecimal amount) {
+    BigDecimal owed = loan.getBalance().negate();
+    if (owed.signum() < 0) {
+      owed = BigDecimal.ZERO;
+    }
+    if (amount.compareTo(owed) > 0) {
+      throw new TransferValidationException(
+          "Loan repayment of " + amount.toPlainString() + " exceeds the amount owed ("
+              + owed.toPlainString() + ")");
+    }
+  }
+
+  /**
+   * Credits the loan's balance and allocates the payment interest-first:
+   * the unpaid interest (owed minus drawn principal) is extinguished first,
+   * then the remainder reduces principal. The caller has already validated
+   * the cap.
+   */
+  public void applyLoanCredit(Account loan, BigDecimal amount) {
+    BigDecimal debtBefore = loan.getBalance().negate();
+    BigDecimal interestBefore = debtBefore.subtract(loan.getPrincipal());
+    if (interestBefore.signum() < 0) {
+      interestBefore = BigDecimal.ZERO;
+    }
+    BigDecimal interestPaid = amount.min(interestBefore);
+    loan.setBalance(loan.getBalance().add(amount));
+    loan.setPrincipal(loan.getPrincipal().subtract(amount.subtract(interestPaid)));
+  }
+
+  /**
+   * Simulated-rail credit into a LOAN (deposit): same repayment policy as a
+   * transfer credit - capped at the amount owed, interest first.
+   */
+  public void creditLoan(Account loan, BigDecimal amount) {
+    assertLoanRepayment(loan, amount);
+    applyLoanCredit(loan, amount);
+    accounts.save(loan);
+  }
+
 }

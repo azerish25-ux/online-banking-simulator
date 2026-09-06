@@ -6,11 +6,20 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { Field, Input } from "../../components/ui/input";
+import { PasswordInput } from "../../components/ui/password-input";
 import { Modal } from "../../components/ui/modal";
 import { Skeleton } from "../../components/ui/skeleton";
 import { useToast } from "../../components/feedback/toast";
 import { useResultToast } from "../../components/feedback/use-result-toast";
-import { useMe, useTotpDisable, useTotpEnable, useTotpSetup } from "../../lib/queries";
+import {
+  useMe,
+  useTotpCancel,
+  useTotpDisable,
+  useTotpEnable,
+  useTotpSetup
+} from "../../lib/queries";
+
+const CODE_LENGTH = 6;
 
 export default function SettingsPage() {
   const { push } = useToast();
@@ -18,26 +27,42 @@ export default function SettingsPage() {
   const totpEnabled = me.data?.totpEnabled ?? false;
 
   const setup = useTotpSetup();
+  const cancelSetup = useTotpCancel();
   const enable = useTotpEnable();
   const disable = useTotpDisable();
 
+  // The pending-enrollment pane (F02). `isReplacement` is captured when the
+  // setup STARTS - the factor is replaced only if one was active then - and
+  // drives whether the password + existing-factor proof fields appear.
   const [pendingSetup, setPendingSetup] = React.useState<{ secret: string; qrDataUri: string } | null>(null);
+  const [isReplacement, setIsReplacement] = React.useState(false);
   const [enableCode, setEnableCode] = React.useState("");
+  const [enableCurrentCode, setEnableCurrentCode] = React.useState("");
+  const [enablePassword, setEnablePassword] = React.useState("");
+  const [enableError, setEnableError] = React.useState<string | null>(null);
+
   const [disableOpen, setDisableOpen] = React.useState(false);
+  const [disablePassword, setDisablePassword] = React.useState("");
   const [disableCode, setDisableCode] = React.useState("");
-  // A wrong code is rejected while the modal stays open with the bad value
-  // still in the field - the message renders under it, not in a corner toast.
+  // Rejections render inline under the fields, never as a corner toast behind
+  // the scrim, so the bad value stays visible next to the message.
   const [disableError, setDisableError] = React.useState<string | null>(null);
 
   // A fresh attempt never carries a previous rejection.
   React.useEffect(() => {
-    if (disableOpen) setDisableError(null);
+    if (disableOpen) {
+      setDisableError(null);
+      setDisablePassword("");
+      setDisableCode("");
+    }
   }, [disableOpen]);
+  React.useEffect(() => {
+    if (pendingSetup) setEnableError(null);
+  }, [pendingSetup]);
 
-  // Result → feedback wiring lives in the shared owner. Setup succeeds into
-  // a state (the QR pane), so it has no toast - only its failure speaks.
-  // The enable pane is page-level, so its wrong-code failure stays a corner
-  // toast; the disable modal renders its rejection inline under the code.
+  // Setup succeeds into the QR pane (state, not a toast); only its failure
+  // speaks. Enabling stays on the page, so its rejection is rendered inline
+  // beside the fields instead of as a corner toast.
   useResultToast(setup, {
     success: {
       run: (d) => {
@@ -47,10 +72,26 @@ export default function SettingsPage() {
     }
   });
   useResultToast(enable, {
+    error: false,
+    onFailure: setEnableError,
     success: {
-      toast: { message: "Two-factor authentication is on. You'll be asked for a code at your next login." },
-      run: () => setPendingSetup(null)
+      toast: () => ({
+        message: isReplacement
+          ? "Your authenticator was replaced."
+          : "Two-factor authentication is on. You'll be asked for a code at your next login."
+      }),
+      run: () => {
+        setPendingSetup(null);
+        setIsReplacement(false);
+        setEnableCode("");
+        setEnableCurrentCode("");
+        setEnablePassword("");
+        setEnableError(null);
+      }
     }
+  });
+  useResultToast(cancelSetup, {
+    success: { toast: { message: "Setup cancelled - your current settings are unchanged." } }
   });
   useResultToast(disable, {
     error: false,
@@ -60,10 +101,50 @@ export default function SettingsPage() {
       run: () => {
         setDisableOpen(false);
         setDisableCode("");
+        setDisablePassword("");
         setDisableError(null);
       }
     }
   });
+
+  function startSetup() {
+    // Captured now: if MFA is active this becomes a REPLACEMENT and the
+    // backend will require password + existing-factor proof at enable time.
+    setIsReplacement(totpEnabled);
+    setEnableCode("");
+    setEnableCurrentCode("");
+    setEnablePassword("");
+    setup.mutate();
+  }
+
+  function abandonSetup() {
+    // Tell the server the pending row is abandoned so it cannot be promoted
+    // later from a stale tab; the active factor (if any) is untouched.
+    cancelSetup.mutate(undefined, {
+      onSettled: () => {
+        setPendingSetup(null);
+        setIsReplacement(false);
+        setEnableError(null);
+        setup.reset();
+      }
+    });
+  }
+
+  function submitEnable() {
+    enable.mutate(
+      isReplacement
+        ? {
+            code: enableCode.trim(),
+            currentPassword: enablePassword,
+            currentCode: enableCurrentCode.trim()
+          }
+        : { code: enableCode.trim() }
+    );
+  }
+
+  function submitDisable() {
+    disable.mutate({ password: disablePassword, code: disableCode.trim() });
+  }
 
   async function copySecret() {
     if (!pendingSetup) return;
@@ -74,6 +155,12 @@ export default function SettingsPage() {
       push("Couldn't copy - select the secret manually.", "error");
     }
   }
+
+  const enableReady = isReplacement
+    ? enableCode.length === CODE_LENGTH &&
+      enableCurrentCode.length === CODE_LENGTH &&
+      enablePassword.length > 0
+    : enableCode.length === CODE_LENGTH;
 
   return (
     <AppShell>
@@ -100,24 +187,34 @@ export default function SettingsPage() {
             <Button
               className="mt-4"
               disabled={setup.isPending}
-              onClick={() => setup.mutate()}
+              onClick={startSetup}
             >
               {setup.isPending ? "Preparing..." : "Set up authenticator"}
             </Button>
           )}
 
-          {totpEnabled && (
-            <Button variant="secondary" className="mt-4" onClick={() => setDisableOpen(true)}>
-              Turn off two-factor
-            </Button>
+          {totpEnabled && !pendingSetup && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="secondary" disabled={setup.isPending} onClick={startSetup}>
+                {setup.isPending ? "Preparing..." : "Replace authenticator"}
+              </Button>
+              <Button variant="secondary" onClick={() => setDisableOpen(true)}>
+                Turn off two-factor
+              </Button>
+            </div>
           )}
 
           {pendingSetup && (
             <div className="mt-4 rounded-md border border-line p-4">
-              <p className="text-sm font-medium">Scan with your authenticator app</p>
+              <p className="text-sm font-medium">
+                {isReplacement ? "Replace your authenticator" : "Scan with your authenticator app"}
+              </p>
               <p className="muted mt-1 text-sm">
-                Open your authenticator, scan the QR code (or type the secret), then enter the
-                six-digit code to confirm. Don&rsquo;t close this window until it&rsquo;s enabled.
+                {isReplacement
+                  ? "This does not change your current two-factor yet. Scan the QR code (or type the secret), "
+                    + "then prove your identity with your password and current authenticator before the new one activates."
+                  : "Open your authenticator, scan the QR code (or type the secret), then enter the "
+                    + "six-digit code to confirm. Don&rsquo;t close this window until it&rsquo;s enabled."}
               </p>
               <div className="mt-3 flex flex-wrap items-center gap-4">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -136,28 +233,72 @@ export default function SettingsPage() {
                   </Button>
                 </div>
               </div>
+
+              {isReplacement && (
+                <div className="mt-4 grid max-w-sm gap-4">
+                  <Field label="Password" hint="Confirm your identity to change two-factor">
+                    <PasswordInput
+                      autoComplete="current-password"
+                      value={enablePassword}
+                      onChange={(e) => {
+                        setEnablePassword(e.target.value);
+                        setEnableError(null);
+                      }}
+                    />
+                  </Field>
+                  <Field label="Current authenticator code" hint="6 digits, from the factor being replaced">
+                    <Input
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      placeholder="000000"
+                      value={enableCurrentCode}
+                      onChange={(e) => {
+                        setEnableCurrentCode(e.target.value.replace(/\D/g, ""));
+                        setEnableError(null);
+                      }}
+                      className="font-mono tracking-[0.4em]"
+                    />
+                  </Field>
+                </div>
+              )}
+
               <div className="mt-4 max-w-xs">
-                <Field label="Authenticator code" hint="6 digits">
+                <Field label={isReplacement ? "New authenticator code" : "Authenticator code"} hint="6 digits">
                   <Input
                     inputMode="numeric"
                     autoComplete="one-time-code"
                     maxLength={6}
                     placeholder="000000"
                     value={enableCode}
-                    onChange={(e) => setEnableCode(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => {
+                      setEnableCode(e.target.value.replace(/\D/g, ""));
+                      setEnableError(null);
+                    }}
                     className="font-mono tracking-[0.4em]"
                   />
                 </Field>
               </div>
+
+              {enableError && (
+                <p role="alert" className="mt-3 text-sm text-rose">
+                  {enableError}
+                </p>
+              )}
+
               <div className="mt-3 flex gap-2">
                 <Button
-                  disabled={enable.isPending || enableCode.length !== 6}
-                  onClick={() => enable.mutate(enableCode.trim())}
+                  disabled={enable.isPending || !enableReady}
+                  onClick={submitEnable}
                 >
-                  {enable.isPending ? "Verifying..." : "Enable two-factor"}
+                  {enable.isPending
+                    ? "Verifying..."
+                    : isReplacement
+                      ? "Replace authenticator"
+                      : "Enable two-factor"}
                 </Button>
-                <Button variant="ghost" onClick={() => { setPendingSetup(null); setup.reset(); }}>
-                  Cancel
+                <Button variant="ghost" disabled={cancelSetup.isPending} onClick={abandonSetup}>
+                  {cancelSetup.isPending ? "Cancelling..." : "Cancel"}
                 </Button>
               </div>
             </div>
@@ -167,11 +308,21 @@ export default function SettingsPage() {
 
       <Modal open={disableOpen} onClose={() => setDisableOpen(false)} title="Turn off two-factor?">
         <p className="text-sm">
-          Enter your current authenticator code to confirm. This weakens your account
+          Enter your password and a current authenticator code to confirm. This weakens your account
           security - consider re-enabling it afterwards.
         </p>
-        <div className="mt-4">
-          <Field label="Authenticator code" hint="6 digits" error={disableError ?? undefined}>
+        <div className="mt-4 space-y-4">
+          <Field label="Password" error={disableError?.includes("credential") ? disableError : undefined}>
+            <PasswordInput
+              autoComplete="current-password"
+              value={disablePassword}
+              onChange={(e) => {
+                setDisablePassword(e.target.value);
+                setDisableError(null);
+              }}
+            />
+          </Field>
+          <Field label="Authenticator code" hint="6 digits">
             <Input
               inputMode="numeric"
               autoComplete="one-time-code"
@@ -185,10 +336,23 @@ export default function SettingsPage() {
               className="font-mono tracking-[0.4em]"
             />
           </Field>
+          {disableError && !disableError.includes("credential") && (
+            <p role="alert" className="text-sm text-rose">
+              {disableError}
+            </p>
+          )}
         </div>
         <div className="mt-4 flex justify-end gap-2">
           <Button variant="secondary" onClick={() => setDisableOpen(false)}>Cancel</Button>
-          <Button variant="danger" disabled={disable.isPending || disableCode.length !== 6} onClick={() => disable.mutate(disableCode.trim())}>
+          <Button
+            variant="danger"
+            disabled={
+              disable.isPending ||
+              disablePassword.length === 0 ||
+              disableCode.length !== CODE_LENGTH
+            }
+            onClick={submitDisable}
+          >
             {disable.isPending ? "Disabling..." : "Turn off"}
           </Button>
         </div>

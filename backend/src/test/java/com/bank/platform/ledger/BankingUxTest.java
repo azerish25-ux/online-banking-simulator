@@ -9,11 +9,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -83,6 +83,7 @@ class BankingUxTest {
 
     mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"1000.00"}"""))
@@ -90,6 +91,7 @@ class BankingUxTest {
 
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"250.00","memo":"Hello, \\"Bob\\"","fromAccountId":"%s"}"""
@@ -102,7 +104,7 @@ class BankingUxTest {
             .header("Authorization", "Bearer " + alice))
         .andExpect(status().isOk())
         .andExpect(header().string("Content-Disposition", containsString("attachment")))
-        .andExpect(content().string(containsString("id,created_at,from_iban,to_iban,amount,currency,memo,status")))
+        .andExpect(content().string(containsString("id,posted_at,from_iban,to_iban,amount,currency,memo,status")))
         .andExpect(content().string(containsString("\"Hello, \"\"Bob\"\"\"")))
         .andExpect(content().string(containsString("250.0000")));
 
@@ -143,6 +145,7 @@ class BankingUxTest {
   private void deposit(String token, String accountId, String amount) throws Exception {
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"%s"}""".formatted(amount)))
@@ -178,6 +181,7 @@ class BankingUxTest {
     String before = summaryOutflow(alice, aliceId);
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"50.00"}""".formatted(bobIban)))

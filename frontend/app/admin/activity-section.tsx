@@ -1,6 +1,8 @@
 "use client";
 
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
+import { LoadFailed } from "../../components/ui/load-failed";
+import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { useAdminTransactions } from "../../lib/queries";
 import { fmtDate, maskIban, usd } from "../../lib/format";
@@ -12,7 +14,14 @@ export function ActivitySection() {
   return (
     <Card>
       <CardTitle>Latest transfers</CardTitle>
-      {rows.length === 0 ? (
+      {recent.isError && recent.data == null ? (
+        <LoadFailed
+          title="Couldn't load the transfer feed"
+          onRetry={() => recent.refetch()}
+        />
+      ) : recent.isLoading && recent.data == null ? (
+        <div className="mt-3 space-y-2"><Skeleton className="h-8" /><Skeleton className="h-8" /></div>
+      ) : rows.length === 0 ? (
         <CardDescription>No transfers yet.</CardDescription>
       ) : (
         <div className="mt-3">

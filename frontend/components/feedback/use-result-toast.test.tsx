@@ -1,6 +1,5 @@
 import { renderHook } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import * as React from "react";
+import { beforeEach, expect, it, vi } from "vitest";
 import { useResultToast, type ResultToastFeedback } from "./use-result-toast";
 
 const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));

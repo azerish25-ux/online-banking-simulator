@@ -43,7 +43,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["mine_2"];
+        get: operations["mine_1"];
         put?: never;
         post: operations["open"];
         delete?: never;
@@ -212,6 +212,38 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/email-outbox": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["emailOutbox"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/email-outbox/{id}/retry": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["requeueEmail"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/interest/run": {
         parameters: {
             query?: never;
@@ -222,6 +254,38 @@ export interface paths {
         get?: never;
         put?: never;
         post: operations["runInterest"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/kind-review": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["kindReview"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/reconciliation": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["reconciliation"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -333,6 +397,10 @@ export interface paths {
         };
         get?: never;
         put?: never;
+        /**
+         * Log in
+         * @description Returns 200 with an authenticated session, or 202 with a single-use MFA challenge when the account has a factor enabled.
+         */
         post: operations["login"];
         delete?: never;
         options?: never;
@@ -420,6 +488,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/totp/cancel": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["totpCancel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/totp/disable": {
         parameters: {
             query?: never;
@@ -475,7 +559,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["mine_1"];
+        get: operations["mine"];
         put?: never;
         post: operations["add"];
         delete?: never;
@@ -539,7 +623,7 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get: operations["mine"];
+        get: operations["mine_2"];
         put?: never;
         post?: never;
         delete?: never;
@@ -596,6 +680,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["operation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transactions": {
         parameters: {
             query?: never;
@@ -628,183 +728,267 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/transfers/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["transferDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        AccountDifferenceRow: {
+            accountId: string;
+            balance: string;
+            expected: string;
+        };
         AccountResponse: {
-            balance?: string;
-            iban?: string;
+            balance: string;
+            iban: string;
             /** Format: uuid */
-            id?: string;
-            status?: string;
-            type?: string;
+            id: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "FROZEN";
+            /** @enum {string} */
+            type: "CHECKING" | "SAVINGS" | "LOAN";
+        };
+        ApiProblem: {
+            detail: string;
+            /** Format: int32 */
+            status: number;
+            timestamp: string;
+            title: string;
+            type: string;
         };
         AuditResponse: {
-            action?: string;
+            action: string;
             /** Format: uuid */
-            actorId?: string;
-            createdAt?: string;
-            entity?: string;
-            entityId?: string;
+            actorId: string;
+            createdAt: string;
+            entity: string;
+            entityId: string;
             /** Format: int64 */
-            id?: number;
-            metadata?: {
+            id: number;
+            metadata: {
                 [key: string]: string;
             };
         };
         AuthResponse: {
-            accessToken?: string;
+            accessToken: string;
             /** Format: int64 */
-            expiresInSeconds?: number;
-            tokenType?: string;
-            user?: components["schemas"]["UserResponse"];
+            expiresInSeconds: number;
+            tokenType: string;
+            user: components["schemas"]["UserResponse"];
         };
         BeneficiaryResponse: {
             /** Format: date-time */
-            createdAt?: string;
-            iban?: string;
+            createdAt: string;
+            iban: string;
             /** Format: uuid */
-            id?: string;
-            nickname?: string;
+            id: string;
+            nickname: string;
         };
         CardResponse: {
             /** Format: int32 */
-            expMonth?: number;
+            expMonth: number;
             /** Format: int32 */
-            expYear?: number;
+            expYear: number;
             /** Format: uuid */
-            id?: string;
-            last4?: string;
-            status?: string;
+            id: string;
+            last4: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "FROZEN";
         };
         CreateRequest: {
             iban: string;
             nickname: string;
         };
+        CurrencyNetRow: {
+            currency: string;
+            net: string;
+        };
         DayTotal: {
-            date?: string;
-            depositVolume?: string;
+            date: string;
+            depositVolume: string;
             /** Format: int64 */
-            deposits?: number;
+            deposits: number;
             /** Format: int64 */
-            interestEvents?: number;
-            interestNet?: string;
-            transferVolume?: string;
+            interestEvents: number;
+            interestNet: string;
+            transferVolume: string;
             /** Format: int64 */
-            transfers?: number;
+            transfers: number;
         };
         DepositRequest: {
             amount: string;
         };
-        IssuedCardResponse: {
-            cvv?: string;
+        DuplicateRow: {
+            count: string;
+            kind: string;
+            operationRef: string;
+        };
+        EmailOutboxRow: {
             /** Format: int32 */
-            expMonth?: number;
-            /** Format: int32 */
-            expYear?: number;
+            attempts: number;
+            createdAt: string;
+            email: string;
             /** Format: uuid */
-            id?: string;
-            pan?: string;
-            status?: string;
+            id: string;
+            lastError: string;
+            nextAttemptAt: string;
+            status: string;
+            subject: string;
+        };
+        IssuedCardResponse: {
+            cvv: string;
+            /** Format: int32 */
+            expMonth: number;
+            /** Format: int32 */
+            expYear: number;
+            /** Format: uuid */
+            id: string;
+            pan: string;
+            /** @enum {string} */
+            status: "ACTIVE" | "FROZEN";
+        };
+        KindReviewResponse: {
+            memoSnippet: string | null;
+            priorKind: string;
+            reason: string;
+            reviewedAt: string;
+            transactionId: string;
         };
         LoginRequest: {
+            /** Format: email */
             email: string;
             password: string;
+        };
+        MfaRequiredResponse: {
+            message: string;
+            mfaToken: string;
         };
         MfaVerifyRequest: {
             code: string;
             mfaToken: string;
         };
         MonthSummary: {
-            inflow?: string;
-            month?: string;
-            outflow?: string;
+            inflow: string;
+            month: string;
+            outflow: string;
         };
         NotificationResponse: {
-            body?: string;
+            body: string;
             /** Format: date-time */
-            createdAt?: string;
+            createdAt: string;
             /** Format: uuid */
-            id?: string;
-            read?: boolean;
-            title?: string;
-            type?: string;
+            id: string;
+            read: boolean;
+            title: string;
+            type: string;
         };
         OpenAccountRequest: {
             type: string;
         };
         PageAuditResponse: {
-            content?: components["schemas"]["AuditResponse"][];
-            empty?: boolean;
-            first?: boolean;
-            last?: boolean;
+            content: components["schemas"]["AuditResponse"][];
+            empty: boolean;
+            first: boolean;
+            last: boolean;
             /** Format: int32 */
-            number?: number;
+            number: number;
             /** Format: int32 */
-            numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
+            numberOfElements: number;
+            pageable: components["schemas"]["PageableObject"];
             /** Format: int32 */
-            size?: number;
-            sort?: components["schemas"]["SortObject"][];
+            size: number;
+            sort: components["schemas"]["SortObject"];
             /** Format: int64 */
-            totalElements?: number;
+            totalElements: number;
             /** Format: int32 */
-            totalPages?: number;
+            totalPages: number;
+        };
+        PageEmailOutboxRow: {
+            content: components["schemas"]["EmailOutboxRow"][];
+            empty: boolean;
+            first: boolean;
+            last: boolean;
+            /** Format: int32 */
+            number: number;
+            /** Format: int32 */
+            numberOfElements: number;
+            pageable: components["schemas"]["PageableObject"];
+            /** Format: int32 */
+            size: number;
+            sort: components["schemas"]["SortObject"];
+            /** Format: int64 */
+            totalElements: number;
+            /** Format: int32 */
+            totalPages: number;
         };
         PageNotificationResponse: {
-            content?: components["schemas"]["NotificationResponse"][];
-            empty?: boolean;
-            first?: boolean;
-            last?: boolean;
+            content: components["schemas"]["NotificationResponse"][];
+            empty: boolean;
+            first: boolean;
+            last: boolean;
             /** Format: int32 */
-            number?: number;
+            number: number;
             /** Format: int32 */
-            numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
+            numberOfElements: number;
+            pageable: components["schemas"]["PageableObject"];
             /** Format: int32 */
-            size?: number;
-            sort?: components["schemas"]["SortObject"][];
+            size: number;
+            sort: components["schemas"]["SortObject"];
             /** Format: int64 */
-            totalElements?: number;
+            totalElements: number;
             /** Format: int32 */
-            totalPages?: number;
+            totalPages: number;
         };
         PageTransactionResponse: {
-            content?: components["schemas"]["TransactionResponse"][];
-            empty?: boolean;
-            first?: boolean;
-            last?: boolean;
+            content: components["schemas"]["TransactionResponse"][];
+            empty: boolean;
+            first: boolean;
+            last: boolean;
             /** Format: int32 */
-            number?: number;
+            number: number;
             /** Format: int32 */
-            numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
+            numberOfElements: number;
+            pageable: components["schemas"]["PageableObject"];
             /** Format: int32 */
-            size?: number;
-            sort?: components["schemas"]["SortObject"][];
+            size: number;
+            sort: components["schemas"]["SortObject"];
             /** Format: int64 */
-            totalElements?: number;
+            totalElements: number;
             /** Format: int32 */
-            totalPages?: number;
+            totalPages: number;
         };
         PageUserResponse: {
-            content?: components["schemas"]["UserResponse"][];
-            empty?: boolean;
-            first?: boolean;
-            last?: boolean;
+            content: components["schemas"]["UserResponse"][];
+            empty: boolean;
+            first: boolean;
+            last: boolean;
             /** Format: int32 */
-            number?: number;
+            number: number;
             /** Format: int32 */
-            numberOfElements?: number;
-            pageable?: components["schemas"]["PageableObject"];
+            numberOfElements: number;
+            pageable: components["schemas"]["PageableObject"];
             /** Format: int32 */
-            size?: number;
-            sort?: components["schemas"]["SortObject"][];
+            size: number;
+            sort: components["schemas"]["SortObject"];
             /** Format: int64 */
-            totalElements?: number;
+            totalElements: number;
             /** Format: int32 */
-            totalPages?: number;
+            totalPages: number;
         };
         Pageable: {
             /** Format: int32 */
@@ -815,56 +999,84 @@ export interface components {
         };
         PageableObject: {
             /** Format: int64 */
-            offset?: number;
+            offset: number;
             /** Format: int32 */
-            pageNumber?: number;
+            pageNumber: number;
             /** Format: int32 */
-            pageSize?: number;
-            paged?: boolean;
-            sort?: components["schemas"]["SortObject"][];
-            unpaged?: boolean;
+            pageSize: number;
+            paged: boolean;
+            sort: components["schemas"]["SortObject"];
+            unpaged: boolean;
         };
         PublicStats: {
             /** Format: int64 */
-            accounts?: number;
+            accounts: number;
             /** Format: int64 */
-            transfers?: number;
+            transfers: number;
             /** Format: int64 */
-            users?: number;
-            volume?: string;
+            users: number;
+            volume: string;
+        };
+        ReconciliationReport: {
+            balanced: boolean;
+            currencyNets: components["schemas"]["CurrencyNetRow"][];
+            duplicateOperations: components["schemas"]["DuplicateRow"][];
+            /** Format: int64 */
+            journalEntries: number;
+            /** Format: int64 */
+            journalLines: number;
+            projectionDifferences: components["schemas"]["AccountDifferenceRow"][];
+            unbalancedEntries: components["schemas"]["UnbalancedEntryRow"][];
         };
         RegisterRequest: {
+            /** Format: email */
             email: string;
             fullName: string;
             password: string;
         };
         SortObject: {
-            ascending?: boolean;
-            direction?: string;
-            ignoreCase?: boolean;
-            nullHandling?: string;
-            property?: string;
+            empty: boolean;
+            sorted: boolean;
+            unsorted: boolean;
         };
-        TotpCodeRequest: {
+        TotpDisableRequest: {
             code: string;
+            password: string;
+        };
+        TotpEnableRequest: {
+            code: string;
+            currentCode?: string;
+            currentPassword?: string;
         };
         TotpSetupResponse: {
-            qrDataUri?: string;
-            secret?: string;
+            qrDataUri: string;
+            secret: string;
+        };
+        TransactionHistoryPage: {
+            items: components["schemas"]["TransactionResponse"][];
+            nextCursor: string;
+            /** Format: int64 */
+            total: number;
         };
         TransactionResponse: {
-            amount?: string;
-            createdAt?: string;
-            currency?: string;
-            flagged?: boolean;
-            fromIban?: string;
+            amount: string;
+            createdAt: string;
+            currency: string;
+            flagged: boolean;
+            /** @description null on deposits/credits (no originator) */
+            fromIban: string | null;
             /** Format: uuid */
-            id?: string;
-            kind?: string;
-            memo?: string;
-            reviewed?: boolean;
-            status?: string;
-            toIban?: string;
+            id: string;
+            /** @enum {string} */
+            kind: "TRANSFER" | "DEPOSIT" | "INTEREST";
+            memo: string | null;
+            /** @description null while HELD or when CANCELLED - money has not moved */
+            postedAt: string | null;
+            reviewed: boolean;
+            /** @enum {string} */
+            status: "POSTED" | "HELD" | "CANCELLED";
+            /** @description null on engine loan charges (no destination) */
+            toIban: string | null;
         };
         TransferRequest: {
             amount: string;
@@ -875,24 +1087,35 @@ export interface components {
             toIban: string;
         };
         TransferResponse: {
-            amount?: string;
-            createdAt?: string;
-            currency?: string;
-            flagged?: boolean;
-            fromIban?: string;
+            amount: string;
+            createdAt: string;
+            currency: string;
+            flagged: boolean;
+            /** @description null on deposits (no originator) */
+            fromIban: string | null;
             /** Format: uuid */
-            id?: string;
-            memo?: string;
-            status?: string;
-            toIban?: string;
+            id: string;
+            memo: string | null;
+            /** @description null while HELD or when CANCELLED - money has not moved */
+            postedAt: string | null;
+            /** @enum {string} */
+            status: "POSTED" | "HELD" | "CANCELLED";
+            toIban: string | null;
+        };
+        UnbalancedEntryRow: {
+            entryId: string;
+            kind: string;
+            net: string;
+            operationRef: string;
         };
         UserResponse: {
-            email?: string;
-            fullName?: string;
+            email: string;
+            fullName: string;
             /** Format: uuid */
-            id?: string;
-            role?: string;
-            totpEnabled?: boolean;
+            id: string;
+            /** @enum {string} */
+            role: "CUSTOMER" | "ADMIN";
+            totpEnabled: boolean;
         };
     };
     responses: never;
@@ -919,7 +1142,7 @@ export interface operations {
                 };
                 content: {
                     "*/*": {
-                        [key: string]: Record<string, never>;
+                        [key: string]: unknown;
                     };
                 };
             };
@@ -945,7 +1168,7 @@ export interface operations {
             };
         };
     };
-    mine_2: {
+    mine_1: {
         parameters: {
             query?: never;
             header?: never;
@@ -1058,7 +1281,9 @@ export interface operations {
     deposit: {
         parameters: {
             query?: never;
-            header?: never;
+            header?: {
+                "Idempotency-Key"?: string;
+            };
             path: {
                 id: string;
             };
@@ -1126,7 +1351,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string[];
+                    "*/*": string;
                 };
             };
         };
@@ -1197,7 +1422,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": string[];
+                    "*/*": string;
                 };
             };
         };
@@ -1247,6 +1472,49 @@ export interface operations {
             };
         };
     };
+    emailOutbox: {
+        parameters: {
+            query: {
+                status?: "PENDING" | "DELIVERING" | "SENT" | "FAILED";
+                pageable: components["schemas"]["Pageable"];
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["PageEmailOutboxRow"];
+                };
+            };
+        };
+    };
+    requeueEmail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     runInterest: {
         parameters: {
             query?: never;
@@ -1265,6 +1533,46 @@ export interface operations {
                     "*/*": {
                         [key: string]: number;
                     };
+                };
+            };
+        };
+    };
+    kindReview: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["KindReviewResponse"][];
+                };
+            };
+        };
+    };
+    reconciliation: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["ReconciliationReport"];
                 };
             };
         };
@@ -1420,13 +1728,49 @@ export interface operations {
             };
         };
         responses: {
-            /** @description OK */
+            /** @description Authenticated - session tokens issued */
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": Record<string, never>;
+                    "application/json": components["schemas"]["AuthResponse"];
+                };
+            };
+            /** @description MFA required - verify the returned mfaToken */
+            202: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MfaRequiredResponse"];
+                };
+            };
+            /** @description Invalid credentials or validation failure */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Wrong email or password */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiProblem"];
+                };
+            };
+            /** @description Login attempts throttled */
+            429: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ApiProblem"];
                 };
             };
         };
@@ -1541,6 +1885,24 @@ export interface operations {
             };
         };
     };
+    totpCancel: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No Content */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     totpDisable: {
         parameters: {
             query?: never;
@@ -1550,7 +1912,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TotpCodeRequest"];
+                "application/json": components["schemas"]["TotpDisableRequest"];
             };
         };
         responses: {
@@ -1560,7 +1922,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponse"];
+                    "*/*": components["schemas"]["AuthResponse"];
                 };
             };
         };
@@ -1574,7 +1936,7 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["TotpCodeRequest"];
+                "application/json": components["schemas"]["TotpEnableRequest"];
             };
         };
         responses: {
@@ -1584,7 +1946,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["UserResponse"];
+                    "*/*": components["schemas"]["AuthResponse"];
                 };
             };
         };
@@ -1609,7 +1971,7 @@ export interface operations {
             };
         };
     };
-    mine_1: {
+    mine: {
         parameters: {
             query?: never;
             header?: never;
@@ -1717,7 +2079,7 @@ export interface operations {
             };
         };
     };
-    mine: {
+    mine_2: {
         parameters: {
             query: {
                 pageable: components["schemas"]["Pageable"];
@@ -1805,14 +2167,10 @@ export interface operations {
             };
         };
     };
-    history: {
+    operation: {
         parameters: {
             query: {
-                accountId: string;
-                from?: string;
-                to?: string;
-                page?: number;
-                size?: number;
+                key: string;
             };
             header?: never;
             path?: never;
@@ -1826,7 +2184,33 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["PageTransactionResponse"];
+                    "*/*": components["schemas"]["TransactionResponse"];
+                };
+            };
+        };
+    };
+    history: {
+        parameters: {
+            query: {
+                accountId: string;
+                from?: string;
+                to?: string;
+                size?: number;
+                cursor?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransactionHistoryPage"];
                 };
             };
         };
@@ -1853,6 +2237,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TransferResponse"];
+                };
+            };
+        };
+    };
+    transferDetail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransactionResponse"];
                 };
             };
         };

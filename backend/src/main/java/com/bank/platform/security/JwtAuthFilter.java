@@ -32,8 +32,17 @@ public class JwtAuthFilter extends OncePerRequestFilter {
     if (header != null && header.startsWith("Bearer ")) {
       String token = header.substring(7);
       try {
-        String email = jwtService.extractEmail(token);
-        users.findByEmail(email).ifPresent(user -> {
+        // The ONLY trusted validation path for authenticated requests. An MFA
+        // challenge token (purpose=mfa, mfa audience) is rejected here, so a
+        // half-finished login can never call protected endpoints.
+        JwtService.AccessToken parsed = jwtService.parseAccess(token);
+        users.findByEmail(parsed.subject()).ifPresent(user -> {
+          // A token minted before a factor change carries a stale security
+          // version: reject it so old access credentials do not outlive the
+          // revocation (F02). Authorities always come from the database row.
+          if (user.getSecurityVersion() != parsed.securityVersion()) {
+            return;
+          }
           var auth = new UsernamePasswordAuthenticationToken(
               user.getEmail(), null,
               List.of(new SimpleGrantedAuthority("ROLE_" + user.getRole().name())));

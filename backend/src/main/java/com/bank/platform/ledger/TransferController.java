@@ -2,6 +2,7 @@ package com.bank.platform.ledger;
 
 import com.bank.platform.accounts.AccountService;
 import com.bank.platform.ledger.TransferDtos.MonthSummary;
+import com.bank.platform.ledger.TransferDtos.TransactionHistoryPage;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
 import com.bank.platform.ledger.TransferDtos.TransferRequest;
 import com.bank.platform.ledger.TransferDtos.TransferResponse;
@@ -11,9 +12,6 @@ import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageImpl;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -34,13 +32,6 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @RequestMapping("/api/v1")
 public class TransferController {
-
-  /**
-   * Deepest page a history call may address. Beyond it the OFFSET (page * size)
-   * is pointless anyway, and without a cap a caller asking for page=2^31-1
-   * overflows the int offset and 500s in SQL instead of getting an empty page.
-   */
-  private static final int MAX_PAGE_INDEX = 100_000;
 
   private final AccountService accounts;
   private final MoneyService money;
@@ -79,28 +70,79 @@ public class TransferController {
   }
 
   @GetMapping("/transactions")
-  public Page<TransactionResponse> history(
+  public TransactionHistoryPage history(
       Authentication authentication,
       @RequestParam UUID accountId,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
-      @RequestParam(defaultValue = "0") int page,
-      @RequestParam(defaultValue = "20") int size) {
+      @RequestParam(defaultValue = "20") int size,
+      @RequestParam(required = false) String cursor) {
     // Ownership check first: throws 404 for foreign or missing accounts.
     accounts.accountDetail(authentication.getName(), accountId);
     int safeSize = Math.min(Math.max(size, 1), 100);
-    int safePage = Math.min(Math.max(page, 0), MAX_PAGE_INDEX);
     // A dated filter is an inclusive-day window whose half-open bounds Period
     // owns; a null side means the side is open (the queries are null-tolerant,
     // so no sentinel bounds exist). An inverted from/to pair is rejected by
-    // Period and surfaces as a 400 before any query runs.
+    // Period and surfaces as a 400 before any query runs. The cursor is the
+    // opaque position AFTER the previously returned page (F26): an absent or
+    // null cursor is the newest page, and a malformed one is a 400 - keyset
+    // paging has no "absurd depth" to clamp because it never re-scans an
+    // offset.
     Period window = new Period(from, to);
+    Long cursorSeq = cursor == null || cursor.isBlank() ? null : HistoryCursor.decode(cursor);
+    // Fetch one extra row to learn whether another page exists.
     List<Transaction> rows =
-        transactions.historyPage(accountId, window, safeSize, safePage * safeSize);
+        transactions.historyPage(accountId, window, cursorSeq, safeSize + 1);
     long total = transactions.historyCount(accountId, window);
-    Map<UUID, String> ibans = statements.ibanMap(rows);
-    List<TransactionResponse> mapped = rows.stream().map(tx -> TransactionMapper.toResponse(tx, ibans)).toList();
-    return new PageImpl<>(mapped, PageRequest.of(safePage, safeSize), total);
+    boolean hasMore = rows.size() > safeSize;
+    List<Transaction> page = hasMore ? rows.subList(0, safeSize) : rows;
+    Map<UUID, String> ibans = statements.ibanMap(page);
+    List<TransactionResponse> mapped =
+        page.stream().map(tx -> TransactionMapper.toResponse(tx, ibans)).toList();
+    Transaction last = page.isEmpty() ? null : page.get(page.size() - 1);
+    String nextCursor = null;
+    if (hasMore && last != null) {
+      // The ordering key's seq is DB-assigned and never written back to the
+      // mapped entity (see TransactionRepository.rawSeqOf), so read it from
+      // the table - a keyset cursor built from a null seq would corrupt the
+      // next page's boundary.
+      Long seq = transactions.rawSeqOf(last.getId())
+          .orElseThrow(() -> new IllegalStateException("transaction row lacks its seq key"));
+      nextCursor = HistoryCursor.encode(seq);
+    }
+    return new TransactionHistoryPage(mapped, total, nextCursor);
+  }
+
+  /**
+   * Operation-status lookup by idempotency key (F06). Ownership is
+   * originator-scoped: only the user whose account carries the key may see
+   * the operation - a foreign or unknown key is indistinguishable (404), so
+   * probing never discloses another user's row. A client that lost the
+   * response resolves its key here before offering another submit.
+   */
+  @GetMapping("/operations")
+  public TransactionResponse operation(
+      Authentication authentication, @RequestParam String key) {
+    Transaction tx = money.operationStatus(authentication.getName(), key)
+        .orElseThrow(() -> new TransactionNotFoundException(
+            "No operation found for this idempotency key"));
+    return TransactionMapper.toResponse(tx, statements.ibanMap(List.of(tx)));
+  }
+
+  /**
+   * One of the caller's own transactions by id (F11 durable receipt). The
+   * receipt URL is bookmarkable: it carries only the operation id, and the
+   * lookup is originator-scoped server-side (a foreign or unknown id is the
+   * same 404, so nothing is disclosed). Re-fetching after a HELD→POSTED
+   * transition returns the current authoritative status and posting time.
+   */
+  @GetMapping("/transfers/{id}")
+  public TransactionResponse transferDetail(
+      Authentication authentication, @PathVariable UUID id) {
+    Transaction tx = money.transferDetail(authentication.getName(), id)
+        .orElseThrow(() -> new TransactionNotFoundException(
+            "No transfer found for this id"));
+    return TransactionMapper.toResponse(tx, statements.ibanMap(List.of(tx)));
   }
 
   @GetMapping("/accounts/{id}/summary")

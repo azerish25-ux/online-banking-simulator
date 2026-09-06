@@ -51,7 +51,6 @@ vi.mock("next/link", () => {
   };
 });
 
-// eslint-disable-next-line import/order
 import { api } from "../../lib/api";
 
 const checking = { id: "acc-checking", iban: "DE00000000000000000001", type: "CHECKING", balance: "50.00", status: "ACTIVE" };
@@ -106,7 +105,16 @@ describe("transfers page HELD outcome", () => {
     await userEvent.type(await screen.findByLabelText("Recipient IBAN"), savings.iban);
     await userEvent.type(screen.getByLabelText("Amount (USD)"), "10000.00");
     await userEvent.type(screen.getByLabelText("Memo (optional)"), "big wire");
-    await userEvent.click(screen.getByRole("button", { name: /Send transfer/ }));
+    // F11: the first click opens REVIEW - nothing is sent yet.
+    await userEvent.click(screen.getByRole("button", { name: /Review transfer/ }));
+
+    // The review shows the exact frozen payload, and the submit button is gone
+    // until confirmed (editing would exit review back to draft).
+    expect(await screen.findByRole("region", { name: "Review your transfer" })).toBeInTheDocument();
+    expect(screen.getByText("$10,000.00")).toBeInTheDocument();
+    expect(screen.getByText(savings.iban)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Review transfer/ })).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Confirm & send" }));
 
     // The receipt card must read HELD, and the toast must say the transfer is
     // awaiting review - the regression where a bare `status` reference resolved
@@ -116,6 +124,12 @@ describe("transfers page HELD outcome", () => {
       expect(screen.getByText(/it is sent once an operator approves it/)).toBeTruthy()
     );
     expect(screen.queryByText("Transfer posted.")).toBeNull();
+
+    // The durable receipt is reachable from the inline receipt.
+    expect(screen.getByRole("link", { name: /Open permanent receipt/ })).toHaveAttribute(
+      "href",
+      "/transfers/receipt/tx-held"
+    );
   });
 });
 

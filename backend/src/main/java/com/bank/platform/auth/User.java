@@ -35,6 +35,24 @@ public class User {
   @Column(name = "totp_secret", length = 64)
   private String totpSecret;
 
+  // F30 secret custody: when a master key is configured, the usable seed is
+  // stored encrypted in totp_secret_ciphertext (key version >= 1) and the
+  // legacy totp_secret column is cleared. Version 0 rows are pre-migration
+  // plaintext that the startup migrator converts once a key is supplied.
+  @Column(name = "totp_secret_ciphertext", length = 512)
+  private String totpSecretCiphertext;
+
+  @Column(name = "totp_key_version", nullable = false)
+  private int totpKeyVersion;
+
+  /**
+   * Bumped on every factor change. Access tokens carry the version they were
+   * minted under and the auth filter rejects stale ones, so an old access
+   * token stops working the moment a factor changes (F02).
+   */
+  @Column(name = "security_version", nullable = false)
+  private int securityVersion;
+
   @Column(name = "totp_enabled", nullable = false)
   private boolean totpEnabled;
 
@@ -74,6 +92,12 @@ public class User {
   public Instant getUpdatedAt() { return updatedAt; }
   public String getTotpSecret() { return totpSecret; }
   public void setTotpSecret(String v) { totpSecret = v; }
+  public String getTotpSecretCiphertext() { return totpSecretCiphertext; }
+  public void setTotpSecretCiphertext(String v) { totpSecretCiphertext = v; }
+  public int getTotpKeyVersion() { return totpKeyVersion; }
+  public void setTotpKeyVersion(int v) { totpKeyVersion = v; }
+  public int getSecurityVersion() { return securityVersion; }
+  public void setSecurityVersion(int v) { securityVersion = v; }
   public boolean isTotpEnabled() { return totpEnabled; }
   public void setTotpEnabled(boolean v) { totpEnabled = v; }
   public Instant getCreatedAt() { return createdAt; }

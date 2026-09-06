@@ -8,12 +8,12 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -123,7 +123,7 @@ class OpsReviewTest {
         .andExpect(status().isOk())
         .andReturn();
     String csvBody = csv.getResponse().getContentAsString();
-    assertTrue(csvBody.startsWith("id,created_at"), "CSV keeps its header");
+    assertTrue(csvBody.startsWith("id,posted_at"), "CSV keeps its header");
   }
 
   @Test
@@ -189,6 +189,7 @@ class OpsReviewTest {
   private String transfer(String token, String toIban, String amount, boolean flagged) throws Exception {
     MvcResult result = mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"toIban":"%s","amount":"%s"}""".formatted(toIban, amount)))
@@ -202,6 +203,7 @@ class OpsReviewTest {
   private void deposit(String token, String accountId, String amount) throws Exception {
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
                 {"amount":"%s"}""".formatted(amount)))

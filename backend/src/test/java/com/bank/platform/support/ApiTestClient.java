@@ -4,8 +4,8 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.springframework.http.MediaType;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
@@ -61,9 +61,11 @@ public final class ApiTestClient {
         .get(0).get("iban").asText();
   }
 
+  /** Every deposit needs its own key (F06): fundings are user operations. */
   public void deposit(String token, String accountId, String amount) throws Exception {
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + java.util.UUID.randomUUID())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"amount\":\"%s\"}".formatted(amount)))
         .andExpect(status().isOk());
@@ -73,14 +75,30 @@ public final class ApiTestClient {
     return transferWithKey(token, toIban, amount, null);
   }
 
+  /** One-shot transfer carrying a memo; returns the created transaction id. */
+  public String transferId(String token, String toIban, String amount, String memo) throws Exception {
+    String key = "tx-" + java.util.UUID.randomUUID();
+    MvcResult result = mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", key)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"toIban\":\"%s\",\"amount\":\"%s\",\"memo\":\"%s\"}"
+                .formatted(toIban, amount, memo)))
+        .andExpect(status().isCreated())
+        .andReturn();
+    return json.readValue(result.getResponse().getContentAsString(), JsonNode.class)
+        .get("id").asText();
+  }
+
   public String transferWithKey(String token, String toIban, String amount, String idempotencyKey) throws Exception {
+    // Every transfer needs a key (F06): one-shot transfers mint their own.
+    String key = idempotencyKey != null ? idempotencyKey
+        : "tx-" + java.util.UUID.randomUUID();
     var request = post("/api/v1/transfers")
         .header("Authorization", "Bearer " + token)
+        .header("Idempotency-Key", key)
         .contentType(MediaType.APPLICATION_JSON)
         .content("{\"toIban\":\"%s\",\"amount\":\"%s\"}".formatted(toIban, amount));
-    if (idempotencyKey != null) {
-      request = request.header("Idempotency-Key", idempotencyKey);
-    }
     MvcResult result = mvc.perform(request).andReturn();
     int status = result.getResponse().getStatus();
     if (status != 201 && status != 200) {

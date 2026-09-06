@@ -10,13 +10,14 @@ import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
+import { LoadFailed } from "../../components/ui/load-failed";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { SpendingChart } from "../../components/charts/spending-chart";
 import { Routes } from "../../lib/routes";
 import { useAccounts, useMe, useSummary, useTransactions } from "../../lib/queries";
-import { decimalToCents, fmtDate, maskIban, signedUsd, usd, usdFromCents } from "../../lib/format";
+import { decimalToCents, fmtDate, maskIban, signedUsd, totalUsd, usd, usdFromCents } from "../../lib/format";
 
 export default function DashboardPage() {
   const me = useMe();
@@ -25,7 +26,7 @@ export default function DashboardPage() {
   // Primary account drives the feed + chart; queries stay independent so the
   // chart never waits on the table (and vice versa).
   const primaryId = accounts.data?.[0]?.id ?? "";
-  const recent = useTransactions(primaryId, 0, 5);
+  const recent = useTransactions(primaryId, "", 5);
   const summary = useSummary(primaryId, 6);
 
   const [depositOpen, setDepositOpen] = React.useState(false);
@@ -40,10 +41,11 @@ export default function DashboardPage() {
   const accs = accounts.data;
   const primaryAccount = accs?.[0];
 
-  // Exact total: integer-cents arithmetic over the server's decimal strings -
-  // no float ever sums the ledger. A loan's negative balance counts as debt,
-  // so the card reads as a net figure across all accounts.
-  const totalCents = (accs ?? []).reduce((sum, a) => sum + decimalToCents(a.balance), 0n);
+  // Exact total across the server's decimal strings (F17): components are
+  // summed at the ledger's ten-thousandths scale and rounded ONCE at display,
+  // so per-item cent rounding can never skew the net figure. A loan's
+  // negative balance counts as debt.
+  const netUsd = totalUsd((accs ?? []).map((a) => a.balance));
   const hasLoan = (accs ?? []).some((a) => a.type === "LOAN");
 
   return (
@@ -68,21 +70,38 @@ export default function DashboardPage() {
         </div>
       </div>
 
-      {accounts.isLoading || accs == null ? (
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
-        </div>
+      {accs == null ? (
+        accounts.isError ? (
+          <Card>
+            <LoadFailed
+              title="Couldn't load your accounts"
+              description="Balances and recent activity need the account list. Check your connection and try again."
+              onRetry={() => accounts.refetch()}
+            />
+          </Card>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-3">
+            <Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" />
+          </div>
+        )
+      ) : accs.length === 0 ? (
+        <Card>
+          <EmptyState
+            title="No accounts yet"
+            description="Open a checking, savings or loan account to get started - deposits and transfers land here."
+          />
+        </Card>
       ) : (
         <div className="grid gap-4 md:grid-cols-3">
           <Card>
             <CardDescription>
               {hasLoan
-                ? "Net position across accounts"
+                ? "Net position across all your accounts - loans count as debt"
                 : accs && accs.length > 1
-                  ? "Total across accounts"
-                  : "Available balance"}
+                  ? "Total across your " + accs.length + " accounts, all in USD"
+                  : "Available balance (USD)"}
             </CardDescription>
-            <p className="mt-1 text-3xl font-bold tabular-nums">{usdFromCents(totalCents)}</p>
+            <p className="mt-1 text-3xl font-bold tabular-nums">{netUsd}</p>
           </Card>
           {accs.map((a) => {
             // A drawn loan (negative balance) is debt, so its card must not
@@ -115,24 +134,19 @@ export default function DashboardPage() {
 
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">
-          <CardTitle>Money flow · last 6 months</CardTitle>
-          <Link href={Routes.activity} className="text-sm text-brass-300 hover:underline">Full activity</Link>
-        </div>
-        {summary.data == null ? (
-          <Skeleton className="h-48" />
-        ) : (
-          <SpendingChart data={summary.data} />
-        )}
-      </Card>
-
-      <Card className="mt-4">
-        <div className="mb-3 flex items-center justify-between">
           <CardTitle>Recent activity</CardTitle>
           <Link href={Routes.transfers} className="text-sm text-brass-300 hover:underline">
             New transfer
           </Link>
         </div>
-        {(recent.data?.content ?? []).length === 0 ? (
+        {recent.isLoading && recent.data == null ? (
+          <div className="space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+        ) : recent.isError && recent.data == null ? (
+          <LoadFailed
+            title="Couldn't load recent activity"
+            onRetry={() => recent.refetch()}
+          />
+        ) : (recent.data?.items ?? []).length === 0 ? (
           <EmptyState title="No transactions yet" description="Send your first transfer to see it here." />
         ) : (
           <Table>
@@ -142,7 +156,7 @@ export default function DashboardPage() {
               </TRow>
             </THead>
             <tbody>
-              {(recent.data?.content ?? []).map((t) => (
+              {(recent.data?.items ?? []).map((t) => (
                 <TRow key={t.id}>
                   <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
                   <TD className="mono">{maskIban(t.fromIban) ?? "DEPOSIT"}</TD>
@@ -154,6 +168,32 @@ export default function DashboardPage() {
               ))}
             </tbody>
           </Table>
+        )}
+      </Card>
+
+      {/* The chart sits AFTER recent activity (money first) and is width-
+          constrained so it decorates instead of dominating the feed (F19). */}
+      <Card className="mx-auto mt-4 w-full max-w-3xl">
+        <div className="mb-3 flex items-center justify-between">
+          <CardTitle>Money flow · last 6 months</CardTitle>
+          <Link href={Routes.activity} className="text-sm text-brass-300 hover:underline">Full activity</Link>
+        </div>
+        <CardDescription className="mb-3">
+          {accs && accs.length > 1
+            ? "For your first account only - pick any account in Activity for its own view."
+            : "Money in and out of this account."}
+        </CardDescription>
+        {summary.data == null ? (
+          summary.isError ? (
+            <LoadFailed
+              title="Couldn't load the chart"
+              onRetry={() => summary.refetch()}
+            />
+          ) : (
+            <Skeleton className="h-48" />
+          )
+        ) : (
+          <SpendingChart data={summary.data} />
         )}
       </Card>
 

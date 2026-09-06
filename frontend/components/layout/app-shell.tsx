@@ -4,7 +4,7 @@ import * as React from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
-import { clearToken } from "../../lib/api";
+import { broadcastLogout, clearToken } from "../../lib/api";
 import { useMe, useUnreadCount } from "../../lib/queries";
 import { Bell } from "lucide-react";
 import { cn } from "../../lib/cn";
@@ -88,6 +88,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     } finally {
       clearToken();
       qc.clear();
+      // Sibling tabs share the cookie jar but not this React tree: tell them
+      // to evict their cached user data and leave the app too (F22).
+      broadcastLogout();
       router.push(Routes.login);
     }
   }

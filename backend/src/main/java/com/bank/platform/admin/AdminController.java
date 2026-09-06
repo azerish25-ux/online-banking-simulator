@@ -10,8 +10,10 @@ import com.bank.platform.auth.AuthDtos.UserResponse;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.ledger.InterestService;
 import com.bank.platform.ledger.Period;
+import com.bank.platform.ledger.ReconciliationService;
 import com.bank.platform.ledger.StatementService;
 import com.bank.platform.ledger.Transaction;
+import com.bank.platform.ledger.TransactionKindReviewRepository;
 import com.bank.platform.ledger.TransactionMapper;
 import com.bank.platform.ledger.TransactionRepository;
 import com.bank.platform.ledger.TransactionSpecs;
@@ -53,6 +55,9 @@ public class AdminController {
   private final InterestService interestService;
   private final ReportService reportService;
   private final StatementService statementService;
+  private final ReconciliationService reconciliationService;
+  private final TransactionKindReviewRepository kindReviews;
+  private final com.bank.platform.notifications.EmailOutboxService emailOutbox;
 
   public AdminController(
       UserRepository users,
@@ -62,7 +67,10 @@ public class AdminController {
       AdminService adminService,
       InterestService interestService,
       ReportService reportService,
-      StatementService statementService) {
+      StatementService statementService,
+      ReconciliationService reconciliationService,
+      TransactionKindReviewRepository kindReviews,
+      com.bank.platform.notifications.EmailOutboxService emailOutbox) {
     this.users = users;
     this.accounts = accounts;
     this.transactions = transactions;
@@ -71,6 +79,56 @@ public class AdminController {
     this.interestService = interestService;
     this.reportService = reportService;
     this.statementService = statementService;
+    this.reconciliationService = reconciliationService;
+    this.kindReviews = kindReviews;
+    this.emailOutbox = emailOutbox;
+  }
+
+  /**
+   * Dead-lettered (or any-status) external mail, for the operator's retry
+   * path (F25). Only PENDING rows are in flight; FAILED rows have exhausted
+   * their delivery budget and need a decision. Recipient addresses are the
+   * operator's business - this is the internal ops tool, not a public feed.
+   */
+  @GetMapping("/email-outbox")
+  public org.springframework.data.domain.Page<EmailOutboxRow> emailOutbox(
+      @RequestParam(required = false) com.bank.platform.notifications.EmailOutbox.Status status,
+      @PageableDefault(size = 20) org.springframework.data.domain.Pageable pageable) {
+    return emailOutbox.list(status, capped(pageable)).map(EmailOutboxRow::from);
+  }
+
+  /** Requeue one dead letter for another bounded delivery attempt (F25). */
+  @PostMapping("/email-outbox/{id}/retry")
+  @org.springframework.web.bind.annotation.ResponseStatus(
+      org.springframework.http.HttpStatus.NO_CONTENT)
+  public void requeueEmail(@PathVariable UUID id) {
+    if (!emailOutbox.requeue(id)) {
+      throw new com.bank.platform.ledger.TransactionNotFoundException(
+          "No dead-lettered email row with that id");
+    }
+  }
+
+  /** Operator-facing view of one outbox row - errors stay redacted. */
+  public record EmailOutboxRow(
+      UUID id, String email, String subject, String status, int attempts,
+      String lastError, String createdAt, String nextAttemptAt) {
+    static EmailOutboxRow from(com.bank.platform.notifications.EmailOutbox row) {
+      return new EmailOutboxRow(
+          row.getId(), row.getEmail(), row.getSubject(), row.getStatus().name(),
+          row.getAttempts(), row.getLastError(),
+          row.getCreatedAt().toString(), row.getNextAttemptAt().toString());
+    }
+  }
+
+  /**
+   * Independent reconciliation (F15): derived-from-journal account checks,
+   * per-currency balancing, duplicate operation entries and unexplained
+   * movements. Operator-visible so a drift between the journal and the
+   * balance projections is surfaced instead of silently absorbed.
+   */
+  @GetMapping("/reconciliation")
+  public ReconciliationService.ReconciliationReport reconciliation() {
+    return reconciliationService.reconcile();
   }
 
   /**
@@ -143,6 +201,28 @@ public class AdminController {
   public Map<String, Integer> runInterest() {
     return interestService.accrueMonthly();
   }
+
+  /**
+   * The F21 kind-review quarantine: every legacy transaction whose kind was
+   * corrected from structural/audit evidence, or labelled UNCERTAIN because no
+   * evidence proved it, is listed here with its original classification and
+   * the reason. Operators see exactly what was decided - nothing was silently
+   * re-tagged or rebalanced to make reports fit.
+   */
+  @GetMapping("/kind-review")
+  public List<KindReviewResponse> kindReview() {
+    return kindReviews.findAllByOrderByCreatedAtDesc().stream()
+        .map(row -> new KindReviewResponse(
+            row.getTransactionId().toString(), row.getPriorKind(), row.getReason(),
+            row.getMemoSnippet(), row.getCreatedAt().toString()))
+        .toList();
+  }
+
+  /** One archived classification decision (F21). */
+  public record KindReviewResponse(
+      String transactionId, String priorKind, String reason,
+      @io.swagger.v3.oas.annotations.media.Schema(nullable = true) String memoSnippet,
+      String reviewedAt) {}
 
   @PostMapping("/transactions/{id}/review")
   public TransactionResponse review(Authentication authentication, @PathVariable UUID id) {

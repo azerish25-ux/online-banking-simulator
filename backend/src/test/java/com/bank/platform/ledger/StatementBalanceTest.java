@@ -9,8 +9,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bank.platform.support.ApiTestClient;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
 import org.apache.pdfbox.Loader;
@@ -19,7 +19,7 @@ import org.apache.pdfbox.text.PDFTextStripper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -146,6 +146,7 @@ class StatementBalanceTest {
     // Draw the full $1,000 credit limit into checking - the LOAN floor.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"1000.00\",\"fromAccountId\":\"%s\"}"
                 .formatted(checkingIban, loanId)))
@@ -159,12 +160,13 @@ class StatementBalanceTest {
   }
 
   /**
-   * Draw then repay across zero: the loan ends positive after a negative
-   * middle state, and the rendered figures must reflect the final balance
-   * through the same cut arithmetic (in-window net +$1,000 → closing $1,000).
+   * Draw then repay the full amount: the loan returns exactly to zero, and
+   * the statement figures carry the negative draw then the zero closing. An
+   * over-repayment is rejected under the F16 policy - a repayment may never
+   * exceed the amount owed, so a loan balance cannot go positive.
    */
   @Test
-  void repaidLoanStatementFiguresCrossBackThroughZero() throws Exception {
+  void repaidLoanStatementFiguresReturnToZeroAndOverpaymentIsRejected() throws Exception {
     String alice = client.register("stmt-loan-r@example.com", "Stmt Loan Repaid");
     String checkingId = client.accountId(alice);
     String checkingIban = client.accountIban(alice);
@@ -172,26 +174,37 @@ class StatementBalanceTest {
     String loanId = loan.get("id").asText();
     String loanIban = loan.get("iban").asText();
 
-    // Fund checking, draw the limit, then repay more than the draw: the loan
-    // crosses -$1,000 and lands at +$1,000 (checking back to zero).
-    client.deposit(alice, checkingId, "1000.00");
+    // Fund checking, draw the limit, then try to over-repay: the sender can
+    // afford it, but the repayment cap rejects it (F16).
+    client.deposit(alice, checkingId, "2000.00");
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"1000.00\",\"fromAccountId\":\"%s\"}"
                 .formatted(checkingIban, loanId)))
         .andExpect(status().isCreated());
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"2000.00\"}".formatted(loanIban)))
+        .andExpect(status().isBadRequest());
+    assertEquals("-1000.0000", accountBalance(alice, loanId), "overpayment must not move the loan");
+
+    // Repay exactly the draw: the loan returns to zero.
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"toIban\":\"%s\",\"amount\":\"1000.00\"}".formatted(loanIban)))
         .andExpect(status().isCreated());
-    assertEquals("1000.0000", accountBalance(alice, loanId), "repayment exceeds the draw");
+    assertEquals("0.0000", accountBalance(alice, loanId), "full repayment zeroes the loan");
 
     LocalDate today = LocalDate.now(ZoneOffset.UTC);
     String pdf = statementText(alice, loanId, today, today);
     assertTrue(pdf.contains("Opening $0.00"), "in-window net backs out the opening:\n" + pdf);
-    assertTrue(pdf.contains("Closing $1,000.00"), "positive after the crossing:\n" + pdf);
+    assertTrue(pdf.contains("Closing $0.00"), "zero after the full round trip:\n" + pdf);
   }
 
   /** Opens a LOAN (one per user) and returns its account payload. */
@@ -209,6 +222,7 @@ class StatementBalanceTest {
   private String heldTransfer(String token, String toIban, String amount, String memo) throws Exception {
     MvcResult result = mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"%s\",\"memo\":\"%s\"}"
                 .formatted(toIban, amount, memo)))

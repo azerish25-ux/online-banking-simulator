@@ -31,7 +31,7 @@ public interface TransactionRepository
    * money, so summaries and other money-movement reads must exclude them.
    */
   @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
-      + "and t.status = :status and t.createdAt >= :since order by t.createdAt asc")
+      + "and t.status = :status and t.postedAt >= :since order by t.postedAt asc")
   List<Transaction> findSettledByAccountSince(UUID accountId, TxStatus status, Instant since);
 
   // Statements read oldest-first like a paper bank statement (history - the
@@ -47,30 +47,57 @@ public interface TransactionRepository
   // history is genuinely open-ended, and its null-tolerant guards carry an
   // explicit CAST because PostgreSQL cannot infer a parameter's type from an
   // IS NULL comparison alone (SQLState 42P18) when the bound is a bare null.
+  //
+  // F04: a statement is a window of money that MOVED, so the bounds and the
+  // ordering cut on posted_at - never created_at, which is the request time
+  // and can precede settlement across a month boundary. Rows that never
+  // posted (HELD/CANCELLED) have no posted_at and can never match.
   @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
-      + "and t.createdAt >= :from and t.createdAt < :to order by t.createdAt asc, t.seq asc")
-  List<Transaction> statementRowsBetween(UUID accountId, Instant from, Instant to);
+      + "and t.status = :status and t.postedAt >= :from and t.postedAt < :to "
+      + "order by t.postedAt asc, t.seq asc")
+  List<Transaction> postedRowsBetween(UUID accountId, TxStatus status, Instant from, Instant to);
 
-  /** Statement rows over an inclusive-day {@link Period}, oldest-first. */
+  /** Settled rows over an inclusive-day {@link Period}, oldest-first. */
   default List<Transaction> statementRows(UUID accountId, Period period) {
-    return statementRowsBetween(accountId, period.start(), period.endExclusive());
+    return postedRowsBetween(accountId, TxStatus.POSTED, period.start(), period.endExclusive());
+  }
+
+  /** Count of settled rows in the window - the statement size guard. */
+  @Query("select count(t) from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
+      + "and t.status = :status and t.postedAt >= :from and t.postedAt < :to")
+  long countPostedBetween(UUID accountId, TxStatus status, Instant from, Instant to);
+
+  /** Settled-row count over an inclusive-day {@link Period}. */
+  default long postedCount(UUID accountId, Period period) {
+    return countPostedBetween(accountId, TxStatus.POSTED, period.start(), period.endExclusive());
   }
 
   // Rows tied on created_at resolve newest-inserted-first via the DB-assigned
   // seq column (the random UUID id cannot express insertion order - V14).
+  // F26: history pages with a KEYSET cursor over the immutable seq identity,
+  // never an OFFSET - an offset re-scans from the newest row every time, so a
+  // row committed between two reads shifts everything and the reader
+  // duplicates or skips it. A null cursorSeq means the first page (no bound);
+  // the keyset predicate is seq < cursor, so the fetched page is exactly the
+  // next {@code limit} rows under the same ordering. Ordering by seq alone
+  // (not created_at) keeps the page key precise: created_at is shared by rows
+  // flushed together and can round-trip differently through timestamp
+  // columns, while seq is a total, immutable, database-assigned order.
   @Query(value = "SELECT * FROM ("
       + "SELECT t.* FROM transactions t WHERE t.from_account_id = :accountId "
       + "UNION ALL "
       + "SELECT t.* FROM transactions t WHERE t.to_account_id = :accountId"
       + ") u WHERE (CAST(:from AS timestamp with time zone) IS NULL OR u.created_at >= :from) "
       + "AND (CAST(:to AS timestamp with time zone) IS NULL OR u.created_at < :to) "
-      + "ORDER BY u.created_at DESC, u.seq DESC LIMIT :limit OFFSET :offset",
+      + "AND (CAST(:cursorSeq AS bigint) IS NULL OR u.seq < :cursorSeq) "
+      + "ORDER BY u.seq DESC LIMIT :limit",
       nativeQuery = true)
-  List<Transaction> historyPageBetween(UUID accountId, Instant from, Instant to, int limit, int offset);
+  List<Transaction> historyAfterCursor(UUID accountId, Instant from, Instant to,
+      Long cursorSeq, int limit);
 
   /** One page of history over an inclusive-day {@link Period}, newest-first. */
-  default List<Transaction> historyPage(UUID accountId, Period period, int limit, int offset) {
-    return historyPageBetween(accountId, period.start(), period.endExclusive(), limit, offset);
+  default List<Transaction> historyPage(UUID accountId, Period period, Long cursorSeq, int limit) {
+    return historyAfterCursor(accountId, period.start(), period.endExclusive(), cursorSeq, limit);
   }
 
   @Query(value = "SELECT COUNT(*) FROM transactions t "
@@ -88,6 +115,7 @@ public interface TransactionRepository
   @Query("select t from Transaction t where t.createdAt >= :since order by t.createdAt asc")
   List<Transaction> findSince(Instant since);
 
+
   /** Columns the daily-totals report actually buckets on - no full entities. */
   interface PostedRow {
     Instant getCreatedAt();
@@ -102,10 +130,10 @@ public interface TransactionRepository
    * status and window filters run in SQL, so the JVM never materializes every
    * transaction entity (with memo, currency, ...) just to sum a few columns.
    */
-  @Query("select t.createdAt as createdAt, t.kind as kind, t.amount as amount, "
+  @Query("select t.postedAt as createdAt, t.kind as kind, t.amount as amount, "
       + "t.fromAccountId as fromAccountId, t.toAccountId as toAccountId "
-      + "from Transaction t where t.createdAt >= :since and t.status = :status "
-      + "order by t.createdAt asc")
+      + "from Transaction t where t.postedAt >= :since and t.status = :status "
+      + "order by t.postedAt asc")
   List<PostedRow> findPostedSince(@Param("since") Instant since, @Param("status") TxStatus status);
 
   /**
@@ -118,27 +146,70 @@ public interface TransactionRepository
    */
   @Query("select coalesce(sum(case when t.toAccountId = :accountId then t.amount else -t.amount end), 0) "
       + "from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
-      + "and t.status = :status and t.createdAt >= :after")
+      + "and t.status = :status and t.postedAt >= :after")
   Optional<BigDecimal> sumSettledMovementAfter(@Param("accountId") UUID accountId,
       @Param("status") TxStatus status, @Param("after") Instant after);
 
   /**
    * Atomically resolves a held transfer: moves it out of HELD into {@code to}
-   * (POSTED on approval, CANCELLED on decline) and marks it reviewed. Returns
-   * 1 for the operator who won the race, 0 when someone already resolved it -
-   * so two concurrent approvals can never both settle the same money.
+   * (POSTED on approval, CANCELLED on decline), marks it reviewed and stamps
+   * the posting time (F04). Returns 1 for the operator who won the race,
+   * 0 when someone already resolved it - so two concurrent approvals can
+   * never both settle the same money. {@code postedAt} is set only when
+   * {@code to == POSTED} (null for a decline, leaving the column null); the
+   * CHECK requires every POSTED row to carry one, so the flip and the stamp
+   * happen in the same UPDATE.
    */
   @Modifying
-  @Query("update Transaction t set t.status = :to, t.reviewed = true "
+  @Query("update Transaction t set t.status = :to, t.reviewed = true, t.postedAt = :postedAt "
       + "where t.id = :id and t.status = :from")
-  int resolveAwaitingReview(@Param("id") UUID id, @Param("from") TxStatus from, @Param("to") TxStatus to);
+  int resolveAwaitingReview(@Param("id") UUID id, @Param("from") TxStatus from, @Param("to") TxStatus to,
+      @Param("postedAt") Instant postedAt);
 
-  /** Only settled (POSTED) rows count as transfers - HELD rows are intents, not money moved. */
-  @Query("select count(t) from Transaction t where t.fromAccountId is not null and t.status = :status")
-  long countSettledTransfers(@Param("status") TxStatus status);
+  /**
+   * Deposit idempotency keys are scoped to the account they fund (unique on
+   * (to_account_id, idempotency_key) for rows with no originator - V20), so a
+   * foreign key can never surface another user's deposit.
+   */
+  Optional<Transaction> findFirstByIdempotencyKeyAndToAccountIdAndFromAccountIdIsNull(
+      String idempotencyKey, UUID toAccountId);
 
-  @Query("select coalesce(sum(t.amount), 0) from Transaction t where t.fromAccountId is not null and t.status = :status")
-  Optional<BigDecimal> sumSettledTransferVolume(@Param("status") TxStatus status);
+  /**
+   * Operation-status lookup scoped to the ORIGINATOR (F06): the user whose
+   * account carries the key namespace. A deposit's originator is its funded
+   * account (from_account_id IS NULL); a transfer's is its sender. Rows the
+   * caller merely received are not their operations.
+   */
+  @Query("select t from Transaction t where t.idempotencyKey = :key "
+      + "and ((t.fromAccountId is not null and t.fromAccountId in :owned) "
+      + "or (t.fromAccountId is null and t.toAccountId in :owned))")
+  List<Transaction> findOperationsByKey(@Param("key") String key, @Param("owned") List<UUID> owned);
+
+  /**
+   * Raw DB-assigned seq of one row, read straight from the table. The paging
+   * query maps entities, and an entity that is already in the persistence
+   * context keeps its in-memory state - where {@code seq} is still null
+   * because the identity value is assigned by the database, never written
+   * back to the object. The keyset cursor must carry the real ordering key,
+   * so the boundary row's seq comes from this column read instead.
+   */
+  @Query(value = "SELECT seq FROM transactions WHERE id = :id", nativeQuery = true)
+  Optional<Long> rawSeqOf(UUID id);
+
+  /**
+   * F28: public transfer numbers classify by KIND and posted status - never
+   * by "has a from side". The interest engine posts loan charges with a from
+   * side and no to side; counting {@code from_account_id IS NOT NULL} rows
+   * would present engine interest as user transfers. A public transfer is a
+   * row the banking rail labelled TRANSFER that actually posted; HELD and
+   * CANCELLED instructions never moved money and are excluded by status, and
+   * DEPOSIT/INTEREST rows are excluded by kind.
+   */
+  @Query("select count(t) from Transaction t where t.kind = :kind and t.status = :status")
+  long countByKindAndStatus(@Param("kind") TxKind kind, @Param("status") TxStatus status);
+
+  @Query("select coalesce(sum(t.amount), 0) from Transaction t where t.kind = :kind and t.status = :status")
+  Optional<BigDecimal> sumAmountByKindAndStatus(@Param("kind") TxKind kind, @Param("status") TxStatus status);
 
 }
 

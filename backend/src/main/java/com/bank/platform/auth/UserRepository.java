@@ -15,5 +15,8 @@ public interface UserRepository extends JpaRepository<User, UUID> {
   @Query("select u from User u where u.id = :id")
   Optional<User> findByIdForUpdate(UUID id);
   boolean existsByEmail(String email);
+
+  /** Legacy plaintext TOTP rows waiting for the F30 custody migration. */
+  java.util.List<User> findByTotpKeyVersionAndTotpSecretIsNotNull(int totpKeyVersion);
   org.springframework.data.domain.Page<User> findByEmailContainingIgnoreCaseOrFullNameContainingIgnoreCase(String email, String fullName, org.springframework.data.domain.Pageable pageable);
 }

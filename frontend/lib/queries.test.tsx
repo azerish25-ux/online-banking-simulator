@@ -104,7 +104,7 @@ describe("query hooks", () => {
 
   it("queryKeys are stable and parameterized", () => {
     expect(queryKeys.accounts).toEqual(["accounts"]);
-    expect(queryKeys.transactions("a1", 0, "2026-01-01")).toEqual(["transactions", "a1", 0, "2026-01-01", ""]);
+    expect(queryKeys.transactions("a1", "", 10, "2026-01-01")).toEqual(["transactions", "a1", "", 10, "2026-01-01", ""]);
     expect(queryKeys.summary("a1", 6)).toEqual(["summary", "a1", 6]);
   });
 
@@ -185,5 +185,55 @@ describe("query hooks", () => {
       )
     );
     expect(paths).toContain("/v1/accounts/a1/deposit");
+  });
+
+  it("deposits carry an idempotency key reused across ambiguous retries", async () => {
+    const user = userEvent.setup();
+    setToken("tok");
+    vi.mocked(api)
+      // Transient 5xx: the deposit may or may not have posted - the retry must
+      // reuse the same key so the server never double-credits.
+      .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"))
+      .mockResolvedValueOnce({ id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" });
+    withClient(<DepositSender />);
+    const send = screen.getByRole("button", { name: "deposit" });
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    const firstCall = sentKeys();
+    expect(firstCall[0]).toBeTruthy();
+
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    const keys = sentKeys();
+    expect(keys[1]).toBe(keys[0]);
+  });
+
+  it("deposits keep the key on 409/429 and drop it on a definitive 4xx", async () => {
+    const user = userEvent.setup();
+    setToken("tok");
+    vi.mocked(api)
+      // A 409 means the key already names an operation - never discard it: a
+      // retry must resolve the original result, not mint a competing op.
+      .mockRejectedValueOnce(new ApiError(409, "Idempotency Conflict", "already used"))
+      .mockResolvedValueOnce({ id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" })
+      // A definitive rejection (validation) records nothing: the key is free.
+      .mockRejectedValueOnce(new ApiError(400, "Transfer Rejected", "limit"))
+      .mockResolvedValueOnce({ id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" });
+    withClient(<DepositSender />);
+    const send = screen.getByRole("button", { name: "deposit" });
+
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    const after409 = sentKeys();
+    expect(after409[1]).toBe(after409[0]);
+
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(3));
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(4));
+    const keys = sentKeys();
+    expect(keys[3]).not.toBe(keys[2]);
   });
 });

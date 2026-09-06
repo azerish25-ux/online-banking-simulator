@@ -9,13 +9,13 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.support.ApiTestClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -110,18 +110,19 @@ class IdempotencyScopingTest {
     client.transferWithKey(alice, bobIban, "40.00", key);
 
     // The same sender reusing the key for a different destination must never
-    // replay silently or double-post: it is a conflicting use of one key.
+    // replay silently or double-post: it is a conflicting use of one key (F06
+    // - one key names one intent, and a changed intent is a 409 conflict).
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
             .header("Idempotency-Key", key)
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"7.00\"}".formatted(carolIban)))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isConflict());
     assertEquals(new BigDecimal("460.0000"), balance(aliceId), "money moved exactly once");
   }
 
   @Test
-  void mutatedReplayReturnsOriginalRowAndStillMovesMoneyOnce() throws Exception {
+  void changedIntentUnderSameKeyIsAConflictAndMovesMoneyOnce() throws Exception {
     String alice = client.register("idem-e@example.com", "Idem E");
     String bob = client.register("idem-f@example.com", "Idem F");
     String aliceId = client.accountId(alice);
@@ -129,14 +130,35 @@ class IdempotencyScopingTest {
     client.deposit(alice, aliceId, "500.00");
 
     String key = "idem-payload-" + UUID.randomUUID();
-    String firstId = client.transferWithKey(alice, bobIban, "40.00", key);
+    client.transferWithKey(alice, bobIban, "40.00", key);
 
-    // The key identifies the logical transfer, so a retry that mutated the
-    // amount still resolves to the ORIGINAL $40 row - the stored row is the
-    // source of truth and money never moves a second time for one key.
-    String replayId = client.transferWithKey(alice, bobIban, "99.00", key);
-    assertEquals(firstId, replayId, "mutated replay must return the original transaction");
+    // F06: the key identifies the logical intent, not just the destination.
+    // A retry that changed the amount under the same key is a conflict (409)
+    // - never a silent replay of the older row, never a second posting.
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", key)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"toIban\":\"%s\",\"amount\":\"99.00\"}".formatted(bobIban)))
+        .andExpect(status().isConflict());
     assertEquals(new BigDecimal("460.0000"), balance(aliceId), "one key may debit only once");
+  }
+
+  @Test
+  void keylessTransferIsRejected() throws Exception {
+    String alice = client.register("idem-k@example.com", "Idem K");
+    String bob = client.register("idem-l@example.com", "Idem L");
+    String aliceId = client.accountId(alice);
+    String bobIban = client.accountIban(bob);
+    client.deposit(alice, aliceId, "100.00");
+
+    // User-submitted money movements require an idempotency key (F06).
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + alice)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"toIban\":\"%s\",\"amount\":\"10.00\"}".formatted(bobIban)))
+        .andExpect(status().isBadRequest());
+    assertEquals(new BigDecimal("100.0000"), balance(aliceId), "nothing moved");
   }
 
   private BigDecimal balance(String accountId) throws Exception {

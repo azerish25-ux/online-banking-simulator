@@ -22,6 +22,9 @@ public class RefreshService {
   public record TokenPair(String accessToken, String refreshToken, long expiresInSeconds, User user) {}
 
   public static final String COOKIE = "refresh_token";
+  // Backwards-compatible default only: the LIVE cookie max age always comes
+  // from cookieMaxAgeSeconds() so a configured AUTH_REFRESH_DAYS is honored by
+  // both the stored token and the browser cookie (F22).
   public static final long COOKIE_MAX_AGE = 7 * 24 * 3600L;
 
   private final RefreshTokenRepository refreshTokens;
@@ -44,6 +47,15 @@ public class RefreshService {
     this.refreshDays = refreshDays;
   }
 
+  /**
+   * Browser-cookie lifetime for the refresh token. Derived from the SAME
+   * configured refresh-days value that sets the token's DB expiry, so the
+   * cookie never outlives (or underlives) the credential it carries.
+   */
+  public long cookieMaxAgeSeconds() {
+    return refreshDays * 24 * 3600L;
+  }
+
   @Transactional
   public TokenPair issue(User user) {
     // Opportunistic housekeeping on every mint keeps the table bounded: rows
@@ -55,7 +67,8 @@ public class RefreshService {
     String plain = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
     refreshTokens.save(new RefreshToken(
         user.getId(), sha256(plain), Instant.now().plusSeconds(refreshDays * 24 * 3600)));
-    String access = jwtService.generate(user.getEmail(), user.getRole().name());
+    String access = jwtService.generate(
+        user.getEmail(), user.getRole().name(), user.getSecurityVersion());
     return new TokenPair(access, plain, jwtService.getAccessSeconds(), user);
   }
 

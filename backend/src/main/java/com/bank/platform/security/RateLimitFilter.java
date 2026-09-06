@@ -1,7 +1,7 @@
 package com.bank.platform.security;
 
 import com.bank.platform.common.ApiExceptionHandler;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
@@ -9,7 +9,10 @@ import jakarta.servlet.http.HttpServletResponse;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import java.io.IOException;
+import java.net.InetAddress;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -21,26 +24,40 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * stuffing and enumeration floods. Single-instance scope is fine for this
  * deployment shape; a Redis bucket would replace it behind a load balancer.
  *
- * Buckets live in a bounded, time-evicted cache (not an unbounded map): an
+ * <p>Client identity (F03): forwarding headers are TRUSTED ONLY when the
+ * request's direct socket peer is inside the explicitly configured
+ * {@code app.auth.rate-limit.trusted-proxies} CIDR allowlist (default: empty,
+ * i.e. never). With no configured trusted edge, a spoofed
+ * {@code X-Forwarded-For} cannot open a fresh bucket: the bucket key is the
+ * socket address, so every value an attacker can mint maps to the same
+ * budget. Behind an allowlisted edge that actually sanitizes forwarding
+ * metadata (see docker-compose topology notes), the FIRST forwarded address
+ * is the client; degenerate values (blank, oversized, malformed) fall back to
+ * the socket address rather than minting attacker-chosen buckets.
+ *
+ * <p>Buckets live in a bounded, time-evicted cache (not an unbounded map): an
  * idle IP stops costing memory, and a flood of spoofed identities cannot
  * grow the table forever.
  */
 @Component
 public class RateLimitFilter extends OncePerRequestFilter {
 
+  private static final int MAX_FORWARDED_LENGTH = 256;
+  private static final String FORWARDED_FOR = "X-Forwarded-For";
+
   private final int perMinute;
-  private final boolean trustProxyHeaders;
   private final ObjectMapper objectMapper;
   private final Cache<String, Bucket> buckets;
+  private final List<Cidr> trustedProxies;
 
   public RateLimitFilter(
       @Value("${app.auth.rate-limit.per-minute:20}") int perMinute,
-      @Value("${app.trust-proxy-headers:false}") boolean trustProxyHeaders,
+      @Value("${app.auth.rate-limit.trusted-proxies:}") String trustedProxies,
       @Value("${app.auth.rate-limit.bucket-ttl-minutes:10}") long bucketTtlMinutes,
       ObjectMapper objectMapper) {
     this.perMinute = perMinute;
     this.objectMapper = objectMapper;
-    this.trustProxyHeaders = trustProxyHeaders;
+    this.trustedProxies = parseCidrs(trustedProxies);
     this.buckets = Caffeine.newBuilder()
         .expireAfterAccess(Duration.ofMinutes(bucketTtlMinutes))
         .maximumSize(100_000)
@@ -75,28 +92,120 @@ public class RateLimitFilter extends OncePerRequestFilter {
   }
 
   /**
-   * The bucket key for one request.
-   *
-   * Proxy trust model: {@code X-Forwarded-For} is spoofable by any client that
-   * can reach us directly, so it is ignored unless a proxy we control sits in
-   * front of every request (compose topology). That proxy must REPLACE the
-   * header with the real peer address - Next.js rewrites do this from the
-   * socket peer (vercel/next.js#57397). With such a proxy the leftmost entry
-   * is the client. Degenerate values (blank, oversized garbage) fall back to
-   * the socket address rather than minting a fresh bucket.
+   * The bucket key for one request: a canonical IP literal. Forwarded metadata
+   * is only consulted when the direct peer is an allowlisted trusted proxy;
+   * otherwise the socket address is authoritative (spoof-proof).
    */
   String clientIp(HttpServletRequest request) {
-    if (!trustProxyHeaders) {
-      return request.getRemoteAddr();
+    String peer = request.getRemoteAddr();
+    String canonicalPeer = canonicalIp(peer);
+    if (canonicalPeer == null || !isTrustedPeer(canonicalPeer)) {
+      return canonicalPeer == null ? peer : canonicalPeer;
     }
-    String forwarded = request.getHeader("X-Forwarded-For");
-    if (forwarded != null && !forwarded.isBlank() && forwarded.length() <= 256) {
-      String first = forwarded.split(",")[0].trim();
-      if (!first.isEmpty()) {
-        return first;
+    String forwarded = request.getHeader(FORWARDED_FOR);
+    if (forwarded == null || forwarded.isBlank() || forwarded.length() > MAX_FORWARDED_LENGTH) {
+      return canonicalPeer;
+    }
+    String first = forwarded.split(",")[0].trim();
+    String canonical = canonicalIp(first);
+    return canonical == null ? canonicalPeer : canonical;
+  }
+
+  private boolean isTrustedPeer(String canonicalPeer) {
+    try {
+      InetAddress peer = InetAddress.getByName(canonicalPeer);
+      for (Cidr cidr : trustedProxies) {
+        if (cidr.contains(peer)) {
+          return true;
+        }
+      }
+    } catch (java.net.UnknownHostException ex) {
+      return false;
+    }
+    return false;
+  }
+
+  /** Canonicalizes an IP literal, or null for malformed/oversized values. */
+  private static String canonicalIp(String value) {
+    if (value == null || value.isBlank() || value.length() > MAX_FORWARDED_LENGTH) {
+      return null;
+    }
+    String clean = value.trim();
+    // A forwarding entry must be ONE literal - never a list, CIDR, or comment.
+    if (clean.contains(",") || clean.contains("/") || clean.contains(" ")) {
+      return null;
+    }
+    try {
+      return InetAddress.getByName(clean).getHostAddress();
+    } catch (java.net.UnknownHostException ex) {
+      return null;
+    }
+  }
+
+  private static List<Cidr> parseCidrs(String spec) {
+    List<Cidr> parsed = new ArrayList<>();
+    if (spec == null || spec.isBlank()) {
+      return parsed;
+    }
+    for (String part : spec.split(",")) {
+      String clean = part.trim();
+      if (clean.isEmpty()) {
+        continue;
+      }
+      try {
+        parsed.add(Cidr.parse(clean));
+      } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException(
+            "Invalid CIDR in app.auth.rate-limit.trusted-proxies: " + clean, ex);
       }
     }
-    return request.getRemoteAddr();
+    return parsed;
+  }
+
+  /** Minimal IPv4/IPv6 CIDR containment (no external dependency needed). */
+  private static final class Cidr {
+    private final byte[] network;
+    private final int prefix;
+
+    static Cidr parse(String spec) {
+      String[] parts = spec.split("/", 2);
+      int prefix = parts.length == 2 ? Integer.parseInt(parts[1]) : 32;
+      byte[] address;
+      try {
+        address = InetAddress.getByName(parts[0]).getAddress();
+      } catch (java.net.UnknownHostException ex) {
+        throw new IllegalArgumentException("Unparseable address: " + parts[0], ex);
+      }
+      int maxBits = address.length * 8;
+      if (prefix < 0 || prefix > maxBits) {
+        throw new IllegalArgumentException("Prefix out of range: " + prefix);
+      }
+      return new Cidr(address, prefix);
+    }
+
+    private Cidr(byte[] network, int prefix) {
+      this.network = network;
+      this.prefix = prefix;
+    }
+
+    boolean contains(InetAddress address) {
+      byte[] candidate = address.getAddress();
+      if (candidate.length != network.length) {
+        return false;
+      }
+      int fullBytes = prefix / 8;
+      int remainingBits = prefix % 8;
+      for (int i = 0; i < fullBytes; i++) {
+        if (candidate[i] != network[i]) {
+          return false;
+        }
+      }
+      if (remainingBits > 0) {
+        int mask = 0xFF << (8 - remainingBits);
+        return (candidate[fullBytes] & mask) == (network[fullBytes] & mask);
+      }
+      return true;
+    }
   }
 
   private static final class Bucket {

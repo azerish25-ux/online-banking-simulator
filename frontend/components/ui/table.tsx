@@ -9,18 +9,28 @@ export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTab
   );
 }
 
-export function THead(props: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className="border-b border-line text-content-muted" {...props} />;
+export function THead({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
+  return <thead className={cn("border-b border-line text-content-muted", className)} {...props} />;
 }
 
-export function TRow(props: React.HTMLAttributes<HTMLTableRowElement>) {
-  return <tr className="border-t border-line/70 first:border-t-0 hover:bg-ink-800/60" {...props} />;
+export function TRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
+  return (
+    <tr
+      className={cn(
+        "border-t border-line/70 first:border-t-0 hover:bg-ink-800/60",
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
-export function TH(props: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  return <th scope="col" className="label px-4 py-2.5" {...props} />;
+export function TH({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
+  // Alignment classes (text-right etc.) merge with the base cell padding via
+  // cn; callers never lose px-4 py-2.5 just because they aligned a header.
+  return <th scope="col" className={cn("label px-4 py-2.5", className)} {...props} />;
 }
 
-export function TD(props: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className="px-4 py-2.5" {...props} />;
+export function TD({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
+  return <td className={cn("px-4 py-2.5", className)} {...props} />;
 }

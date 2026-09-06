@@ -1,8 +1,9 @@
 package com.bank.platform.cards;
 
 import com.bank.platform.common.ApiExceptionHandler;
+import com.bank.platform.common.ApiProblem;
 import java.util.List;
-import java.util.Map;
+
 import java.util.UUID;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -25,15 +26,15 @@ public class CardController {
     this.service = service;
   }
 
-  public record CardResponse(UUID id, String last4, int expMonth, int expYear, String status) {
+  public record CardResponse(UUID id, String last4, int expMonth, int expYear, CardStatus status) {
     static CardResponse from(Card card) {
       return new CardResponse(
-          card.getId(), card.getLast4(), card.getExpMonth(), card.getExpYear(), card.getStatus().name());
+          card.getId(), card.getLast4(), card.getExpMonth(), card.getExpYear(), card.getStatus());
     }
   }
 
   public record IssuedCardResponse(
-      UUID id, String pan, String cvv, int expMonth, int expYear, String status) {}
+      UUID id, String pan, String cvv, int expMonth, int expYear, CardStatus status) {}
 
   @GetMapping("/accounts/{id}/cards")
   public List<CardResponse> list(Authentication authentication, @PathVariable UUID id) {
@@ -46,7 +47,7 @@ public class CardController {
     CardService.IssuedCard issued = service.issue(authentication.getName(), id);
     Card card = issued.card();
     return new IssuedCardResponse(
-        card.getId(), issued.pan(), issued.cvv(), card.getExpMonth(), card.getExpYear(), card.getStatus().name());
+        card.getId(), issued.pan(), issued.cvv(), card.getExpMonth(), card.getExpYear(), card.getStatus());
   }
 
   @PostMapping("/cards/{id}/freeze")
@@ -60,7 +61,7 @@ public class CardController {
   }
 
   @ExceptionHandler(CardNotFoundException.class)
-  public ResponseEntity<Map<String, Object>> notFound(CardNotFoundException ex) {
+  public ResponseEntity<ApiProblem> notFound(CardNotFoundException ex) {
     return ApiExceptionHandler.response(HttpStatus.NOT_FOUND, "Not Found", ex.getMessage());
   }
 }

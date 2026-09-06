@@ -28,14 +28,38 @@ export function Modal({
   const opener = React.useRef<Element | null>(null);
   const titleId = React.useId();
 
+  // Latest-callback ref: the keydown listener is registered once per
+  // open/close, but must call the CURRENT onClose when it fires. Without the
+  // ref, callers that pass inline closures would force the listener (and the
+  // focus lifecycle) to restart on every parent render.
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
+
+  // Focus + scroll lifecycle is governed by `open` ALONE - never by the
+  // identity of onClose. A dialog that owns a controlled input whose state
+  // lives in the page re-renders the parent on each keystroke, which re-
+  // creates the inline onClose; if that identity restarted this effect the
+  // close button would steal focus after every character (F09). Restore to
+  // the actual opener and unlock scroll on close/unmount.
   React.useEffect(() => {
     if (!open) return;
     opener.current = document.activeElement;
     closeRef.current?.focus();
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      (opener.current as HTMLElement | null)?.focus?.();
+      opener.current = null;
+    };
+  }, [open]);
 
+  // Trap + Escape: registered while open, reads callbacks through the ref.
+  React.useEffect(() => {
+    if (!open) return;
     function onKey(e: KeyboardEvent) {
       if (e.key === "Escape") {
-        onClose();
+        onCloseRef.current();
         return;
       }
       if (e.key !== "Tab") return;
@@ -57,13 +81,9 @@ export function Modal({
         first.focus();
       }
     }
-
     document.addEventListener("keydown", onKey);
-    return () => {
-      document.removeEventListener("keydown", onKey);
-      (opener.current as HTMLElement | null)?.focus?.();
-    };
-  }, [open, onClose]);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [open]);
 
   if (!open) return null;
   return (

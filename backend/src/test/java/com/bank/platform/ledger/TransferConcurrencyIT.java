@@ -5,7 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.support.ApiTestClient;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.List;
@@ -18,8 +18,11 @@ import java.util.concurrent.TimeUnit;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
+import org.springframework.context.annotation.Primary;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,6 +44,18 @@ import org.springframework.transaction.support.TransactionTemplate;
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
 class TransferConcurrencyIT {
+
+  /** Shared mutable business clock - the accrual test advances it to July 1st. */
+  private static final SettableClock CLOCK = new SettableClock();
+
+  @TestConfiguration
+  static class FixedClockConfig {
+    @Bean
+    @Primary
+    java.time.Clock testClock() {
+      return CLOCK;
+    }
+  }
 
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper objectMapper;
@@ -93,17 +108,36 @@ class TransferConcurrencyIT {
     for (Future<Boolean> job : jobs) {
       if (job.get()) succeeded++;
     }
-    if (succeeded == 0) {
+    if (!failures.isEmpty()) {
       failures.forEach(f -> System.err.println("[cc-failure] " + f));
     }
 
-    // Money is conserved: total is 2000 no matter how the writes interleave.
+    // F12: no "at least one success" oracle. Every one of the 24 transfers is
+    // valid and fully funded ($10 each, balances $1,000, under the review
+    // threshold), so ALL must settle - the ID-ordered locking must serialize
+    // opposite directions without deadlock, starvation, or spurious rejection.
+    assertEquals(24, succeeded, "all 24 funded $10 transfers settle under contention");
+    assertTrue(failures.isEmpty(), () -> "expected zero rejections: " + String.join(" | ", failures));
+
+    // Alice sends 12×$10 to Bob and receives 12×$10 back: both net to $1,000.
     BigDecimal aliceFinal = accounts.findById(UUID.fromString(aliceId)).orElseThrow().getBalance();
     BigDecimal bobFinal = accounts.findById(UUID.fromString(bobId)).orElseThrow().getBalance();
+    assertEquals(new BigDecimal("1000.0000"), aliceFinal,
+        "Alice nets zero across the 24 transfers (12 out, 12 in)");
+    assertEquals(new BigDecimal("1000.0000"), bobFinal,
+        "Bob nets zero across the 24 transfers (12 in, 12 out)");
+    // Money is conserved as well as exact: total is 2000.
     assertEquals(new BigDecimal("2000.0000"), aliceFinal.add(bobFinal), "total money must be conserved");
-    // Every attempted transfer either fully applied or fully failed - never a partial.
-    assertEquals(0, aliceFinal.add(bobFinal).remainder(new BigDecimal("10.00")).intValueExact());
-    assertTrue(succeeded > 0, "contention must not reject the whole batch");
+
+    // Exact operation count: 24 TRANSFER postings involving Alice, one per
+    // settled call - no dupes, no partials (Alice's own deposit row excluded
+    // by kind).
+    long transferRows = transactions
+        .findByAccountSince(UUID.fromString(aliceId), java.time.Instant.EPOCH)
+        .stream()
+        .filter(tx -> tx.getKind() == com.bank.platform.ledger.TxKind.TRANSFER)
+        .count();
+    assertEquals(24L, transferRows, "exactly one ledger row per settled transfer");
   }
 
   @Test
@@ -147,9 +181,13 @@ class TransferConcurrencyIT {
    */
   @Test
   void parallelAccrualPostsInterestExactlyOnce() throws Exception {
+    // Money moves mid-June; both accrual runs price the completed June month
+    // (F16) so the period they contend over is deterministic.
+    CLOCK.set(java.time.Instant.parse("2026-06-15T10:00:00Z"));
     String alice = client.register("cc-int@example.com", "CC Interest");
     String savingsId = openAccount(alice, "SAVINGS");
     client.deposit(alice, savingsId, "1200.00");
+    CLOCK.set(java.time.Instant.parse("2026-07-01T03:00:00Z"));
 
     int n = 2;
     ExecutorService pool = Executors.newFixedThreadPool(n);
@@ -177,6 +215,30 @@ class TransferConcurrencyIT {
     assertEquals(1L, interestRows, "exactly one INTEREST transaction may exist for the account");
   }
 
+  /** A clock a test can wind forward; defaults to mid-June. */
+  private static final class SettableClock extends java.time.Clock {
+    private java.time.Instant instant = java.time.Instant.parse("2026-06-15T10:00:00Z");
+
+    void set(java.time.Instant value) {
+      instant = value;
+    }
+
+    @Override
+    public java.time.ZoneId getZone() {
+      return java.time.ZoneOffset.UTC;
+    }
+
+    @Override
+    public java.time.Clock withZone(java.time.ZoneId zone) {
+      return this;
+    }
+
+    @Override
+    public java.time.Instant instant() {
+      return instant;
+    }
+  }
+
   private String openAccount(String token, String type) throws Exception {
     var result = mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
             .post("/api/v1/accounts")
@@ -185,7 +247,7 @@ class TransferConcurrencyIT {
             .content("{\"type\":\"%s\"}".formatted(type)))
         .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isCreated())
         .andReturn();
-    return objectMapper.readValue(result.getResponse().getContentAsString(), com.fasterxml.jackson.databind.JsonNode.class)
+    return objectMapper.readValue(result.getResponse().getContentAsString(), tools.jackson.databind.JsonNode.class)
         .get("id").asText();
   }
 

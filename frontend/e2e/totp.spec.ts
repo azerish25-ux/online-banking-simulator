@@ -88,10 +88,12 @@ test("TOTP round trip: enable, challenge at next login, disable", async ({ page 
   await page.locator("main p.mono").first().waitFor({ timeout: 10_000 });
   await expect(page).toHaveURL(/\/dashboard/);
 
-  // --- Disable: current code required again, then the next login is direct.
+  // --- Disable: password + current code required (F02 - a stolen bearer
+  //     token alone must never remove the factor), then the next login is direct.
   await page.goto("/settings");
   await page.getByRole("button", { name: /Turn off two-factor/ }).click();
   await expect(page.getByRole("heading", { name: "Turn off two-factor?" })).toBeVisible();
+  await page.getByLabel("Password", { exact: true }).fill("secret123");
   await submitCode(page, secretValue, "Turn off", async () =>
     (await page.locator('[role="status"]').allTextContents()).some((t) =>
       t.includes("Two-factor authentication is off")

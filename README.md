@@ -1,7 +1,7 @@
 # Online Banking Simulator
 
 A full-stack demo of a banking core: **Next.js + TypeScript** frontend,
-**Java 17 + Spring Boot 3** backend, **PostgreSQL 16** database. It simulates
+**Java 17 + Spring Boot 4** backend, **PostgreSQL 16** database. It simulates
 real money-movement semantics - atomic transfers, idempotency keys, interest
 accrual, an operator review queue, audit trails - without inventing a fake
 bank brand or touching real money.
@@ -87,7 +87,7 @@ Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
 ## Verify it
 
 ```powershell
-Set-Location backend; .\mvnw.cmd verify     # 84 tests + JaCoCo gate (H2 in PG mode)
+Set-Location backend; .\mvnw.cmd verify     # 171 tests + JaCoCo gate (H2 in PG mode)
 # The concurrency proof against real PostgreSQL (CI's concurrency-postgres job
 # runs the identical recipe against its Postgres service):
 .\mvnw.cmd test "-Dtest=TransferConcurrencyIT" `
@@ -97,7 +97,7 @@ Set-Location backend; .\mvnw.cmd verify     # 84 tests + JaCoCo gate (H2 in PG m
   "-Dspring.datasource.driver-class-name=org.postgresql.Driver"
 Set-Location ..\frontend
 npm run lint
-npm test                                    # 60 tests: lib units + RTL component suite
+npm test                                    # 94 tests: lib units + RTL component suite
 npx playwright test                         # smoke + a11y + the full money loop (incl. the ≥$10k HELD path) + silent refresh (needs the stack running)
 npm run build
 # README screenshots (requires the seeded stack; kept out of CI by design):
@@ -124,7 +124,7 @@ audit passes ([changelog](CHANGELOG.md)). Supporting docs:
 
 ## Highlights
 
-- A banking monolith (Next.js 14 + Spring Boot 3 + PostgreSQL 16) with atomic,
+- A banking monolith (Next.js 16 + Spring Boot 4 + PostgreSQL 16) with atomic,
   idempotent money movement, an operator review queue, and full audit trails
 - A 15-version Flyway schema (three Java migrations: portable unnamed-CHECK
   retirement, idempotency-key scoping, and a one-loan-per-user partial index)

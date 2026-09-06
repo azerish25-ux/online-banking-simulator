@@ -6,6 +6,7 @@ import { Button } from "../../components/ui/button";
 import { Card, CardDescription, CardTitle } from "../../components/ui/card";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { Input } from "../../components/ui/input";
+import { LoadFailed } from "../../components/ui/load-failed";
 import { Skeleton } from "../../components/ui/skeleton";
 import { Pager } from "../../components/ui/pager";
 import { useToast } from "../../components/feedback/toast";
@@ -78,8 +79,17 @@ export function UsersSection() {
         <Input aria-label="Search users" placeholder="email or name..." value={query} onChange={(e) => setQuery(e.target.value)} />
         <Button type="submit" variant="secondary">Search</Button>
       </form>
-      {usersQuery.isLoading ? (
+      {usersQuery.isError && usersQuery.data == null ? (
+        <div className="mt-3">
+          <LoadFailed
+            title="Couldn't load users"
+            onRetry={() => usersQuery.refetch()}
+          />
+        </div>
+      ) : usersQuery.isLoading && usersQuery.data == null ? (
         <div className="mt-3 space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+      ) : userRows.length === 0 ? (
+        <CardDescription className="mt-3">No users match that search.</CardDescription>
       ) : (
         <ul className="mt-3 space-y-1">
           {userRows.map((u) => (

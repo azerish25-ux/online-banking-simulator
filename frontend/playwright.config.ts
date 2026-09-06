@@ -13,13 +13,19 @@ export default defineConfig({
   // timeout. It passes locally and on every rerun - a slow-runner artifact,
   // not an app bug - so CI retries the test once instead of failing the job.
   retries: process.env.CI ? 1 : 0,
-  // :3000 is the single canonical origin - it matches the backend's default
-  // CORS allow-list (app.cors.allowed-origins) and the CI banking-e2e job.
-  // Serving the e2e app from any other port gets 403s on proxied API calls.
-  use: { baseURL: "http://localhost:3000" },
-  webServer: {
-    command: "npm run start -- --port 3000",
-    port: 3000,
-    reuseExistingServer: true
-  }
+  // The canonical origin is :3000 (matches the backend's default CORS
+  // allow-list and the CI banking-e2e job). For an EPHEMERAL sweep, point
+  // E2E_BASE_URL at a second frontend (BACKEND_URL + --port on a free port)
+  // and this config follows it; the browser stays same-origin with that
+  // frontend, so its proxy keeps every API call same-origin and the backend
+  // CORS allow-list never comes into play. When E2E_BASE_URL is set the
+  // webServer is skipped - the caller already runs the app there.
+  use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000" },
+  webServer: process.env.E2E_BASE_URL
+    ? undefined
+    : {
+        command: "npm run start -- --port 3000",
+        port: 3000,
+        reuseExistingServer: true
+      }
 });

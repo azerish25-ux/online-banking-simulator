@@ -29,6 +29,7 @@ export function DepositDialog({
   accounts: Account[];
 }) {
   const deposit = useDeposit();
+  const { resetIdempotencyKey } = deposit;
 
   const [amount, setAmount] = React.useState("100.00");
   // One inline slot under the amount field for both shapes of rejection:
@@ -63,6 +64,20 @@ export function DepositDialog({
   // submit time) - the owner fires exactly once, so a refetch after the
   // deposit can never replay this toast.
   const lastAmount = React.useRef("0");
+  // Editing a deposit that was already attempted is a NEW intent (F06): the
+  // outstanding idempotency key made retries of THAT deposit safe - it must
+  // not silently carry an edited amount to the server. Track the attempted
+  // intent and reset the key only when the user moves away from it, so a
+  // reload-recovered key survives the dialog reopening untouched.
+  const attempted = React.useRef<{ account: string; amount: string } | null>(null);
+  React.useEffect(() => {
+    const tried = attempted.current;
+    const targetIdNow = target?.id ?? "";
+    if (tried && (tried.account !== targetIdNow || tried.amount !== amount)) {
+      attempted.current = null;
+      resetIdempotencyKey();
+    }
+  }, [amount, target, resetIdempotencyKey]);
   useResultToast(deposit, {
     error: false,
     onFailure: (message) => setError(message),
@@ -88,6 +103,7 @@ export function DepositDialog({
     }
     setError(undefined);
     lastAmount.current = amount;
+    attempted.current = { account: target.id, amount };
     deposit.mutate({ accountId: target.id, amount });
   }
 
@@ -97,7 +113,6 @@ export function DepositDialog({
         {activeAccounts.length > 1 && (
           <Field label="Deposit to">
             <Select
-              aria-label="Deposit to"
               value={target?.id ?? ""}
               onChange={(e) => setTargetId(e.target.value)}
             >
@@ -120,7 +135,7 @@ export function DepositDialog({
           />
         </Field>
         <div className="flex justify-end gap-2">
-          <Button type="button" variant="secondary" onClick={onClose}>Cancel</Button>
+          <Button type="button" variant="secondary" disabled={deposit.isPending} onClick={onClose}>Cancel</Button>
           <Button type="submit" disabled={deposit.isPending || !target}>
             {deposit.isPending ? "Depositing..." : "Deposit"}
           </Button>

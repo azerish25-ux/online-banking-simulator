@@ -5,7 +5,6 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
-import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.HttpStatus;
@@ -23,34 +22,34 @@ class ApiExceptionHandlerTest {
 
   @Test
   void unhandledFailuresAnswerRfc7807WithoutLeakingInternals() {
-    ResponseEntity<Map<String, Object>> response =
+    ResponseEntity<ApiProblem> response =
         handler.unexpected(new IllegalStateException("top-secret-internals"));
 
     assertEquals(HttpStatus.INTERNAL_SERVER_ERROR, response.getStatusCode());
-    Map<String, Object> body = response.getBody();
+    ApiProblem body = response.getBody();
     assertNotNull(body);
-    assertEquals("Internal Error", body.get("title"));
-    assertEquals(500, body.get("status"));
-    assertNotNull(body.get("timestamp"));
+    assertEquals("Internal Error", body.title());
+    assertEquals(500, body.status());
+    assertNotNull(body.timestamp());
     // The generic message must never surface: it may contain paths, SQL or
     // library details an attacker could exploit.
-    assertFalse(String.valueOf(body.get("detail")).contains("top-secret-internals"),
+    assertFalse(String.valueOf(body.detail()).contains("top-secret-internals"),
         "detail must not echo the exception message");
-    assertTrue(String.valueOf(body.get("type")).startsWith("/problems/"),
+    assertTrue(String.valueOf(body.type()).startsWith("/problems/"),
         "problem type must be a resolvable RFC-7807 URI reference");
   }
 
   @Test
   void dataIntegrityRacesAnswer409Not500() {
-    ResponseEntity<Map<String, Object>> response =
+    ResponseEntity<ApiProblem> response =
         handler.conflict(new DataIntegrityViolationException("duplicate key value"));
 
     assertEquals(HttpStatus.CONFLICT, response.getStatusCode());
-    Map<String, Object> body = response.getBody();
+    ApiProblem body = response.getBody();
     assertNotNull(body);
-    assertEquals("Conflict", body.get("title"));
-    assertEquals(409, body.get("status"));
-    assertFalse(String.valueOf(body.get("detail")).contains("duplicate key"),
+    assertEquals("Conflict", body.title());
+    assertEquals(409, body.status());
+    assertFalse(String.valueOf(body.detail()).contains("duplicate key"),
         "raw constraint text must not leak into the detail");
   }
 }

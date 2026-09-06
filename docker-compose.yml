@@ -1,4 +1,20 @@
 # Production-like full stack (CI builds this; local dev stays Docker-free - see start-all.ps1).
+#
+# F24 hardening notes:
+# - No service publishes to 0.0.0.0. The database is reachable ONLY on the
+#   compose network (plus an explicit 127.0.0.1 forward below for host
+#   tooling); the frontend binds the loopback interface.
+# - The stack fails CLOSED in production mode: set APP_DEPLOYMENT_ENV=production
+#   AND real secrets in the environment; DeploymentEnvGuard then refuses to
+#   start on any documented dev/placeholder default (JWT, admin password, DB
+#   password, TOTP master key). Without production mode the backend runs with
+#   the compose placeholders and logs a loud warning - demo posture only.
+# - Rate limiting buckets by socket address because no sanitizing edge is
+#   deployed here. RATE_LIMIT_TRUSTED_PROXIES stays empty: enabling it before
+#   a proxy that strips client-supplied X-Forwarded-For is verified would let
+#   spoofed headers replenish login budgets (F03). Run a real TLS-terminating
+#   reverse proxy in front of :3000 for anything beyond a demo; HTTPS is what
+#   makes COOKIE_SECURE=true meaningful.
 services:
   db:
     image: postgres:16-alpine
@@ -8,8 +24,10 @@ services:
       POSTGRES_DB: bankdb
       POSTGRES_USER: bankapp
       POSTGRES_PASSWORD: ${PG_PASSWORD:-bankapp_secret_change_me}
+    # Host-tooling convenience only (loopback - never exposed to the LAN).
+    # Remove entirely if nothing on the host needs direct SQL access.
     ports:
-      - "5432:5432"
+      - "127.0.0.1:5432:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
       - ./db/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
@@ -22,23 +40,37 @@ services:
   backend:
     build: ./backend
     restart: unless-stopped
+    # Non-root in the image already; drop Linux capabilities it cannot need.
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
+      # APP_DEPLOYMENT_ENV=production makes DeploymentEnvGuard refuse every
+      # placeholder below - real deployments set it plus all the secrets.
+      APP_DEPLOYMENT_ENV: ${APP_DEPLOYMENT_ENV:-dev}
       PG_URL: jdbc:postgresql://db:5432/bankdb
       PG_USER: bankapp
       PG_PASSWORD: ${PG_PASSWORD:-bankapp_secret_change_me}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-0123456789abcdef-0123456789abcdef}
       APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-change-me-admin-123}
-      # Auth rate-limit buckets must key on the real client IP, not the proxy's
-      # own address. This is safe ONLY because the API is reachable exclusively
-      # through the Next.js rewrite proxy (no backend host port is published)
-      # and Next stamps X-Forwarded-For from the socket peer, replacing any
-      # client-supplied value (vercel/next.js#57397). If an upstream proxy or
-      # load balancer is ever added in front of Next, revisit this flag: the
-      # added hop must sanitize X-Forwarded-For before it reaches the backend.
-      TRUST_PROXY_HEADERS: "true"
+      # F30 custody: without this, TOTP seeds would fall back to plaintext.
+      # Override with a real secret (DeploymentEnvGuard refuses placeholders
+      # in production mode).
+      APP_TOTP_MASTER_KEY: ${APP_TOTP_MASTER_KEY:-dev-totp-master-key-change-me}
+      # The cookie is HttpOnly and SameSite=Lax but gains Secure only over
+      # HTTPS - set true once TLS terminates in front of the stack.
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      # Auth rate-limit buckets must key on the real client IP, never on the
+      # Next proxy's own address. Forwarding headers are honored ONLY for
+      # allowlisted peers (F03). No allowlist is set by default: without a
+      # verified sanitizing edge the backend buckets by socket address, which
+      # is spoof-proof but coarse.
+      RATE_LIMIT_TRUSTED_PROXIES: ""
     depends_on:
       db:
         condition: service_healthy
+    # The image carries its own HEALTHCHECK (probes /api/health over /dev/tcp).
 
   frontend:
     build:
@@ -46,12 +78,17 @@ services:
       args:
         BACKEND_URL: http://backend:8080
     restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
     environment:
       BACKEND_URL: http://backend:8080
     ports:
-      - "3000:3000"
+      - "127.0.0.1:3000:3000"
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
 
 volumes:
   postgres-data:

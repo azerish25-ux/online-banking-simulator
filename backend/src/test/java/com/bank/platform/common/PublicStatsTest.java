@@ -6,11 +6,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bank.platform.ledger.TransactionRepository;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
@@ -39,7 +39,8 @@ class PublicStatsTest {
     String aliceId = accountId(alice);
     String bobIban = accountIban(bob);
 
-    long transfersBefore = transactions.countSettledTransfers(com.bank.platform.ledger.TxStatus.POSTED);
+    long transfersBefore = transactions.countByKindAndStatus(
+        com.bank.platform.ledger.TxKind.TRANSFER, com.bank.platform.ledger.TxStatus.POSTED);
 
     deposit(alice, aliceId, "500.00");
     transfer(alice, bobIban, "120.00");
@@ -91,6 +92,7 @@ class PublicStatsTest {
   private void deposit(String token, String accountId, String amount) throws Exception {
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "dep-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"amount\":\"%s\"}".formatted(amount)))
         .andExpect(status().isOk());
@@ -99,6 +101,7 @@ class PublicStatsTest {
   private void transfer(String token, String toIban, String amount) throws Exception {
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
             .contentType(MediaType.APPLICATION_JSON)
             .content("{\"toIban\":\"%s\",\"amount\":\"%s\"}".formatted(toIban, amount)))
         .andExpect(status().isCreated());

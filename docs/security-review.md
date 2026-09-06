@@ -12,11 +12,22 @@ browser actually calls, made the RFC-7807 error surface complete, and capped
 passwords by UTF-8 byte length instead of characters. The 1.3.0 audit
 (2026-09-05) throttled TOTP verification per account, tied the access-token
 cookie to its JWT's lifetime, capped credit at one open loan, made history
-orderings deterministic via the `seq` column, and paginated the review queue.)
+orderings deterministic via the `seq` column, and paginated the review queue.
+The same-day hardening release added the reconciled journal + posting-time
+(F15/F04), scoped idempotency with a request fingerprint (F06), resumable
+interest (F16), an email outbox that commits delivery intent with the operation
+(F25), keyset history pagination (F26), evidence-backed kind classification
+(V24), and the honest OpenAPI contract (F14).)
 
 Scope: Spring Boot API + Next.js frontend, local single-instance deployment.
-Method: code review + automated tests (82 fast tests + JaCoCo gate, concurrency
-IT against real Postgres in CI) + live verification on the seeded stack.
+Method: code review + automated tests + disposable-real-PostgreSQL runs. As of
+the frontend-state phase close, backend `./mvnw -B verify` is green at **171
+tests / 0 failures** (JaCoCo gate met) and frontend lint/tsc/vitest are green
+at **94 tests**; the concurrency/exactness ITs are additionally run against
+real PostgreSQL (CI services and disposable local databases - never `bankdb`).
+This document's claims follow the implementation; the tested state is the
+unchanged pre-hardening baseline plus the uncommitted working tree
+(single final commit policy).
 
 ## ✅ Passing
 
@@ -36,6 +47,7 @@ IT against real Postgres in CI) + live verification on the seeded stack.
 | 11 | Secrets | JWT secret, admin password, DB creds via env (`JWT_SECRET`, `APP_ADMIN_*`, `PG_*`); defaults warn loudly at boot and `app.deployment-env=production` refuses to start until real secrets are set |
 | 12 | Error handling | RFC-7807 on every path: field validation, business failures, constraint violations, malformed JSON/UUIDs, unknown routes, and a catch-all so even an unhandled exception answers a problem+json body - never HTML or a stack trace. Missing/invalid/expired credentials answer **401** (the status the browser's silent refresh keys on) via the security entry point; authenticated-but-forbidden stays **403** - both RFC-7807 |
 | 13 | Review queue | Transfers at/above the threshold never settle on submit: a HELD row records the intent and an operator must approve it (money moves under the same ID-ordered locks; the HELD→POSTED flip is atomic so two approvals can't double-settle) or decline it (CANCELLED, no money ever moves). Flagged deposits credit on arrival and only need acknowledging. Replays of a held transfer's idempotency key return the same row |
+| 14 | Commit-safe external delivery | Email is an OUTBOX intent written in the SAME transaction as the operation that produced it - a rollback leaves no intent, a commit cannot lose mail to a crash. `EmailOutboxWorker` claims rows with an atomic PENDING→DELIVERING flip after commit (concurrent workers deliver each row exactly once per claim), retries with backoff up to a bounded budget, dead-letters with a redacted single-line error (no stack traces), and only an operator can list/requeue dead letters (`/api/v1/admin/email-outbox`). Delivery identity is deduped by a unique `delivery_key`. V25 table verified on real PostgreSQL. `EmailOutboxCommitTest` (5) pins rollback/commit/failure/dead-letter/operator/race boundaries |
 
 ## ⚠️ Known limitations (documented, not ignored)
 
@@ -45,6 +57,7 @@ IT against real Postgres in CI) + live verification on the seeded stack.
 4. **No account lockout** - per-IP rate limiting + BCrypt cost + the per-account TOTP budget make online brute force uneconomical; a hard lockout would risk user-enumeration and support load.
 5. **Middleware role check is UX-only** - it decodes (not verifies) the JWT for routing; the API re-verifies signature + role on every call.
 6. **Idle sessions bounce on next navigation** - the `bank_token` cookie's Max-Age mirrors the 15-minute JWT (a stolen cookie dies with the token it carries), so a session idle past that TTL is redirected to login on its next page load even though the HttpOnly refresh cookie could still repair it. Active sessions rotate silently and never notice; a full BFF (no browser-visible tokens) would remove the trade-off.
+7. **Real-tab browser witnesses now run locally on an ephemeral stack** - a full Playwright sweep passed 19/19 on 2026-09-05 against a second backend (:8081, disposable PostgreSQL `pf_e2e`, `APP_JWT_ACCESS_SECONDS=15`) and a second frontend (:3111, built with `BACKEND_URL` baked at build time, `APP_CORS_ORIGINS` including the ephemeral origin) - the user's pre-existing :3000/:8080 processes stayed untouched. That sweep gave the F22 two-tab refresh/peer-logout witness and the F23 live-page CSP-nonce witness their real-browser evidence (CI's `banking-e2e` job remains the canonical gate on every push). The one local caveat: the app's CORS allow-list is enforced per-origin even behind the same-origin proxy (the rewrite forwards `Origin`), so any future ephemeral frontend must add its origin to `APP_CORS_ORIGINS`.
 
 ## v2 - hardening series (Phase C)
 
@@ -56,10 +69,10 @@ IT against real Postgres in CI) + live verification on the seeded stack.
 ## How to re-verify
 
 ```powershell
-.\mvnw.cmd verify                    # backend: 82 tests + JaCoCo gate (from backend/)
-cd ..\frontend; npm run lint; npm test   # 60 unit/component tests
-npm run build; npx playwright test   # e2e against the running stack
-.\start-all.ps1; .\seed-demo.ps1     # live stack + demo data
+.\mvnw.cmd verify                    # backend: 171 tests + JaCoCo gate (from backend/)
+cd ..\frontend; npm run lint; npx tsc --noEmit; npx vitest run   # 94 tests
+npm run build; npx playwright test   # e2e against the running stack (CI's banking-e2e)
+.\start-all.ps1; .\seed-demo.ps1     # live stack + demo data (start-all discovers PostgreSQL)
 # customer: alice@bank.local / secret123 -> Security -> Set up authenticator,
 #   enter a code from an authenticator app, log out, log in -> /login/mfa challenge
 # operator: admin@bank.local / change-me-admin-123 -> Operations -> review queue:

@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
-import { accountLabel, decimalToCents, fmtDate, maskIban, signedUsd, usd, usdFromCents } from "./format";
+import {
+  accountLabel,
+  decimalToCents,
+  fmtDate,
+  maskIban,
+  signedUsd,
+  toTenThousandths,
+  totalUsd,
+  usd,
+  usdFromCents,
+  usdReview
+} from "./format";
 
 describe("usd", () => {
   it("formats string balances with two decimals", () => {
@@ -12,8 +23,47 @@ describe("usd", () => {
     expect(usd("2.6750")).toBe("$2.68");
     expect(usd("1234.5678")).toBe("$1,234.57");
   });
-  it("falls back for garbage input", () => {
-    expect(usd("nope")).toBe("$0.00");
+  it("makes invalid input unavailable rather than zero (F17)", () => {
+    // Malformed money must never read as a real $0.00 balance.
+    expect(usd("nope")).toBe("-");
+    expect(usd("")).toBe("-");
+    expect(usd("1.23456")).toBe("-"); // beyond the ledger's 4-decimal scale
+    expect(totalUsd(["100.00", "junk"])).toBe("-");
+  });
+
+  it("normalizes negative zero and half boundaries (F17)", () => {
+    expect(usd("-0.0000")).toBe("$0.00");
+    expect(usd("-0.0049")).toBe("$0.00"); // half below the cent rounds to zero
+    expect(usd("-0.0050")).toBe("-$0.01"); // HALF_UP: away from zero
+    expect(usd("0.0050")).toBe("$0.01");
+  });
+});
+
+describe("exact sums and review precision (F17)", () => {
+  it("sums at the ledger scale and rounds only the final result", () => {
+    // 0.0049 + 0.0049 = 0.0098 - per-item rounding would give $0.00 + $0.00;
+    // summing at ten-thousandths and rounding once shows the true $0.01.
+    expect(totalUsd(["0.0049", "0.0049"])).toBe("$0.01");
+    // The classic float trap stays exact: 0.1 + 0.2 + 0.3 = 0.6.
+    expect(totalUsd(["0.10", "0.20", "0.30"])).toBe("$0.60");
+    // Large values never overflow (BigInt units).
+    expect(totalUsd(["9007199254740991.0001", "0.9999"])).toBe("$9,007,199,254,740,992.00");
+  });
+
+  it("never hides a nonzero sub-cent amount on a review (F17)", () => {
+    expect(usdReview("0.0049")).toBe("$0.0049");
+    expect(usdReview("-0.0049")).toBe("-$0.0049");
+    expect(usdReview("1234.5678")).toBe("$1,234.5678");
+    // No sub-cent part: review shows the normal two-decimal amount.
+    expect(usdReview("5.00")).toBe("$5.00");
+    expect(usdReview("-1000.00")).toBe("-$1,000.00");
+    expect(usdReview("bad")).toBe("-");
+  });
+
+  it("exposes the exact ledger scale for sign checks", () => {
+    expect(toTenThousandths("0.0049")).toBe(49n);
+    expect(toTenThousandths("-0.0001")).toBe(-1n);
+    expect(toTenThousandths("junk")).toBeNull();
   });
 });
 
