@@ -20,6 +20,12 @@ jobs:
           cache: maven
       - working-directory: backend
         run: ./mvnw -B verify
+      # F21 forward-only kind-reclassification chain over a V7-era fixture.
+      # The class is *IT-named, which Maven's default surefire/failsafe
+      # naming never picks up, so it must be requested explicitly (H2 in
+      # PostgreSQL mode - no service needed).
+      - working-directory: backend
+        run: ./mvnw -B test -Dtest=TransactionKindMigrationIT
 
   frontend:
     runs-on: ubuntu-latest
@@ -85,6 +91,73 @@ jobs:
           -Dspring.datasource.username=bankapp
           -Dspring.datasource.password=ci-secret
           -Dspring.datasource.driver-class-name=org.postgresql.Driver
+
+  # F15 migration gate on real PostgreSQL: migrate a FRESH database to V21,
+  # seed realistic pre-journal accounts + legacy transaction rows, then migrate
+  # to head. V22 must book exactly one reconciling OPENING_BALANCE entry per
+  # non-zero account against MIGRATION_OPENING, preserve every legacy row, and
+  # V23 must establish loan principal. Needs its own job-scoped database - it
+  # never shares a schema another test has written to.
+  cutover-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bankdb
+          POSTGRES_USER: bankapp
+          POSTGRES_PASSWORD: ci-secret
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U bankapp" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - working-directory: backend
+        run: >-
+          ./mvnw -B test -Dtest=JournalCutoverIT
+          -Dit.pg.url=jdbc:postgresql://localhost:5432/bankdb
+          -Dit.pg.user=bankapp
+          -Dit.pg.password=ci-secret
+
+  # F15 journal guarantees that only PostgreSQL can prove (H2's weaker locking
+  # hides them): append-only BEFORE UPDATE/DELETE triggers reject even the app
+  # role, the (kind, operation_ref) unique constraint refuses a duplicate
+  # journal for one operation, a corrupted balance projection surfaces in the
+  # operator reconciliation and is never auto-repaired, and a HELD approval
+  # journals exactly one entry. Job-scoped fresh database, same command shape
+  # the disposable local runs use.
+  journal-postgres:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: bankdb
+          POSTGRES_USER: bankapp
+          POSTGRES_PASSWORD: ci-secret
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U bankapp" --health-interval 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: maven
+      - working-directory: backend
+        run: >-
+          ./mvnw -B test -Dtest=JournalReconciliationIT
+          -Dspring.datasource.url=jdbc:postgresql://localhost:5432/bankdb
+          -Dspring.datasource.username=bankapp
+          -Dspring.datasource.password=ci-secret
+          -Dspring.datasource.driver-class-name=org.postgresql.Driver
+          -Dit.pg.url=jdbc:postgresql://localhost:5432/bankdb
+          -Dit.pg.user=bankapp
+          -Dit.pg.password=ci-secret
 
   contract:
     runs-on: ubuntu-latest

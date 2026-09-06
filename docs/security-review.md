@@ -21,15 +21,19 @@ interest (F16), an email outbox that commits delivery intent with the operation
 
 Scope: Spring Boot API + Next.js frontend, local single-instance deployment.
 Method: code review + automated tests + disposable-real-PostgreSQL runs. As of
-the post-merge audit pass, backend `./mvnw -B verify` is green at **175
-tests / 0 failures** (JaCoCo gate met) and frontend lint/tsc/vitest are green
-at **98 tests**; the concurrency/exactness ITs are additionally run against
-real PostgreSQL (CI services and disposable local databases - never `bankdb`).
-This document's claims follow the implementation. The hardening campaign is
-merged via PR #17 (the F01-F30 campaign plus a CI test-isolation fix), with
-all six CI jobs green
-(backend, banking-e2e, concurrency-postgres, contract, docker, frontend) and
-the local Playwright sweep 19/19 on an ephemeral stack.
+the N-pass (residual closure, 2026-09-06), backend `./mvnw -B verify` is
+green at **176 tests / 0 failures** (JaCoCo gate met) and frontend
+lint/tsc/vitest are green at **98 tests**; the migration/journal/concurrency
+ITs are additionally run against real PostgreSQL in CI (job-scoped services)
+and against disposable local databases - never `bankdb`. This document's
+claims follow the implementation. The hardening campaign is merged via PR #17
+(the F01-F30 campaign plus a CI test-isolation fix) and the G1-G5 audit pass
+via PR #18,
+and the N01-N04 residual closure currently sits as an uncommitted working-tree
+diff on `master` (per policy). CI runs eight jobs (backend incl. the kindchain
+IT step, frontend, docker, concurrency-postgres, cutover-postgres,
+journal-postgres, contract, banking-e2e); the local Playwright sweep passed
+19/19 on 2026-09-05 and re-passed 19/19 on 2026-09-06 on an ephemeral stack.
 
 ## ✅ Passing
 
@@ -59,7 +63,7 @@ the local Playwright sweep 19/19 on an ephemeral stack.
 4. **No account lockout** - per-IP rate limiting + BCrypt cost + the per-account TOTP budget make online brute force uneconomical; a hard lockout would risk user-enumeration and support load.
 5. **Middleware role check is UX-only** - it decodes (not verifies) the JWT for routing; the API re-verifies signature + role on every call.
 6. **Idle sessions bounce on next navigation** - the `bank_token` cookie's Max-Age mirrors the 15-minute JWT (a stolen cookie dies with the token it carries), so a session idle past that TTL is redirected to login on its next page load even though the HttpOnly refresh cookie could still repair it. Active sessions rotate silently and never notice; a full BFF (no browser-visible tokens) would remove the trade-off.
-7. **Real-tab browser witnesses now run locally on an ephemeral stack** - a full Playwright sweep passed 19/19 on 2026-09-05 against a second backend (:8081, disposable PostgreSQL `pf_e2e`, `APP_JWT_ACCESS_SECONDS=15`) and a second frontend (:3111, built with `BACKEND_URL` baked at build time, `APP_CORS_ORIGINS` including the ephemeral origin) - the user's pre-existing :3000/:8080 processes stayed untouched. That sweep gave the F22 two-tab refresh/peer-logout witness and the F23 live-page CSP-nonce witness their real-browser evidence (CI's `banking-e2e` job remains the canonical gate on every push). The one local caveat: the app's CORS allow-list is enforced per-origin even behind the same-origin proxy (the rewrite forwards `Origin`), so any future ephemeral frontend must add its origin to `APP_CORS_ORIGINS`.
+7. **Real-tab browser witnesses run locally on an ephemeral stack** - Playwright sweeps passed 19/19 on 2026-09-05 and 19/19 on 2026-09-06 against a second backend (:8081, disposable PostgreSQL, `APP_JWT_ACCESS_SECONDS=15`) and a second frontend (:3111, built with `BACKEND_URL` baked at build time, `APP_CORS_ORIGINS` including the ephemeral origin) - the user's pre-existing :3000/:8080 processes stay untouched. Since the N-pass, a default local `npx playwright test` boots its own fresh build on :3000 and FAILS loudly when the port is occupied (no stale-app testing), an `e2e/global-setup.ts` identity probe guards `E2E_BASE_URL` runs, and the a11y spec seeds through the same frontend proxy the browser uses. The sweeps gave the F22 two-tab refresh/peer-logout witness and the F23 live-page CSP-nonce witness their real-browser evidence (CI's `banking-e2e` job remains the canonical gate on every push). One caveat: the app's CORS allow-list is enforced per-origin even behind the same-origin proxy (the rewrite forwards `Origin`), so any future ephemeral frontend must add its origin to `APP_CORS_ORIGINS`.
 
 ## v2 - hardening series (Phase C)
 
@@ -71,7 +75,7 @@ the local Playwright sweep 19/19 on an ephemeral stack.
 ## How to re-verify
 
 ```powershell
-.\mvnw.cmd verify                    # backend: 175 tests + JaCoCo gate (from backend/)
+.\mvnw.cmd verify                    # backend: 176 tests + JaCoCo gate (from backend/)
 cd ..\frontend; npm run lint; npx tsc --noEmit; npx vitest run   # 98 tests
 npm run build; npx playwright test   # e2e against the running stack (CI's banking-e2e)
 .\start-all.ps1; .\seed-demo.ps1     # live stack + demo data (start-all discovers PostgreSQL)

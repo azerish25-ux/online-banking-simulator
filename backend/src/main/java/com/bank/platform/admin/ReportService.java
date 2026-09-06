@@ -4,6 +4,7 @@ import com.bank.platform.ledger.TransactionRepository;
 import com.bank.platform.ledger.TxKind;
 import com.bank.platform.ledger.TxStatus;
 import java.math.BigDecimal;
+import java.time.Clock;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
@@ -18,9 +19,13 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReportService {
 
   private final TransactionRepository transactions;
+  // The injected business clock (F04): the report's "today" is deterministic
+  // and testable at day boundaries instead of a wall-clock LocalDate.now().
+  private final Clock clock;
 
-  public ReportService(TransactionRepository transactions) {
+  public ReportService(TransactionRepository transactions, Clock clock) {
     this.transactions = transactions;
+    this.clock = clock;
   }
 
   public record DayTotal(
@@ -32,7 +37,7 @@ public class ReportService {
   @Transactional(readOnly = true)
   public List<DayTotal> dailyTotals(int days) {
     int window = Math.min(Math.max(days, 1), 90);
-    LocalDate today = LocalDate.now(ZoneOffset.UTC);
+    LocalDate today = LocalDate.now(clock.withZone(ZoneOffset.UTC));
     Instant since = today.minusDays(window - 1).atStartOfDay(ZoneOffset.UTC).toInstant();
 
     Map<LocalDate, Bucket> buckets = new LinkedHashMap<>();
@@ -44,7 +49,7 @@ public class ReportService {
     // a row whose UTC day falls outside the requested window - impossible with
     // the SQL bound, but cheap insurance - must not distort totals.)
     for (TransactionRepository.PostedRow row : transactions.findPostedSince(since, TxStatus.POSTED)) {
-      LocalDate day = row.getCreatedAt().atZone(ZoneOffset.UTC).toLocalDate();
+      LocalDate day = row.getPostedAt().atZone(ZoneOffset.UTC).toLocalDate();
       Bucket bucket = buckets.get(day);
       if (bucket == null) {
         continue;

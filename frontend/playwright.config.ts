@@ -2,6 +2,12 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "./e2e",
+  // Identity preflight (see ./e2e/global-setup.ts): when the suite runs
+  // against an E2E_BASE_URL it verifies the served app really is this
+  // checkout's build (health through the rewrite + the nonce CSP the current
+  // code enforces), and refuses to run assertions against a stale or
+  // unrelated application.
+  globalSetup: "./e2e/global-setup.ts",
   timeout: 30_000,
   // Auth round-trips (register/login → dashboard) can exceed Playwright's
   // 5s expect default on a contended dev machine; the suite's own waits
@@ -26,6 +32,10 @@ export default defineConfig({
     : {
         command: "npm run start -- --port 3000",
         port: 3000,
-        reuseExistingServer: true
+        // Deliberately false: the local run must boot the build from THIS
+        // checkout and fail loudly if :3000 is already taken (e.g. by an old
+        // start-all.ps1 session serving a pre-remediation build) - never
+        // silently run the suite against a stale application (section 11.3).
+        reuseExistingServer: false
       }
 });

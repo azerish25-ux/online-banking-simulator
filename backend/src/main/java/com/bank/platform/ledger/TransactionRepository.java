@@ -118,7 +118,10 @@ public interface TransactionRepository
 
   /** Columns the daily-totals report actually buckets on - no full entities. */
   interface PostedRow {
-    Instant getCreatedAt();
+    // The posting instant (JPQL alias postedAt below). Named for what it IS,
+    // never after request time: a settled row can post long after it was
+    // created, and this report cuts and buckets on the day money moved (F04).
+    Instant getPostedAt();
     TxKind getKind();
     BigDecimal getAmount();
     UUID getFromAccountId();
@@ -130,7 +133,7 @@ public interface TransactionRepository
    * status and window filters run in SQL, so the JVM never materializes every
    * transaction entity (with memo, currency, ...) just to sum a few columns.
    */
-  @Query("select t.postedAt as createdAt, t.kind as kind, t.amount as amount, "
+  @Query("select t.postedAt as postedAt, t.kind as kind, t.amount as amount, "
       + "t.fromAccountId as fromAccountId, t.toAccountId as toAccountId "
       + "from Transaction t where t.postedAt >= :since and t.status = :status "
       + "order by t.postedAt asc")

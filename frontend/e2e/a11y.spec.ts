@@ -9,7 +9,17 @@ import { auditTextContrast } from "./contrast";
  * user has no accounts yet) and stay idempotent against a long-lived local
  * demo database. No mocks anywhere - same real stack as production.
  */
-const BASE = process.env.API_BASE ?? "http://localhost:8080/api";
+/**
+ * Seed target (N02 identity rule): the seed must write where the BROWSER
+ * actually talks - the same frontend proxy the specs exercise - never a
+ * hard-coded backend that can drift from the app under test. The proxy path
+ * /backend/* rewrites to the backend's /api/*, so an ephemeral sweep
+ * (E2E_BASE_URL set) seeds its own ephemeral backend and a default run seeds
+ * whatever the local server proxies to. API_BASE stays honored for callers
+ * that genuinely need a direct backend.
+ */
+const BASE =
+  process.env.API_BASE ?? (process.env.E2E_BASE_URL ?? "http://localhost:3000") + "/backend";
 const ALICE = "alice@bank.local";
 
 /** Login as the demo user; register on first contact with a fresh DB. */

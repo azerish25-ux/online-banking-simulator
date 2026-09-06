@@ -92,29 +92,36 @@ Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
 ## Verify it
 
 ```powershell
-Set-Location backend; .\mvnw.cmd verify     # 175 tests + JaCoCo gate (H2 in PG mode)
-# The concurrency proof against real PostgreSQL (CI's concurrency-postgres job
-# runs the identical recipe against its Postgres service). Create a throwaway
-# database first - never run these ITs against your working bankdb:
+Set-Location backend; .\mvnw.cmd verify     # 176 tests + JaCoCo gate (H2 in PG mode)
+# Real-PostgreSQL ITs (CI runs them against job-scoped Postgres services;
+# locally, create a throwaway database first - never run these against your
+# working bankdb):
 #   psql -U postgres -c "CREATE DATABASE pf_it"
 .\mvnw.cmd test "-Dtest=TransferConcurrencyIT" `
   "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/pf_it" `
   "-Dspring.datasource.username=postgres" `
   "-Dspring.datasource.password=postgres" `
   "-Dspring.datasource.driver-class-name=org.postgresql.Driver"
+# ...and the journal/migration suites (see docs/devops-ci.md): JournalCutoverIT,
+# JournalReconciliationIT, and TransactionKindMigrationIT use the same shape
+# (the cutover IT adds -Dit.pg.url/-Dit.pg.user/-Dit.pg.password).
 Set-Location ..\frontend
 npm run lint
 npm test                                    # 98 tests: lib units + RTL component suite
-npx playwright test                         # smoke + a11y + the full money loop (incl. the ≥$10k HELD path) + silent refresh (needs the stack running)
+npx playwright test                         # boots its own fresh build on :3000 and fails loudly if the port is busy (no stale-app testing); an ephemeral stack runs via E2E_BASE_URL; the silent-refresh specs additionally need a short-TTL backend + E2E_ACCESS_TTL_SECONDS (CI sets both)
 npm run build
 # README screenshots (requires the seeded stack; kept out of CI by design):
 npx playwright test --config=playwright.screenshots.config.ts
 ```
 
-CI (`.github/workflows/ci.yml`) runs six jobs: backend verify → frontend
-lint/test/build + smoke e2e → docker compose build → OpenAPI contract drift
-against a Postgres service → **concurrency-postgres** (the 24-transfer proof
-against a real PostgreSQL service) → **banking-e2e**: boots the real backend +
+CI (`.github/workflows/ci.yml`) runs eight jobs: backend verify (+ the
+`TransactionKindMigrationIT` chain step) → frontend lint/test/build + smoke
+e2e → docker compose build → OpenAPI contract drift against a Postgres
+service → **concurrency-postgres** (the 24-transfer proof against a real
+PostgreSQL service) → **cutover-postgres** (JournalCutoverIT: the V22
+reconciled-journal cutover over a fresh PG schema) → **journal-postgres**
+(JournalReconciliationIT: append-only triggers, duplicate-journal rejection,
+corruption reporting on real PG) → **banking-e2e**: boots the real backend +
 PostgreSQL and drives register → deposit → transfer → receipt through a real
 browser. Dependabot watches npm, maven, docker, and the actions themselves.
 

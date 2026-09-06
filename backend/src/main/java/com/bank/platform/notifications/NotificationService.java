@@ -1,5 +1,7 @@
 package com.bank.platform.notifications;
 
+import java.time.Clock;
+import java.time.Instant;
 import java.util.UUID;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -37,12 +39,15 @@ public class NotificationService {
 
   private final NotificationRepository notifications;
   private final EmailOutboxRepository outbox;
+  private final Clock clock;
   private final long retentionDays;
 
   public NotificationService(NotificationRepository notifications, EmailOutboxRepository outbox,
+      Clock clock,
       @Value("${app.notifications.retention-days:90}") long retentionDays) {
     this.notifications = notifications;
     this.outbox = outbox;
+    this.clock = clock;
     this.retentionDays = retentionDays;
   }
 
@@ -80,7 +85,7 @@ public class NotificationService {
   @Scheduled(cron = "0 0 4 * * *")
   @Transactional
   public long purgeOld() {
-    java.time.Instant cutoff = java.time.Instant.now().minusSeconds(retentionDays * 24 * 3600);
+    Instant cutoff = clock.instant().minusSeconds(retentionDays * 24 * 3600);
     long removed = notifications.deleteByCreatedAtBefore(cutoff);
     // Delivered mail is housekeeping too; FAILED (dead-letter) rows stay for
     // operator review until requeued or the retention window swallows them
