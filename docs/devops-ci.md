@@ -11,10 +11,10 @@ counts and the tested source state are in the commit history.)
 
 | Suite | Command (run in folder) | What it proves |
 |-------|-------------------------|----------------|
-| Backend unit + API tests | `.\mvnw.cmd verify` in `backend/` | 171 tests + JaCoCo gate (≥55% line coverage) |
-| Frontend unit tests | `npm test` (`npx vitest run`) in `frontend/` | 94 Vitest tests (validation, formatting, API client, typed query hooks, RTL component suite) |
+| Backend unit + API tests | `.\mvnw.cmd verify` in `backend/` | 175 tests + JaCoCo gate (≥55% line coverage) |
+| Frontend unit tests | `npm test` (`npx vitest run`) in `frontend/` | 98 Vitest tests (validation, formatting, API client, typed query hooks, RTL component suite) |
 | Frontend build + lint | `npm run build`, `npm run lint` in `frontend/` | Production bundle + ESLint |
-| Browser e2e | `npx playwright test` in `frontend/` (stack running) | smoke + a11y + the full money loop (including the ≥$10k review-threshold hold) + the silent-refresh spec, all against real Postgres on the canonical `:3000` origin (the backend's CORS allow-list rejects others) |
+| Browser e2e | `npx playwright test` in `frontend/` (stack running) | smoke + a11y + the full money loop (including the ≥$10k review-threshold hold) + the silent-refresh spec, all against real Postgres on the canonical `:3000` origin (the backend's CORS allow-list rejects others; an ephemeral second stack runs via `E2E_BASE_URL` + `APP_CORS_ORIGINS` - Phase G swept 19/19 that way) |
 | README screenshots | `npx playwright test --config=playwright.screenshots.config.ts` in `frontend/` | Captures `docs/screenshots/*` from the live seeded product; excluded from the default suite and CI so PNGs only change when regenerated |
 | Live stack | `.\start-all.ps1` then `.\seed-demo.ps1` (repo root) | Real Postgres end-to-end, health-gated |
 

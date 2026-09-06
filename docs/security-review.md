@@ -21,22 +21,24 @@ interest (F16), an email outbox that commits delivery intent with the operation
 
 Scope: Spring Boot API + Next.js frontend, local single-instance deployment.
 Method: code review + automated tests + disposable-real-PostgreSQL runs. As of
-the frontend-state phase close, backend `./mvnw -B verify` is green at **171
+the post-merge audit pass, backend `./mvnw -B verify` is green at **175
 tests / 0 failures** (JaCoCo gate met) and frontend lint/tsc/vitest are green
-at **94 tests**; the concurrency/exactness ITs are additionally run against
+at **98 tests**; the concurrency/exactness ITs are additionally run against
 real PostgreSQL (CI services and disposable local databases - never `bankdb`).
-This document's claims follow the implementation; the tested state is the
-unchanged pre-hardening baseline plus the uncommitted working tree
-(single final commit policy).
+This document's claims follow the implementation. The hardening campaign is
+merged via PR #17 (the F01-F30 campaign plus a CI test-isolation fix), with
+all six CI jobs green
+(backend, banking-e2e, concurrency-postgres, contract, docker, frontend) and
+the local Playwright sweep 19/19 on an ephemeral stack.
 
 ## ✅ Passing
 
 | # | Control | How it holds |
 |---|---------|--------------|
 | 1 | Password storage | BCrypt(12), never logged or returned (no getter on the wire; `UserResponse` excludes hash); the 72-byte BCrypt ceiling is enforced as bytes (`@PasswordBytes`), so multibyte passwords can't silently truncate |
-| 2 | AuthN | JWT HS512, 15-min access tokens, `sub`/`role`/`iss`/`aud`/`jti` claims, signature + issuer + audience verified per request |
+| 2 | AuthN | JWT HS256 (algorithm pinned), 15-min access tokens, `sub`/`role`/`iss`/`aud`/`jti`/`purpose`/`sv` claims, signature + algorithm + issuer + audience + purpose verified per request; access and MFA-challenge tokens are mutually exclusive (typed parse paths, F01) |
 | 3 | AuthZ | Stateless filter sets `ROLE_*`; `/admin/**` additionally guarded by `@PreAuthorize("hasRole('ADMIN')")` (defense in depth: `AdminService` re-checks the role). Credit is bounded: at most one open LOAN account per user (service check + PostgreSQL partial unique index, V15) |
-| 4 | Credential stuffing | Token-bucket rate limit on login/register (20/min/real-IP default, `Retry-After`, isolated test at 5/min). `X-Forwarded-For` is honored only behind `TRUST_PROXY_HEADERS=true`; in the compose deployment the backend publishes no host port, so every request arrives through the Next.js proxy and gets its own bucket |
+| 4 | Credential stuffing | Token-bucket rate limit on login/register/mfa-verify (20/min default, `Retry-After`, isolated test at 5/min). Client identity (F03): forwarding headers are honored ONLY when the direct socket peer is inside the `RATE_LIMIT_TRUSTED_PROXIES` CIDR allowlist (default empty = never), so a spoofed `X-Forwarded-For` cannot mint a fresh bucket - the key is the socket address. That is spoof-proof but coarse behind a proxy: every request through one Next.js proxy shares its socket bucket in the compose/dev topology, so the real per-identity protection is the per-account login/TOTP budget (10 fails/15 min per account, existence-safe) on top of the network bucket. `RateLimitTrustedProxyTest` (5) pins the allowlist boundary (forged IPv4/IPv6, chains, malformed/oversized values, distinct clients staying distinct) |
 | 4b | TOTP brute force | Six-digit codes are only 10^6 values, so a per-IP limit alone cannot stop guessing from many addresses or from a held session. `mfa/verify`, `totp/enable` and `totp/disable` share a per-account failure budget (5/min, success resets) that answers 429 `Retry-After` when exhausted (`TotpThrottle`) |
 | 5 | Login enumeration | Identical "Invalid email or password" for unknown email vs wrong password; register-duplicate 409 is accepted tradeoff |
 | 6 | Money safety | Pessimistic locking (ID-ordered), `NUMERIC(19,4)` + `BigDecimal`, amounts as JSON strings; idempotency keys scoped to owner + source account + kind (a foreign replay returns 404, never another user's row); interest accrual selects candidates `FOR UPDATE` so concurrent runs can't double-accrue |
@@ -61,7 +63,7 @@ unchanged pre-hardening baseline plus the uncommitted working tree
 
 ## v2 - hardening series (Phase C)
 
-- `X-Forwarded-For` is ignored unless `TRUST_PROXY_HEADERS=true`; deposits capped at `DEPOSIT_MAX` (default 100000) and flagged at the review threshold.
+- `X-Forwarded-For` is ignored unless the socket peer is inside `RATE_LIMIT_TRUSTED_PROXIES` (a CIDR allowlist, default empty); deposits capped at `DEPOSIT_MAX` (default 100000) and flagged at the review threshold.
 - Actuator matchers narrowed to health/info; CORS allows + exposes `X-Request-Id`.
 - Refresh cookie: `HttpOnly; Path=/backend/v1/auth; SameSite=Lax`, `Secure` iff `COOKIE_SECURE=true` - scoped to the proxied path the browser actually calls, so the cookie is sent on refresh requests (previously `Path=/api/v1/auth`, which never matched `/backend/v1/auth/*`, silently killing every session at the first token expiry).
 - Access cookie stays readable for edge routing only - blast radius 15 minutes; its Max-Age mirrors the JWT lifetime (it used to linger 7 days), `Secure` is set over HTTPS, and the silent-refresh path rewrites it on every rotation; documented in `middleware.ts`.
@@ -69,8 +71,8 @@ unchanged pre-hardening baseline plus the uncommitted working tree
 ## How to re-verify
 
 ```powershell
-.\mvnw.cmd verify                    # backend: 171 tests + JaCoCo gate (from backend/)
-cd ..\frontend; npm run lint; npx tsc --noEmit; npx vitest run   # 94 tests
+.\mvnw.cmd verify                    # backend: 175 tests + JaCoCo gate (from backend/)
+cd ..\frontend; npm run lint; npx tsc --noEmit; npx vitest run   # 98 tests
 npm run build; npx playwright test   # e2e against the running stack (CI's banking-e2e)
 .\start-all.ps1; .\seed-demo.ps1     # live stack + demo data (start-all discovers PostgreSQL)
 # customer: alice@bank.local / secret123 -> Security -> Set up authenticator,

@@ -21,9 +21,9 @@ the ops queue is a real threshold-triggered hold, not a prop.
 - **Accounts** - open CHECKING / SAVINGS / LOAN, simulated deposit rail, pessimistic-lock transfers
 - **Money movement** - idempotent transfers (keys scoped per sender account), beneficiaries address book, paged history, CSV + PDF statements
 - **Review queue** - transfers at/above the threshold never settle on submit: they stay HELD until an operator approves (money moves) or declines (nothing ever moved); flagged deposits credit on arrival and just need acknowledging
-- **Interest engine** - monthly job (savings earn, loans charged, charges clamped at the credit limit so one maxed loan can't break the run), idempotent per month, admin-triggerable
+- **Interest engine** - deterministic, resumable per account/period job: savings earn actual/365 interest on each day's closing principal, loans are charged simple monthly interest on tracked principal only - never capped at the credit limit, so a maxed loan is charged, not forgiven; scheduler and admin share one implementation
 - **Virtual cards** - Luhn-valid issuance, show-once PAN, freeze/unfreeze (tokenization-lite: hashes + last4)
-- **Auth** - JWT access tokens (iss/aud, HS512), rotating refresh tokens with atomic rotation + reuse detection, TOTP two-factor end to end (Security page setup + `/login/mfa` challenge) with per-account verification throttling, login rate limiting per real client IP, BCrypt(12)
+- **Auth** - purpose-separated JWT tokens (access vs MFA challenge; pinned HS256, iss/aud/purpose), rotating refresh tokens with atomic rotation + reuse/family-burn detection, TOTP two-factor end to end (Security page setup + `/login/mfa` challenge) with persisted single-use challenges + per-account verification throttling, login rate limiting (socket-IP keys unless a trusted proxy is configured), BCrypt(12)
 - **Notifications** - in-app center + unread badge, email stub wired into every money event
 - **Ops console** - user search, freeze/unfreeze, review queue with Approve/Decline, daily totals, audit viewer
 - **Security posture** - RBAC, security headers, locked CORS, RFC-7807 errors on every path, `X-Request-Id` correlation, documented residual risks
@@ -36,7 +36,7 @@ the ops queue is a real threshold-triggered hold, not a prop.
 flowchart LR
     Browser --> Next["Next.js :3000<br/>(rewrite proxy /backend/*)"]
     Next --> API["Spring Boot :8080<br/>/api/v1/*"]
-    API --> PG[("PostgreSQL :5432<br/>Flyway V1-V15")]
+    API --> PG[("PostgreSQL :5432<br/>Flyway V1-V25")]
     API --> Cache[("Caffeine<br/>summaries + public stats")]
 ```
 
@@ -66,7 +66,9 @@ Operators: `admin@bank.local` / `change-me-admin-123` → **Operations** in the 
 | `GET /api/v1/accounts` · `POST /api/v1/accounts` | user | List / open (CHECKING, SAVINGS, LOAN) |
 | `POST /api/v1/accounts/{id}/deposit` | owner | Simulated deposit rail, capped + flagged at the threshold |
 | `POST /api/v1/transfers` (+`Idempotency-Key`) | owner | Atomic transfer; ≥$10k returns HELD for operator review |
-| `GET /api/v1/transactions?accountId=` | owner | Paged history, date filters |
+| `GET /api/v1/transfers/{id}` | owner | Authorized operation detail backing the durable receipt route |
+| `GET /api/v1/operations?key=` | owner | Resolve your own unresolved operation by idempotency key (F06) |
+| `GET /api/v1/transactions?accountId=&cursor=` | owner | Keyset-paged history, date filters (no OFFSET) |
 | `GET /api/v1/accounts/{id}/statement.csv` (.pdf) | owner | Dated statements (bounded windows) |
 | `GET /api/v1/accounts/{id}/summary?months=` | owner | Monthly inflow/outflow (cached after authorization) |
 | `GET/POST /api/v1/beneficiaries` | user | Address book (mod-97 validated IBANs) |
@@ -79,6 +81,9 @@ Operators: `admin@bank.local` / `change-me-admin-123` → **Operations** in the 
 | `POST /api/v1/admin/transactions/{id}/decline` | ADMIN | Cancel a HELD transfer (no money ever moves) |
 | `POST /api/v1/admin/interest/run` | ADMIN | Trigger the monthly job on demand |
 | `GET /api/v1/admin/reports/daily-totals` | ADMIN | Per-day volumes |
+| `GET /api/v1/admin/reconciliation` | ADMIN | Projection-vs-journal drift report (never auto-repairs) |
+| `GET/POST /api/v1/admin/email-outbox` | ADMIN | List / requeue dead-lettered outbox rows |
+| `GET /api/v1/admin/kind-review` | ADMIN | Quarantine of migrations' uncertain kind classifications |
 
 Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
 `X-Request-Id` for log correlation. The contract lives at `frontend/openapi.json`
@@ -87,17 +92,19 @@ Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
 ## Verify it
 
 ```powershell
-Set-Location backend; .\mvnw.cmd verify     # 171 tests + JaCoCo gate (H2 in PG mode)
+Set-Location backend; .\mvnw.cmd verify     # 175 tests + JaCoCo gate (H2 in PG mode)
 # The concurrency proof against real PostgreSQL (CI's concurrency-postgres job
-# runs the identical recipe against its Postgres service):
+# runs the identical recipe against its Postgres service). Create a throwaway
+# database first - never run these ITs against your working bankdb:
+#   psql -U postgres -c "CREATE DATABASE pf_it"
 .\mvnw.cmd test "-Dtest=TransferConcurrencyIT" `
-  "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/bankdb" `
-  "-Dspring.datasource.username=bankapp" `
-  "-Dspring.datasource.password=bankapp_secret_change_me" `
+  "-Dspring.datasource.url=jdbc:postgresql://localhost:5432/pf_it" `
+  "-Dspring.datasource.username=postgres" `
+  "-Dspring.datasource.password=postgres" `
   "-Dspring.datasource.driver-class-name=org.postgresql.Driver"
 Set-Location ..\frontend
 npm run lint
-npm test                                    # 94 tests: lib units + RTL component suite
+npm test                                    # 98 tests: lib units + RTL component suite
 npx playwright test                         # smoke + a11y + the full money loop (incl. the ≥$10k HELD path) + silent refresh (needs the stack running)
 npm run build
 # README screenshots (requires the seeded stack; kept out of CI by design):
@@ -126,8 +133,10 @@ audit passes ([changelog](CHANGELOG.md)). Supporting docs:
 
 - A banking monolith (Next.js 16 + Spring Boot 4 + PostgreSQL 16) with atomic,
   idempotent money movement, an operator review queue, and full audit trails
-- A 15-version Flyway schema (three Java migrations: portable unnamed-CHECK
-  retirement, idempotency-key scoping, and a one-loan-per-user partial index)
+- A 25-version Flyway schema (V1-V25: seven Java migrations - unnamed-CHECK
+  retirement, loan-balance checks, idempotency-key scoping, the one-loan
+  partial index, operation identity, the reconciled journal + cutover, loan
+  principal/interest accruals, and evidence-backed kind classification)
 - Auth hardened with rotating refresh tokens (atomic rotation + reuse
   detection), TOTP 2FA with per-account verification throttling, JWT with
   verified issuer/audience, RBAC, per-client-IP rate limiting, an access-token

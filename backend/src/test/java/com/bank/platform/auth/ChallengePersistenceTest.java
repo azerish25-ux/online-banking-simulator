@@ -1,6 +1,8 @@
 package com.bank.platform.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -11,6 +13,12 @@ import tools.jackson.databind.ObjectMapper;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -38,6 +46,7 @@ class ChallengePersistenceTest {
   @Autowired JwtService jwtService;
   @Autowired LoginChallengeRepository challenges;
   @Autowired UserRepository users;
+  @Autowired AuthService authService;
 
   private String email;
   private String secret;
@@ -97,6 +106,55 @@ class ChallengePersistenceTest {
     String newChallenge = loginChallenge(email);
     mvc.perform(verify(newChallenge, currentCode()))
         .andExpect(status().isTooManyRequests());
+  }
+
+  @Test
+  void twoSimultaneousCorrectSubmissionsMintExactlyOneSession() throws Exception {
+    // F30: two requests present the SAME unused challenge with a correct code
+    // at the same moment (a double-submit race, not a sequential replay). The
+    // atomic consume must let exactly ONE win; the twin must be refused and no
+    // second session may be minted.
+    UUID challengeId = challengeIdOf(challengeToken);
+    String code = currentCode(); // the same 30-second window for both
+    int n = 2;
+    ExecutorService pool = Executors.newFixedThreadPool(n);
+    CountDownLatch ready = new CountDownLatch(n);
+    CountDownLatch start = new CountDownLatch(1);
+    AtomicInteger successes = new AtomicInteger();
+    AtomicInteger rejections = new AtomicInteger();
+    AtomicInteger unexpected = new AtomicInteger();
+    for (int i = 0; i < n; i++) {
+      pool.submit(() -> {
+        ready.countDown();
+        try {
+          if (!start.await(10, TimeUnit.SECONDS)) {
+            return;
+          }
+          authService.verifyMfaChallenge(challengeId, code);
+          successes.incrementAndGet();
+        } catch (BadCredentialsException expected) {
+          // The loser: the challenge was already consumed by the winner.
+          rejections.incrementAndGet();
+        } catch (Exception e) {
+          unexpected.incrementAndGet();
+        }
+      });
+    }
+    assertTrue(ready.await(10, TimeUnit.SECONDS), "both threads must start");
+    start.countDown();
+    pool.shutdown();
+    assertTrue(pool.awaitTermination(60, TimeUnit.SECONDS), "verifications must resolve");
+
+    assertEquals(0, unexpected.get(), "no unexpected failures");
+    assertEquals(1, successes.get(), "exactly one correct submission may mint a session");
+    assertEquals(1, rejections.get(), "the simultaneous twin must be refused");
+
+    // The row is consumed, so even a later replay of the still-valid code fails.
+    LoginChallenge row = challenges.findById(challengeId).orElseThrow();
+    assertTrue(row.isConsumed(), "the winning submission must consume the challenge");
+    assertThrows(BadCredentialsException.class,
+        () -> authService.verifyMfaChallenge(challengeId, currentCode()),
+        "the consumed challenge can never mint another session");
   }
 
   @Test

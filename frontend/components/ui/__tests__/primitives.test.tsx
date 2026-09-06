@@ -269,10 +269,19 @@ describe("SpendingChart", () => {
       { month: "2026-05", inflow: "80.00", outflow: "45.00" }
     ];
     const { container } = render(<SpendingChart data={data} />);
+    const svg = container.querySelector("svg");
+    expect(svg).not.toBeNull();
     expect(screen.getByRole("img", { name: "Monthly money in and out" })).toBeInTheDocument();
     // Two bars per month + two legend swatches.
     expect(container.querySelectorAll("rect")).toHaveLength(data.length * 2 + 2);
-    expect(screen.getByText("Apr")).toBeInTheDocument();
-    expect(screen.getByText("May")).toBeInTheDocument();
+    // Month labels appear once in the chart AND once in its sr-only data table
+    // (F19) - so assert inside the svg for the geometry, then confirm the
+    // table exists as the accessible equivalent.
+    expect(svg?.textContent).toContain("Apr");
+    expect(svg?.textContent).toContain("May");
+    const table = container.querySelector("table");
+    expect(table).not.toBeNull();
+    expect(table?.textContent).toContain("Apr");
+    expect(table?.textContent).toContain("May");
   });
 });

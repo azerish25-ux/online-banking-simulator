@@ -1,3 +1,4 @@
+import * as React from "react";
 import { usd } from "../../lib/format";
 
 export type MonthPoint = { month: string; inflow: string; outflow: string };
@@ -7,8 +8,14 @@ export type MonthPoint = { month: string; inflow: string; outflow: string };
  * brass for money in, slate-blue for money out, serif month labels. All
  * colors come from design tokens (brass-400 / outflow / line / content), so
  * the chart can never drift from the palette - no raw hex literals here.
+ *
+ * The values are NOT tooltip-only (F19): the exact decimal strings are ALSO
+ * rendered into a real (visually hidden) data table - one row per month -
+ * that the SVG names through aria-describedby, so assistive technology reads
+ * the same figures the geometry approximates.
  */
 export function SpendingChart({ data }: { data: MonthPoint[] }) {
+  const tableId = React.useId();
   const max = Math.max(1, ...data.flatMap((d) => [parseFloat(d.inflow), parseFloat(d.outflow)]));
   const W = 560;
   const H = 200;
@@ -20,52 +27,81 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
     new Date(iso + "-02").toLocaleString("en-US", { month: "short" });
 
   return (
-    <svg viewBox={"0 0 " + W + " " + H} className="w-full" role="img" aria-label="Monthly money in and out">
-      <title>Inflow versus outflow by month</title>
-      {[0.25, 0.5, 0.75, 1].map((f) => (
+    <div>
+      <svg
+        viewBox={"0 0 " + W + " " + H}
+        className="w-full"
+        role="img"
+        aria-label="Monthly money in and out"
+        aria-describedby={tableId}
+      >
+        <title>Inflow versus outflow by month</title>
+        {[0.25, 0.5, 0.75, 1].map((f) => (
+          <line
+            key={f}
+            x1={pad} x2={W - pad}
+            y1={H - pad - f * (H - pad * 2)} y2={H - pad - f * (H - pad * 2)}
+            className="stroke-line"
+            strokeWidth="1"
+            strokeDasharray="2 4"
+          />
+        ))}
+        {/* The solid baseline is the zero axis: a $0 month shows its label with
+            no bar at all rather than a fake nonzero sliver (F19). */}
         <line
-          key={f}
           x1={pad} x2={W - pad}
-          y1={H - pad - f * (H - pad * 2)} y2={H - pad - f * (H - pad * 2)}
-          className="stroke-line"
+          y1={H - pad} y2={H - pad}
+          className="stroke-content-muted"
           strokeWidth="1"
-          strokeDasharray="2 4"
+          strokeOpacity="0.55"
         />
-      ))}
-      {/* The solid baseline is the zero axis: a $0 month shows its label with
-          no bar at all rather than a fake nonzero sliver (F19). */}
-      <line
-        x1={pad} x2={W - pad}
-        y1={H - pad} y2={H - pad}
-        className="stroke-content-muted"
-        strokeWidth="1"
-        strokeOpacity="0.55"
-      />
-      {data.map((d, i) => {
-        const x = pad + group * i + group / 2;
-        const inH = scale(parseFloat(d.inflow));
-        const outH = scale(parseFloat(d.outflow));
-        return (
-          <g key={d.month}>
-            <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-brass-400">
-              <title>{"In " + d.month + ": " + usd(d.inflow)}</title>
-            </rect>
-            <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(0, outH)} rx={1.5} className="fill-outflow">
-              <title>{"Out " + d.month + ": " + usd(d.outflow)}</title>
-            </rect>
-            <text x={x} y={H - 8} textAnchor="middle" fontSize={11} className="fill-content-muted"
-              fontFamily="var(--font-display), Georgia, serif" fontStyle="italic">
-              {monthLabel(d.month)}
-            </text>
-          </g>
-        );
-      })}
-      <g fontSize={11} className="fill-content-muted">
-        <rect x={pad} y={4} width={10} height={10} rx={1.5} className="fill-brass-400" />
-        <text x={pad + 14} y={13}>In</text>
-        <rect x={pad + 52} y={4} width={10} height={10} rx={1.5} className="fill-outflow" />
-        <text x={pad + 66} y={13}>Out</text>
-      </g>
-    </svg>
+        {data.map((d, i) => {
+          const x = pad + group * i + group / 2;
+          const inH = scale(parseFloat(d.inflow));
+          const outH = scale(parseFloat(d.outflow));
+          return (
+            <g key={d.month}>
+              <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-brass-400">
+                <title>{"In " + d.month + ": " + usd(d.inflow)}</title>
+              </rect>
+              <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(0, outH)} rx={1.5} className="fill-outflow">
+                <title>{"Out " + d.month + ": " + usd(d.outflow)}</title>
+              </rect>
+              <text x={x} y={H - 8} textAnchor="middle" fontSize={11} className="fill-content-muted"
+                fontFamily="var(--font-display), Georgia, serif" fontStyle="italic">
+                {monthLabel(d.month)}
+              </text>
+            </g>
+          );
+        })}
+        <g fontSize={11} className="fill-content-muted">
+          <rect x={pad} y={4} width={10} height={10} rx={1.5} className="fill-brass-400" />
+          <text x={pad + 14} y={13}>In</text>
+          <rect x={pad + 52} y={4} width={10} height={10} rx={1.5} className="fill-outflow" />
+          <text x={pad + 66} y={13}>Out</text>
+        </g>
+      </svg>
+      {/* The accessible equivalent data table (F19). Visually hidden but a real
+          <table>: exact values, never tooltip-only. */}
+      <table id={tableId} className="sr-only">
+        <caption>Monthly money in and out, by month</caption>
+        <thead>
+          <tr>
+            <th scope="col">Month</th>
+            <th scope="col">Money in</th>
+            <th scope="col">Money out</th>
+          </tr>
+        </thead>
+        <tbody>
+          {data.map((d) => (
+            <tr key={d.month}>
+              <th scope="row">{monthLabel(d.month)}</th>
+              <td>{usd(d.inflow)}</td>
+              <td>{usd(d.outflow)}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
   );
 }
