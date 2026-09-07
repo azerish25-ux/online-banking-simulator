@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Copy, Check } from "lucide-react";
 import * as React from "react";
 import Link from "next/link";
 import { AppShell } from "../../../components/layout/app-shell";
@@ -12,12 +12,58 @@ import { EmptyState } from "../../../components/ui/empty-state";
 import { LoadFailed } from "../../../components/ui/load-failed";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../../components/ui/table";
-import type { CardItem, IssuedCard } from "../../../lib/api-types";
+import { TxStatusBadge } from "../../../components/ui/tx-status-badge";
+import type { CardItem, IssuedCard, Tx } from "../../../lib/api-types";
 import { useResultToast } from "../../../components/feedback/use-result-toast";
 import { useToast } from "../../../components/feedback/toast";
 import { useAccount, useCards, useIssueCard, useSetCardStatus, useTransactions } from "../../../lib/queries";
-import { decimalToCents, fmtDate, signedUsd, usd, usdFromCents } from "../../../lib/format";
+import { fmtDate, signedUsd, usd, usdReview } from "../../../lib/format";
 import { Routes } from "../../../lib/routes";
+import { cn } from "../../../lib/cn";
+
+/** "CHECKING" → "Checking", "LOAN" → "Loan" - the account's readable name. */
+function typeName(type: string): string {
+  return type.charAt(0) + type.slice(1).toLowerCase();
+}
+
+function statusText(status: string): string {
+  return status.charAt(0) + status.slice(1).toLowerCase();
+}
+
+/**
+ * The financial date of a row is its POSTING time; the request time is shown
+ * only when it differs (a HELD/CANCELLED row has no posting time at all and
+ * must never read as having settled - section 14).
+ */
+function TxWhen({ tx }: { tx: Tx }) {
+  if (tx.status === "POSTED") {
+    const posted = tx.postedAt ?? tx.createdAt;
+    const requested = tx.postedAt && tx.postedAt !== tx.createdAt ? tx.createdAt : null;
+    return (
+      <>
+        <p className="whitespace-nowrap">{fmtDate(posted)}</p>
+        {requested ? <p className="muted mt-0.5 text-xs">Requested {fmtDate(requested)}</p> : null}
+      </>
+    );
+  }
+  return (
+    <>
+      <p className="whitespace-nowrap">{fmtDate(tx.createdAt)}</p>
+      <p className="muted mt-0.5 text-xs">Not posted</p>
+    </>
+  );
+}
+
+/** One labelled loan figure - authoritative, policy-derived (never a
+ *  client-side balance subtraction). */
+function LoanFigure({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
+  return (
+    <div>
+      <dt className="muted text-sm">{label}</dt>
+      <dd className={cn("mt-1 text-2xl font-semibold tabular-nums", danger && "text-danger")}>{value}</dd>
+    </div>
+  );
+}
 
 export function AccountDetailPageContent({ id }: { id: string }) {
   const { push } = useToast();
@@ -28,16 +74,14 @@ export function AccountDetailPageContent({ id }: { id: string }) {
   const accountNotFound = account.isError && (account.error?.status === 404 || account.error?.status === 410);
   const recent = useTransactions(id, "", 8);
   const isLoan = account.data?.type === "LOAN";
-  // A drawn loan (negative balance) is debt: the hero presents it as a rose
-  // "amount you owe" figure, exactly like the dashboard card.
-  const isOutstandingLoan =
-    account.data != null && isLoan && decimalToCents(account.data.balance) < 0n;
+  const frozen = account.data?.status === "FROZEN";
   // LOAN accounts can never hold cards; the query stays idle for them.
   const cards = useCards(isLoan ? "" : id);
   const issue = useIssueCard();
   const setCardStatus = useSetCardStatus();
   const [issued, setIssued] = React.useState<IssuedCard | null>(null);
   const [freezeCandidate, setFreezeCandidate] = React.useState<CardItem | null>(null);
+  const [copied, setCopied] = React.useState(false);
   // A failed freeze leaves the confirm dialog open with its buttons re-armed:
   // the rejection renders inside that dialog, not in a corner toast behind it.
   const [freezeError, setFreezeError] = React.useState<string | null>(null);
@@ -70,6 +114,17 @@ export function AccountDetailPageContent({ id }: { id: string }) {
     }
   });
 
+  async function copyIban() {
+    if (!account.data) return;
+    try {
+      await navigator.clipboard.writeText(account.data.iban);
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1500);
+    } catch {
+      push("Copy failed - select the identifier and copy it manually.", "error");
+    }
+  }
+
   return (
     <AppShell>
       <p className="text-sm"><Link href={Routes.dashboard} className="text-action hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Overview</Link></p>
@@ -92,68 +147,73 @@ export function AccountDetailPageContent({ id }: { id: string }) {
         <div className="mt-3 space-y-2"><Skeleton className="h-24" /><Skeleton className="h-40" /></div>
       ) : (
         <>
-          <div className="mt-2 flex flex-wrap items-center gap-3">
-            <h1 className="mono text-2xl font-bold">{account.data.iban}</h1>
-            <Badge tone="info">{account.data.type}</Badge>
-            <Badge tone={account.data.status === "ACTIVE" ? "success" : "danger"}>{account.data.status}</Badge>
+          <div className="mt-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">
+                {typeName(account.data.type)}
+              </h1>
+              <Badge tone={frozen ? "warning" : "neutral"}>{statusText(account.data.status)}</Badge>
+            </div>
+            {/* The identifier sits under the recognizable title with a copy
+                control - never the page's giant heading (section 14). */}
+            <div className="mt-1.5 flex flex-wrap items-center gap-2">
+              <p className="mono muted break-all text-sm">{account.data.iban}</p>
+              <Button type="button" variant="ghost" size="sm" onClick={() => void copyIban()}>
+                {copied ? <Check size={14} aria-hidden="true" /> : <Copy size={14} aria-hidden="true" />}
+                {copied ? "Copied" : "Copy"}
+              </Button>
+            </div>
           </div>
-          {isOutstandingLoan ? (
-            // A drawn loan is debt - same "amount you owe" treatment as the cards.
-            <>
-              <p className="label muted mt-1 text-xs">Outstanding loan (amount you owe)</p>
-              <p className="mt-1 text-4xl font-bold tabular-nums text-danger">{usdFromCents(-decimalToCents(account.data.balance))}</p>
-              <p className="muted text-sm">Repay by sending money to this account from another of yours. Interest accrues monthly on what you owe.</p>
-            </>
-          ) : (
-            <>
-              <p className="mt-1 text-4xl font-bold tabular-nums">{usd(account.data.balance)}</p>
-              {account.data.type === "SAVINGS" && <p className="muted text-sm">Earns monthly interest, posted automatically.</p>}
-              {account.data.type === "LOAN" && <p className="muted text-sm">Borrow up to $1,000 by sending money from this account to another of yours. Repay by sending money back here. Interest accrues monthly on what you owe.</p>}
-            </>
-          )}
 
-          <div className="mt-4 grid gap-4 lg:grid-cols-2">
-            <Card>
-              <div className="mb-3 flex items-center justify-between">
-                <CardTitle>Virtual cards</CardTitle>
-                {isLoan ? null : (
-                  <Button size="sm" onClick={() => issue.mutate(id)} disabled={issue.isPending}>
-                    {issue.isPending ? "Issuing..." : "Issue card"}
-                  </Button>
-                )}
-              </div>
-              {issued && (
-                <div className="mb-3 rounded-md border border-success-border bg-success-surface p-4" role="status">
-                  <p className="text-sm font-medium text-success">Copy now. This number is shown only once.</p>
-                  <p className="mono mt-2 text-xl tracking-widest">{issued.pan}</p>
-                  <p className="mono muted text-sm">CVV {issued.cvv} · Exp {issued.expMonth}/{issued.expYear}</p>
-                </div>
-              )}
-              {(cards.data ?? []).length === 0 ? (
-                <CardDescription>No cards on this account yet.</CardDescription>
-              ) : (
-                <ul className="space-y-2">
-                  {(cards.data ?? []).map((c) => (
-                    <li key={c.id} className="flex items-center justify-between rounded-md border border-divider p-3">
-                      <div>
-                        <p className="mono">•••• •••• •••• {c.last4}</p>
-                        <p className="muted text-xs">Exp {c.expMonth}/{c.expYear} · <Badge tone={c.status === "ACTIVE" ? "success" : "danger"}>{c.status}</Badge></p>
-                      </div>
-                      {c.status === "ACTIVE" ? (
-                        <Button size="sm" variant="secondary" onClick={() => { setFreezeError(null); setFreezeCandidate(c); }}>Freeze</Button>
-                      ) : (
-                        <Button size="sm" variant="secondary" onClick={() => setCardStatus.mutate({ card: c, frozen: false })}>Unfreeze</Button>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </Card>
+          {/* Labelled financial figures from the authoritative account
+              response. A loan shows its policy-derived split (principal,
+              interest, total owed, available credit); deposits show the
+              balance with an honest state line. */}
+          <Card className="mt-4">
+            {isLoan ? (
+              <>
+                <CardTitle>Loan position</CardTitle>
+                <CardDescription>
+                  Drawn principal and unpaid interest are kept separate by the loan policy; credit
+                  available is headroom on principal.
+                </CardDescription>
+                <dl className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+                  <LoanFigure label="Total owed" value={usdReview(account.data.totalOwed ?? "0.0000")} danger />
+                  <LoanFigure label="Principal owed" value={usdReview(account.data.principalOwed ?? "0.0000")} />
+                  <LoanFigure label="Interest owed" value={usdReview(account.data.interestOwed ?? "0.0000")} />
+                  <LoanFigure label="Available credit" value={usdReview(account.data.availableCredit ?? "0.0000")} />
+                </dl>
+                <p className="muted mt-4 text-xs">
+                  Simulator loan, USD. Borrow by sending money from this account to another of yours;
+                  repay by sending money back to this account. Interest is posted monthly on each
+                  day&apos;s outstanding principal. {frozen ? "This loan is frozen - repayments and new draws are disabled." : ""}
+                </p>
+              </>
+            ) : (
+              <>
+                <CardTitle>Balance</CardTitle>
+                <CardDescription>
+                  {account.data.type === "SAVINGS"
+                    ? "Earns monthly interest, posted automatically."
+                    : "Simulated funds. The balance updates when a deposit or transfer posts."}
+                </CardDescription>
+                <p className="mt-3 text-[32px] leading-10 font-semibold tabular-nums">{usd(account.data.balance)}</p>
+                <p className="muted mt-2 text-xs">
+                  USD. {frozen ? "This account is frozen - money cannot be sent from it until an operator unfreezes it." : "Available to spend."}
+                </p>
+              </>
+            )}
+          </Card>
 
-            <Card>
+          <div className="mt-4 grid gap-4 lg:grid-cols-3">
+            {/* Activity is primary content for an account (section 14). */}
+            <Card className="lg:col-span-2">
               <CardTitle>Recent activity</CardTitle>
+              <CardDescription>
+                Posted rows show their posting date; a row awaiting review shows when it was requested.
+              </CardDescription>
               {recent.isLoading && recent.data == null ? (
-                <div className="mt-3 space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+                <div className="mt-3 space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
               ) : recent.isError && recent.data == null ? (
                 <div className="mt-3">
                   <LoadFailed
@@ -162,16 +222,19 @@ export function AccountDetailPageContent({ id }: { id: string }) {
                   />
                 </div>
               ) : (recent.data?.items ?? []).length === 0 ? (
-                <CardDescription>No transactions yet.</CardDescription>
+                <div className="mt-3">
+                  <CardDescription>No transactions yet.</CardDescription>
+                </div>
               ) : (
                 <div className="mt-3">
                   <Table>
-                    <THead><TRow><TH>When</TH><TH>Memo</TH><TH className="text-right">Amount</TH></TRow></THead>
+                    <THead><TRow><TH>When</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH></TRow></THead>
                     <tbody>
                       {(recent.data?.items ?? []).map((t) => (
                         <TRow key={t.id}>
-                          <TD className="whitespace-nowrap">{fmtDate(t.createdAt)}</TD>
+                          <TD><TxWhen tx={t} /></TD>
                           <TD className="max-w-40 truncate">{t.memo ?? (t.fromIban ? "Transfer" : "Deposit")}</TD>
+                          <TD><TxStatusBadge status={t.status} /></TD>
                           <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, account.data.iban)}</TD>
                         </TRow>
                       ))}
@@ -179,7 +242,58 @@ export function AccountDetailPageContent({ id }: { id: string }) {
                   </Table>
                 </div>
               )}
+              <p className="mt-3 text-sm">
+                <Link href={Routes.activity + "?account=" + encodeURIComponent(id)} className="text-action hover:underline">
+                  Full history and statement export (CSV / PDF)
+                </Link>
+              </p>
             </Card>
+
+            {/* Virtual cards stay available but sit beside, never ahead of,
+                the account's financial record (section 14). */}
+            {!isLoan && (
+              <Card>
+                <div className="mb-3 flex items-center justify-between">
+                  <CardTitle>Virtual cards</CardTitle>
+                  <Button size="sm" onClick={() => issue.mutate(id)} disabled={issue.isPending}>
+                    {issue.isPending ? "Issuing..." : "Issue card"}
+                  </Button>
+                </div>
+                {issued && (
+                  <div className="mb-3 rounded-md border border-success-border bg-success-surface p-4" role="status">
+                    <p className="text-sm font-medium text-success">Copy now. This number is shown only once.</p>
+                    <p className="mono mt-2 text-xl tracking-widest">{issued.pan}</p>
+                    <p className="mono muted text-sm">CVV {issued.cvv} · Exp {issued.expMonth}/{issued.expYear}</p>
+                  </div>
+                )}
+                {cards.isError && cards.data == null ? (
+                  <LoadFailed
+                    title="Couldn't load cards"
+                    onRetry={() => cards.refetch()}
+                  />
+                ) : cards.data == null ? (
+                  <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
+                ) : (cards.data ?? []).length === 0 ? (
+                  <CardDescription>No cards on this account yet.</CardDescription>
+                ) : (
+                  <ul className="space-y-2">
+                    {(cards.data ?? []).map((c) => (
+                      <li key={c.id} className="flex items-center justify-between rounded-md border border-divider p-3">
+                        <div>
+                          <p className="mono">•••• •••• •••• {c.last4}</p>
+                          <p className="muted text-xs">Exp {c.expMonth}/{c.expYear} · <Badge tone={c.status === "ACTIVE" ? "success" : "danger"}>{statusText(c.status)}</Badge></p>
+                        </div>
+                        {c.status === "ACTIVE" ? (
+                          <Button size="sm" variant="secondary" onClick={() => { setFreezeError(null); setFreezeCandidate(c); }}>Freeze</Button>
+                        ) : (
+                          <Button size="sm" variant="secondary" onClick={() => setCardStatus.mutate({ card: c, frozen: false })}>Unfreeze</Button>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </Card>
+            )}
           </div>
         </>
       )}

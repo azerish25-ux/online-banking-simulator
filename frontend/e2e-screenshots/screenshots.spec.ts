@@ -34,7 +34,7 @@ test("landing, dashboard, and transfer receipt", async ({ page }) => {
 
   // 1 - Landing hero with live public stats (logged out).
   await page.goto("/");
-  await expect(page.getByRole("heading", { name: /Everything moves,/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Online Banking Simulator" })).toBeVisible();
   await page.waitForTimeout(1200); // hero stats fetch
   await shot(page, "landing.png");
 
@@ -44,7 +44,7 @@ test("landing, dashboard, and transfer receipt", async ({ page }) => {
   await page.getByLabel("Password", { exact: true }).fill("secret123");
   await page.getByRole("button", { name: /^Log in$/ }).click();
   await expect(page).toHaveURL(/\/dashboard/);
-  await expect(page.getByText(/(Net position|Total) across accounts/)).toBeVisible();
+  await expect(page.getByText("Available funds")).toBeVisible();
   await shot(page, "dashboard.png", true);
 
   // 3 - Transfer flow: post a real transfer, capture the receipt. Register

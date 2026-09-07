@@ -18,6 +18,10 @@
       },
       "AccountResponse" : {
         "properties" : {
+          "availableCredit" : {
+            "description" : "Credit still available on a LOAN (limit minus principal); null otherwise",
+            "type" : [ "string", "null" ]
+          },
           "balance" : {
             "type" : "string"
           },
@@ -28,16 +32,28 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "interestOwed" : {
+            "description" : "Unpaid interest on a LOAN (total owed minus principal); null otherwise",
+            "type" : [ "string", "null" ]
+          },
+          "principalOwed" : {
+            "description" : "Outstanding drawn principal on a LOAN; null otherwise",
+            "type" : [ "string", "null" ]
+          },
           "status" : {
             "enum" : [ "ACTIVE", "FROZEN" ],
             "type" : "string"
+          },
+          "totalOwed" : {
+            "description" : "Total amount owed on a LOAN; null otherwise",
+            "type" : [ "string", "null" ]
           },
           "type" : {
             "enum" : [ "CHECKING", "SAVINGS", "LOAN" ],
             "type" : "string"
           }
         },
-        "required" : [ "balance", "iban", "id", "status", "type" ],
+        "required" : [ "availableCredit", "balance", "iban", "id", "interestOwed", "principalOwed", "status", "totalOwed", "type" ],
         "type" : "object"
       },
       "ApiProblem" : {

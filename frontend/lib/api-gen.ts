@@ -786,12 +786,20 @@ export interface components {
             expected: string;
         };
         AccountResponse: {
+            /** @description Credit still available on a LOAN (limit minus principal); null otherwise */
+            availableCredit: string | null;
             balance: string;
             iban: string;
             /** Format: uuid */
             id: string;
+            /** @description Unpaid interest on a LOAN (total owed minus principal); null otherwise */
+            interestOwed: string | null;
+            /** @description Outstanding drawn principal on a LOAN; null otherwise */
+            principalOwed: string | null;
             /** @enum {string} */
             status: "ACTIVE" | "FROZEN";
+            /** @description Total amount owed on a LOAN; null otherwise */
+            totalOwed: string | null;
             /** @enum {string} */
             type: "CHECKING" | "SAVINGS" | "LOAN";
         };

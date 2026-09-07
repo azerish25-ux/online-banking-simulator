@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * The one test that proves the whole machine: register through the browser,
@@ -6,11 +6,26 @@ import { expect, test } from "@playwright/test";
  * backend and a real PostgreSQL, never mocks. CI boots the stack for this.
  *
  * Flow relies on two deterministic facts: accounts list oldest-first
- * (CHECKING before SAVINGS), and the dashboard renders each account card's
- * full IBAN - the transfers form only ever shows truncated IBANs.
+ * (CHECKING before SAVINGS), and the dashboard account list shows MASKED
+ * identifiers (section 14) while each account's detail page shows the full
+ * simulator identifier - the transfers form only accepts full identifiers.
  */
 const email = `e2e-${Date.now()}@bank.local`;
 const emailHeld = `e2e-held-${Date.now()}@bank.local`;
+
+/** Open account row `row` (1-based creation order: Checking, then Savings)
+ *  and read its full simulator identifier from the detail page - the only
+ *  place the dashboard shows it in full (section 14 masks the account list). */
+async function accountIban(page: Page, row: number): Promise<string> {
+  const links = page.locator("main table a[href*='/accounts/']");
+  await links.nth(row - 1).click();
+  await expect(page).toHaveURL(/\/accounts\//);
+  const identifier = page.locator("main p.mono").first();
+  await expect(identifier).toBeVisible();
+  const iban = ((await identifier.textContent()) ?? "").trim();
+  await page.goBack();
+  return iban;
+}
 
 test("review-threshold transfer is held for review, never reported as posted", async ({ page }) => {
   // Register → dashboard.
@@ -27,12 +42,11 @@ test("review-threshold transfer is held for review, never reported as posted", a
   await page.getByLabel("Account type").selectOption("SAVINGS");
   await page.getByRole("button", { name: /^Open$/, exact: true }).click();
   await expect(page.getByText("Account opened.")).toBeVisible();
-  // The toast can land before the second account card re-renders - wait for
-  // both cards, then read the savings IBAN (same discipline as the money-loop
-  // test below; reading p.mono[1] too early crashes on undefined).
-  const ibans = page.locator("p.mono");
-  await expect(ibans).toHaveCount(2);
-  const savingsIban = (await ibans.allTextContents())[1].trim();
+  // The toast can land before the second account row re-renders - wait for
+  // both rows, then open the savings detail page to read its identifier.
+  const accountLinks = page.locator("main table a[href*='/accounts/']");
+  await expect(accountLinks).toHaveCount(2);
+  const savingsIban = await accountIban(page, 2);
 
   await page.getByRole("button", { name: /Deposit funds/ }).click();
   await page.getByLabel("Amount (USD)").fill("10000");
@@ -79,14 +93,14 @@ test("full money loop in the browser", async ({ page }) => {
   await page.getByRole("button", { name: /^Deposit$/ }).click();
   await expect(page.getByText("Deposited $500.00")).toBeVisible();
 
-  // Open a savings account; wait until both account cards are rendered.
+  // Open a savings account; wait until both account rows are rendered.
   await page.getByRole("button", { name: "Open account" }).click();
   await page.getByLabel("Account type").selectOption("SAVINGS");
   await page.getByRole("button", { name: /^Open$/, exact: true }).click();
   await expect(page.getByText("Account opened.")).toBeVisible();
-  const ibans = page.locator("p.mono");
-  await expect(ibans).toHaveCount(2);
-  const [, savingsIban] = await ibans.allTextContents();
+  const accountLinks = page.locator("main table a[href*='/accounts/']");
+  await expect(accountLinks).toHaveCount(2);
+  const savingsIban = await accountIban(page, 2);
 
   // Transfer checking → savings.
   await page.goto("/transfers");
@@ -116,9 +130,8 @@ test("full money loop in the browser", async ({ page }) => {
   await page.goto(receiptHref as string);
   await expect(page.getByRole("heading", { name: "Transfer receipt" })).toBeVisible();
   await expect(page.getByText("Settled. The money moved")).toBeVisible();
-  // The status badge (uppercase-styled span next to the title) - the first
-  // POSTED match; the receipt's "Posted" field label also renders uppercase.
-  await expect(page.locator("main").getByText("POSTED", { exact: true }).first()).toBeVisible();
+  // The sentence-case status badge next to the title (section 12).
+  await expect(page.locator("main").getByText("Posted", { exact: true }).first()).toBeVisible();
 });
 
 test("an over-cap deposit rejection renders inline in the dialog, not as a corner toast", async ({ page }) => {
