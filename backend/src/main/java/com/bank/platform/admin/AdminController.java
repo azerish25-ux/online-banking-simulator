@@ -11,6 +11,7 @@ import com.bank.platform.auth.UserRepository;
 import com.bank.platform.ledger.InterestService;
 import com.bank.platform.ledger.Period;
 import com.bank.platform.ledger.ReconciliationService;
+import com.bank.platform.ledger.ReversalService;
 import com.bank.platform.ledger.StatementService;
 import com.bank.platform.ledger.Transaction;
 import com.bank.platform.ledger.TransactionKindReviewRepository;
@@ -38,6 +39,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -56,6 +58,7 @@ public class AdminController {
   private final ReportService reportService;
   private final StatementService statementService;
   private final ReconciliationService reconciliationService;
+  private final ReversalService reversalService;
   private final TransactionKindReviewRepository kindReviews;
   private final com.bank.platform.notifications.EmailOutboxService emailOutbox;
 
@@ -69,6 +72,7 @@ public class AdminController {
       ReportService reportService,
       StatementService statementService,
       ReconciliationService reconciliationService,
+      ReversalService reversalService,
       TransactionKindReviewRepository kindReviews,
       com.bank.platform.notifications.EmailOutboxService emailOutbox) {
     this.users = users;
@@ -80,6 +84,7 @@ public class AdminController {
     this.reportService = reportService;
     this.statementService = statementService;
     this.reconciliationService = reconciliationService;
+    this.reversalService = reversalService;
     this.kindReviews = kindReviews;
     this.emailOutbox = emailOutbox;
   }
@@ -237,6 +242,24 @@ public class AdminController {
     Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
     return TransactionMapper.toResponse(tx, ibans);
   }
+
+  /**
+   * Authorized reversal of a POSTED transaction (V29). A new REVERSAL row
+   * moves the money back along the original legs and is journaled as a linked
+   * correction; the original row is untouched. The operator's reason is
+   * mandatory and preserved on the row and in the audit trail.
+   */
+  @PostMapping("/transactions/{id}/reverse")
+  public TransactionResponse reverse(Authentication authentication, @PathVariable UUID id,
+      @RequestBody(required = false) ReversalRequest request) {
+    Transaction tx = reversalService.reverse(authentication.getName(), id,
+        request == null ? null : request.reason());
+    Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
+    return TransactionMapper.toResponse(tx, ibans);
+  }
+
+  /** The operator's mandatory reversal reason (validated in ReversalService). */
+  public record ReversalRequest(String reason) {}
 
   @GetMapping("/reports/daily-totals")
   public List<ReportService.DayTotal> dailyTotals(@RequestParam(defaultValue = "30") int days) {

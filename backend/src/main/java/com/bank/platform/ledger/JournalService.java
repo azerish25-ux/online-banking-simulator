@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
  * The ONLY writer of journal entries (F15). Every posted business operation
@@ -60,6 +61,18 @@ public class JournalService {
    */
   public JournalEntry post(JournalKind kind, String operationRef, Instant postedAt,
       String memo, Posting... postings) {
+    return post(kind, operationRef, postedAt, memo, null, postings);
+  }
+
+  /**
+   * Books a journal entry that is a linked correction of an earlier entry
+   * (V29): {@code reversesEntryId} names the original, immutable posting this
+   * new entry undoes. The reference must exist and must not already be
+   * reversed (one reversal per original entry - the DB also allows only one
+   * reversal per original transaction).
+   */
+  public JournalEntry post(JournalKind kind, String operationRef, Instant postedAt,
+      String memo, UUID reversesEntryId, Posting... postings) {
     if (kind == null) {
       throw new TransferValidationException("Journal kind is required");
     }
@@ -68,6 +81,16 @@ public class JournalService {
     }
     if (postings == null || postings.length < 2) {
       throw new TransferValidationException("A journal entry needs at least two postings");
+    }
+    if (reversesEntryId != null) {
+      if (!entries.existsById(reversesEntryId)) {
+        throw new TransferValidationException(
+            "Reversal references an entry that does not exist");
+      }
+      if (entries.countByReversesEntryId(reversesEntryId) > 0) {
+        throw new TransferValidationException(
+            "This entry has already been reversed; a posting is reversed once");
+      }
     }
     BigDecimal net = BigDecimal.ZERO;
     for (Posting posting : postings) {
@@ -79,7 +102,21 @@ public class JournalService {
           "Journal entry would not balance (net " + net.toPlainString() + ")");
     }
 
+    // The journal writer is ONLY reachable inside the transaction that owns
+    // the financial operation: a posting must commit (or roll back) with the
+    // operation's balance flip and status change, never float on its own. A
+    // caller that forgets the transaction boundary gets a loud error at the
+    // write, not a silently detached journal entry (F15 enforcement).
+    if (!TransactionSynchronizationManager.isActualTransactionActive()) {
+      throw new TransferValidationException(
+          "Journal entries may only be written inside the transaction that "
+              + "owns the financial operation");
+    }
+
     JournalEntry entry = new JournalEntry(kind, operationRef, "USD", postedAt, memo);
+    if (reversesEntryId != null) {
+      entry.setReversesEntryId(reversesEntryId);
+    }
     entries.saveAndFlush(entry);
     List<JournalLine> rows = new ArrayList<>(postings.length);
     for (int i = 0; i < postings.length; i++) {

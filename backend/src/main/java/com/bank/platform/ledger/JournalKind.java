@@ -9,5 +9,10 @@ public enum JournalKind {
   /** A monthly interest posting; the balancing side is INTEREST. */
   INTEREST,
   /** A labelled cutover entry that reproduces a pre-journal balance. */
-  OPENING_BALANCE
+  OPENING_BALANCE,
+  /**
+   * A linked correcting entry (V29): reverses an original posting via
+   * {@code reverses_entry_id}. Never an edit of the original entry.
+   */
+  REVERSAL
 }

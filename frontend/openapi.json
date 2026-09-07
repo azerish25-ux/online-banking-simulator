@@ -434,6 +434,18 @@
         "required" : [ "type" ],
         "type" : "object"
       },
+      "OperationGapRow" : {
+        "properties" : {
+          "kind" : {
+            "type" : "string"
+          },
+          "transactionId" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "kind", "transactionId" ],
+        "type" : "object"
+      },
       "OperationListItem" : {
         "properties" : {
           "amount" : {
@@ -456,7 +468,7 @@
             "type" : "string"
           },
           "kind" : {
-            "enum" : [ "TRANSFER", "DEPOSIT", "INTEREST" ],
+            "enum" : [ "TRANSFER", "DEPOSIT", "INTEREST", "REVERSAL" ],
             "type" : "string"
           },
           "memo" : {
@@ -817,9 +829,27 @@
             "format" : "int64",
             "type" : "integer"
           },
+          "operationConsistent" : {
+            "type" : "boolean"
+          },
+          "operationGaps" : {
+            "items" : {
+              "$ref" : "#/components/schemas/OperationGapRow"
+            },
+            "type" : "array"
+          },
           "projectionDifferences" : {
             "items" : {
               "$ref" : "#/components/schemas/AccountDifferenceRow"
+            },
+            "type" : "array"
+          },
+          "reversalConsistent" : {
+            "type" : "boolean"
+          },
+          "reversalIssues" : {
+            "items" : {
+              "$ref" : "#/components/schemas/ReversalIssueRow"
             },
             "type" : "array"
           },
@@ -830,7 +860,7 @@
             "type" : "array"
           }
         },
-        "required" : [ "balanced", "currencyNets", "duplicateOperations", "journalEntries", "journalLines", "projectionDifferences", "unbalancedEntries" ],
+        "required" : [ "balanced", "currencyNets", "duplicateOperations", "journalEntries", "journalLines", "operationConsistent", "operationGaps", "projectionDifferences", "reversalConsistent", "reversalIssues", "unbalancedEntries" ],
         "type" : "object"
       },
       "RegisterRequest" : {
@@ -852,6 +882,29 @@
           }
         },
         "required" : [ "email", "fullName", "password" ],
+        "type" : "object"
+      },
+      "ReversalIssueRow" : {
+        "properties" : {
+          "detail" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "type" : "string"
+          },
+          "reference" : {
+            "type" : "string"
+          }
+        },
+        "required" : [ "detail", "kind", "reference" ],
+        "type" : "object"
+      },
+      "ReversalRequest" : {
+        "properties" : {
+          "reason" : {
+            "type" : "string"
+          }
+        },
         "type" : "object"
       },
       "SortObject" : {
@@ -953,7 +1006,7 @@
             "type" : "string"
           },
           "kind" : {
-            "enum" : [ "TRANSFER", "DEPOSIT", "INTEREST" ],
+            "enum" : [ "TRANSFER", "DEPOSIT", "INTEREST", "REVERSAL" ],
             "type" : "string"
           },
           "memo" : {
@@ -1792,6 +1845,42 @@
             "type" : "string"
           }
         } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/TransactionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "admin-controller" ]
+      }
+    },
+    "/api/v1/admin/transactions/{id}/reverse" : {
+      "post" : {
+        "operationId" : "reverse",
+        "parameters" : [ {
+          "in" : "path",
+          "name" : "id",
+          "required" : true,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
+        } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/ReversalRequest"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {

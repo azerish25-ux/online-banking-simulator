@@ -241,6 +241,9 @@ public interface TransactionRepository
   @Query("select count(t) from Transaction t where t.kind = :kind and t.status = :status")
   long countByKindAndStatus(@Param("kind") TxKind kind, @Param("status") TxStatus status);
 
+  /** Duplicate-reversal protection: at most one reversal per original instruction. */
+  boolean existsByReversesTransactionId(UUID reversesTransactionId);
+
   @Query("select coalesce(sum(t.amount), 0) from Transaction t where t.kind = :kind and t.status = :status")
   Optional<BigDecimal> sumAmountByKindAndStatus(@Param("kind") TxKind kind, @Param("status") TxStatus status);
 

@@ -77,6 +77,20 @@ public class Transaction {
   @Column(name = "posted_at")
   private Instant postedAt;
 
+  /**
+   * For a REVERSAL row (V29): the id of the POSTED transaction it reverses.
+   * The original row is untouched - its history stays as it was; the reversal
+   * is a NEW linked operation that moves the money back. At most one reversal
+   * per original (PostgreSQL partial unique index; checked in the service on
+   * H2).
+   */
+  @Column(name = "reverses_transaction_id")
+  private UUID reversesTransactionId;
+
+  /** The operator's mandatory reason, preserved on the reversal row itself. */
+  @Column(name = "reversal_reason", length = 255)
+  private String reversalReason;
+
   // Monotonic insert sequence (DB identity, see V14). Listings tie-break equal
   // created_at values on this column so "newest first" is total: the random
   // UUID id cannot express insertion order. Read-only - the database assigns it.
@@ -108,6 +122,10 @@ public class Transaction {
   public void setCreatedAt(Instant v) { createdAt = v; }
   public Instant getPostedAt() { return postedAt; }
   public void setPostedAt(Instant v) { postedAt = v; }
+  public UUID getReversesTransactionId() { return reversesTransactionId; }
+  public void setReversesTransactionId(UUID v) { reversesTransactionId = v; }
+  public String getReversalReason() { return reversalReason; }
+  public void setReversalReason(String v) { reversalReason = v; }
   public Long getSeq() { return seq; }
 
   public void setFromAccountId(UUID v) { fromAccountId = v; }

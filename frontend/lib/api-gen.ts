@@ -340,6 +340,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/transactions/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post: operations["reverse"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/transactions/{id}/review": {
         parameters: {
             query?: never;
@@ -924,6 +940,10 @@ export interface components {
         OpenAccountRequest: {
             type: string;
         };
+        OperationGapRow: {
+            kind: string;
+            transactionId: string;
+        };
         OperationListItem: {
             amount: string;
             createdAt: string;
@@ -933,7 +953,7 @@ export interface components {
             id: string;
             idempotencyKey: string;
             /** @enum {string} */
-            kind: "TRANSFER" | "DEPOSIT" | "INTEREST";
+            kind: "TRANSFER" | "DEPOSIT" | "INTEREST" | "REVERSAL";
             memo: string | null;
             postedAt: string | null;
             /** @enum {string} */
@@ -1068,7 +1088,11 @@ export interface components {
             journalEntries: number;
             /** Format: int64 */
             journalLines: number;
+            operationConsistent: boolean;
+            operationGaps: components["schemas"]["OperationGapRow"][];
             projectionDifferences: components["schemas"]["AccountDifferenceRow"][];
+            reversalConsistent: boolean;
+            reversalIssues: components["schemas"]["ReversalIssueRow"][];
             unbalancedEntries: components["schemas"]["UnbalancedEntryRow"][];
         };
         RegisterRequest: {
@@ -1076,6 +1100,14 @@ export interface components {
             email: string;
             fullName: string;
             password: string;
+        };
+        ReversalIssueRow: {
+            detail: string;
+            kind: string;
+            reference: string;
+        };
+        ReversalRequest: {
+            reason?: string;
         };
         SortObject: {
             empty: boolean;
@@ -1111,7 +1143,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             /** @enum {string} */
-            kind: "TRANSFER" | "DEPOSIT" | "INTEREST";
+            kind: "TRANSFER" | "DEPOSIT" | "INTEREST" | "REVERSAL";
             memo: string | null;
             /** @description null while HELD or when CANCELLED - money has not moved */
             postedAt: string | null;
@@ -1679,6 +1711,32 @@ export interface operations {
             cookie?: never;
         };
         requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["TransactionResponse"];
+                };
+            };
+        };
+    };
+    reverse: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["ReversalRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

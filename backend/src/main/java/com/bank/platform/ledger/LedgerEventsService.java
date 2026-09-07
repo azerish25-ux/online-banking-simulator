@@ -88,6 +88,39 @@ public class LedgerEventsService {
                 + " was declined by operations; no money moved.")));
   }
 
+  /** An operator reversed a POSTED transfer: the money moves back along its legs. */
+  public void transactionReversed(User actor, Transaction original, Transaction reversal,
+      Account from, Account to) {
+    audits.save(AuditLog.of(actor.getId(), "TRANSACTION_REVERSED", "Transaction",
+        reversal.getId().toString(),
+        "reverses", original.getId().toString(),
+        "amount", reversal.getAmount().toPlainString(),
+        "from", from.getIban(), "to", to.getIban(),
+        "reason", reversal.getReversalReason()));
+    users.findById(from.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
+        "TRANSACTION_REVERSED", "Transfer reversed",
+        "A transfer of " + Money.usd(reversal.getAmount()) + " was reversed on your account "
+            + from.getIban() + "."));
+    users.findById(to.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
+        "TRANSACTION_REVERSED", "Transfer reversed",
+        "A transfer of " + Money.usd(reversal.getAmount()) + " was reversed on your account "
+            + to.getIban() + "."));
+  }
+
+  /** An operator reversed a POSTED deposit: the credited account is debited back to the rail. */
+  public void depositReversed(User actor, Transaction original, Transaction reversal, Account account) {
+    audits.save(AuditLog.of(actor.getId(), "DEPOSIT_REVERSED", "Transaction",
+        reversal.getId().toString(),
+        "reverses", original.getId().toString(),
+        "amount", reversal.getAmount().toPlainString(),
+        "account", account.getIban(),
+        "reason", reversal.getReversalReason()));
+    users.findById(account.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
+        "DEPOSIT_REVERSED", "Deposit reversed",
+        "A deposit of " + Money.usd(reversal.getAmount()) + " on " + account.getIban()
+            + " was reversed by operations."));
+  }
+
   private String ibanOf(UUID accountId) {
     return accounts.findById(accountId).map(Account::getIban).orElse("");
   }
