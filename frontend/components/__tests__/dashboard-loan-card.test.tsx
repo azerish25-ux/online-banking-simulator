@@ -86,14 +86,14 @@ describe("dashboard loan card", () => {
 
     // The debt reads as a labeled rose magnitude - never a bare "-$600.00".
     expect(await screen.findByText("$600.00")).toBeInTheDocument();
-    expect(screen.getByText("Outstanding loan - amount you owe")).toBeInTheDocument();
+    expect(screen.getByText("Outstanding loan (amount you owe)")).toBeInTheDocument();
     expect(screen.queryByText("-$600.00")).not.toBeInTheDocument();
 
     // Semantics intact: the net-position figure still subtracts the debt
     // (1,250 - 600 = 650) rather than treating it as a credit, and the label
     // names the scope and the loan treatment.
     expect(
-      screen.getByText("Net position across all your accounts - loans count as debt")
+      screen.getByText("Net position across all your accounts. Loans count as debt.")
     ).toBeInTheDocument();
     expect(screen.getByText("$650.00")).toBeInTheDocument();
   });

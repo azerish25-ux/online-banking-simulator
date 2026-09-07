@@ -134,7 +134,7 @@ export function DepositDialog({
             </Select>
           </Field>
         )}
-        <Field label="Amount (USD)" hint="Simulated funding - appears instantly." error={error}>
+        <Field label="Amount (USD)" hint="Simulated funding, credited instantly." error={error}>
           <Input
             value={amount}
             onChange={(e) => {

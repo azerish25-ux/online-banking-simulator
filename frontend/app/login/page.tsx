@@ -39,7 +39,7 @@ export default function LoginPage() {
         router.push(Routes.dashboard);
         return;
       }
-      push("Unexpected login response - try again.", "error");
+      push("Unexpected login response. Try again.", "error");
     } catch (err) {
       push(err instanceof Error ? err.message : "Login failed", "error");
     }

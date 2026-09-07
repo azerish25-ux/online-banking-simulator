@@ -146,7 +146,7 @@ test("operator approve and decline of a HELD transfer is reflected everywhere", 
   const queueRow = queueRowFor(page, checkingTail, savingsTail);
   await expect(queueRow).toContainText("$10,000.00", { timeout: 10_000 });
   await queueRow.getByRole("button", { name: "Approve" }).click();
-  await expect(page.getByText("Approved - transfer settled.")).toBeVisible();
+  await expect(page.getByText("Approved. Transfer settled.")).toBeVisible();
   await expect(queueRow).toHaveCount(0, { timeout: 10_000 }); // queue empties for this transfer
 
   // The operator's decision lands in the audit log with the moved funds.
@@ -180,7 +180,7 @@ test("operator approve and decline of a HELD transfer is reflected everywhere", 
   await declinedQueueRow.getByRole("button", { name: "Decline" }).click();
   await expect(page.getByRole("heading", { name: "Decline this transfer?" })).toBeVisible();
   await page.getByRole("button", { name: "Decline transfer" }).click();
-  await expect(page.getByText("Declined - no money moved.")).toBeVisible();
+  await expect(page.getByText("Declined. No money moved.")).toBeVisible();
   await expect(declinedQueueRow).toHaveCount(0, { timeout: 10_000 });
 
   await page.getByLabel("Filter by action").fill("TRANSFER_DECLINED");

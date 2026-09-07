@@ -59,7 +59,7 @@ test("review-threshold transfer is held for review, never reported as posted", a
   await expect(page).toHaveURL(/\/transfers\/receipt\//);
   await expect(page.getByRole("heading", { name: "Transfer receipt" })).toBeVisible();
   await expect(page.getByText(/awaiting operator review/)).toBeVisible();
-  await expect(page.getByText(/Not yet - no money has moved/)).toBeVisible();
+  await expect(page.getByText(/Not yet posted/)).toBeVisible();
 });
 
 test("full money loop in the browser", async ({ page }) => {
@@ -115,7 +115,7 @@ test("full money loop in the browser", async ({ page }) => {
   // authoritative POSTED state and posting time - never component state.
   await page.goto(receiptHref as string);
   await expect(page.getByRole("heading", { name: "Transfer receipt" })).toBeVisible();
-  await expect(page.getByText("Settled - the money moved")).toBeVisible();
+  await expect(page.getByText("Settled. The money moved")).toBeVisible();
   // The status badge (uppercase-styled span next to the title) - the first
   // POSTED match; the receipt's "Posted" field label also renders uppercase.
   await expect(page.locator("main").getByText("POSTED", { exact: true }).first()).toBeVisible();

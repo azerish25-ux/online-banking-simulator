@@ -44,12 +44,12 @@ export function ReversalAction({ tx }: { tx: Tx }) {
         tx.kind === "DEPOSIT"
           ? {
               message:
-                "Deposit reversed - " + usd(reversal.amount) + " was returned from "
+                "Deposit reversed. " + usd(reversal.amount) + " was returned from "
                 + (maskIban(reversal.fromIban) ?? "the account") + " to the funding rail."
             }
           : {
               message:
-                "Reversed - " + usd(reversal.amount) + " moved back from "
+                "Reversed. " + usd(reversal.amount) + " moved back from "
                 + maskIban(reversal.fromIban ?? "") + " to " + maskIban(reversal.toIban ?? "") + "."
             },
       run: () => {
@@ -95,7 +95,7 @@ export function ReversalAction({ tx }: { tx: Tx }) {
             </p>
             <Field
               label="Reason"
-              hint="Required - preserved on the reversal row and in the audit trail."
+              hint="Required. Preserved on the reversal row and in the audit trail."
             >
               <Textarea
                 value={reason}

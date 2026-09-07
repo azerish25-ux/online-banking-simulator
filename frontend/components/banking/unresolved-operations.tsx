@@ -26,16 +26,16 @@ function resolvedMessage(op: UnresolvedOperation, status: Tx["status"], data: Tx
     // The deposit envelope nests the account it funded; name it when present.
     const account = (data as Deposit).account;
     const to = account ? " to " + account.type + " " + (maskIban(account.iban) ?? "") : "";
-    return "Deposit posted - " + amount + " was credited" + to + ".";
+    return "Deposit posted. " + amount + " was credited" + to + ".";
   }
   if (status === "HELD") {
-    return "Transfer submitted for review - no money has moved yet; an operator must approve it.";
+    return "Transfer submitted for review. No money has moved yet; an operator must approve it.";
   }
   if (status === "CANCELLED") {
-    return "This transfer was cancelled - nothing moved.";
+    return "This transfer was cancelled. Nothing moved.";
   }
   const destination = maskIban(op.toIban);
-  return "Transfer posted - " + amount + (destination ? " to " + destination : "") + ".";
+  return "Transfer posted. " + amount + (destination ? " to " + destination : "") + ".";
 }
 
 /**
@@ -92,7 +92,7 @@ export function UnresolvedOperations() {
       <CardDescription className="mb-3">
         A deposit or transfer you sent ended without a confirmed answer. Nothing was lost:
         checking it again re-sends the exact same request, so the server returns the original
-        result - money can never move twice.
+        result. Money can never move twice.
       </CardDescription>
       <ul className="space-y-2">
         {items.map((op) => {
@@ -108,7 +108,7 @@ export function UnresolvedOperations() {
               <div className="min-w-0">
                 <p className="text-sm font-medium">
                   {op.kind === "deposit" ? "Deposit" : "Transfer"}
-                  {" - "}
+                  {" · "}
                   {usd(op.amount ?? "")}
                   {destination ? " to " + destination : ""}
                   {op.memo ? <span className="muted"> · {op.memo}</span> : null}

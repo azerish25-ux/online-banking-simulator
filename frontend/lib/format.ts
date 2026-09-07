@@ -148,7 +148,7 @@ export function fmtDate(iso: string): string {
 }
 
 /**
- * "...last six" of an IBAN for listings - enough to recognize an account you
+ * "...last six" of an IBAN for listings. Enough to recognize an account you
  * own, never enough to reproduce it. Absent values return null so the caller
  * picks the label ("DEPOSIT", "external", "-") that fits the column.
  */

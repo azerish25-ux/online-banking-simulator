@@ -56,18 +56,18 @@ export function ReviewQueueSection() {
       toast: (settled) => {
         const flaggedDeposit = settled.kind === "DEPOSIT" || !settled.fromIban;
         if (flaggedDeposit) {
-          return { message: "Flag acknowledged - the deposit was credited when it arrived." };
+          return { message: "Flag acknowledged. The deposit was credited when it arrived." };
         }
         return settled.status === "POSTED"
-          ? { message: "Approved - transfer settled." }
-          : { message: "Review recorded - case is now " + String(settled.status) + "." };
+          ? { message: "Approved. Transfer settled." }
+          : { message: "Review recorded. Case is now " + String(settled.status) + "." };
       }
     }
   });
   useResultToast(decline, {
     success: {
       toast: () => ({
-        message: "Declined - no money moved."
+        message: "Declined. No money moved."
       }),
       run: () => setDeclineCandidate(null)
     }
@@ -82,7 +82,7 @@ export function ReviewQueueSection() {
       {queue.isError && queue.data == null ? (
         <LoadFailed
           title="Couldn't load the review queue"
-          description="Nothing changed on the cases - the request failed. Try again."
+          description="Nothing changed on the cases. The request failed. Try again."
           onRetry={() => queue.refetch()}
         />
       ) : queue.isLoading && queue.data == null ? (
@@ -168,7 +168,7 @@ export function ReviewQueueSection() {
             <>
               {usd(declineCandidate.amount)} from{" "}
               <span className="mono">{maskIban(declineCandidate.fromIban ?? "")}</span> will be
-              cancelled - it never settles and no money moves. The sender is notified of the
+              cancelled. It never settles and no money moves. The sender is notified of the
               decision.
             </>
           ) : null

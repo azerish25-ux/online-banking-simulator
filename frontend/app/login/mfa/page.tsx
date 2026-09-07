@@ -22,7 +22,7 @@ export default function MfaChallengePage() {
     e.preventDefault();
     const token = peekMfaToken();
     if (!token) {
-      push("Your login challenge expired - log in again.", "error");
+      push("Your login challenge expired. Please log in again.", "error");
       router.push(Routes.login);
       return;
     }

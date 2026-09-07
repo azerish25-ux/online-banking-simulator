@@ -49,12 +49,12 @@ it("surfaces the error message once per failed attempt, never on re-renders", ()
 
 it("honors a custom error spec and tone", () => {
   const { rerender } = renderHook(({ result }: Props) => useResultToast(result, {
-    error: { message: "Couldn't load your beneficiaries - type the IBAN manually.", tone: "error" }
+    error: { message: "Couldn't load your beneficiaries. Type the IBAN manually.", tone: "error" }
   }), { initialProps: { result: idle } });
 
   rerender({ result: fail("boom") });
   expect(pushMock).toHaveBeenCalledTimes(1);
-  expect(pushMock).toHaveBeenCalledWith("Couldn't load your beneficiaries - type the IBAN manually.", "error");
+  expect(pushMock).toHaveBeenCalledWith("Couldn't load your beneficiaries. Type the IBAN manually.", "error");
 });
 
 it("stays silent when a failure is deliberately suppressed", () => {

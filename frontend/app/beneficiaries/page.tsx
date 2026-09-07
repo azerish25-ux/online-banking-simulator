@@ -88,7 +88,7 @@ export default function BeneficiariesPage() {
           {beneficiaries.isError && items == null ? (
             <LoadFailed
               title="Couldn't load your beneficiaries"
-              description="The saved list failed to load - you can still type an IBAN manually when sending."
+              description="The saved list failed to load. You can still type an IBAN manually when sending."
               onRetry={() => beneficiaries.refetch()}
             />
           ) : beneficiaries.isLoading || items == null ? (

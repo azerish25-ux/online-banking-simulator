@@ -183,7 +183,7 @@ export default function ActivityPage() {
         ) : page.isError && page.data == null ? (
           <LoadFailed
             title="Couldn't load transactions"
-            description="Nothing changed on your side - the history request failed. Try again."
+            description="Nothing changed on your side. The history request failed. Try again."
             onRetry={() => page.refetch()}
           />
         ) : !accountId ? (
@@ -197,7 +197,7 @@ export default function ActivityPage() {
           <>
             {page.isError && page.data != null ? (
               <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-line bg-ink-800/60 px-3 py-2 text-sm">
-                <p className="text-content-muted">Couldn&apos;t refresh - showing the last loaded page.</p>
+                <p className="text-content-muted">Couldn&apos;t refresh. Showing the last loaded page.</p>
                 <Button type="button" variant="ghost" size="sm" onClick={() => page.refetch()}>Retry</Button>
               </div>
             ) : null}

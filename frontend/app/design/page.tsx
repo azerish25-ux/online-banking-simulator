@@ -27,7 +27,7 @@ export default function DesignPage() {
           </Link>
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">Design system</h1>
-        <p className="muted mt-1 text-sm">The primitives used across the app - one source of truth for the UI.</p>
+        <p className="muted mt-1 text-sm">The primitives used across the app, kept as one source of truth for the UI.</p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
           <Card>
@@ -127,7 +127,7 @@ export default function DesignPage() {
           <Card>
             <CardTitle>Color tokens</CardTitle>
             <CardDescription>
-              Every color a view can name comes from tailwind.config.ts - default
+              Every color a view can name comes from tailwind.config.ts. Default
               Tailwind hues and raw hex literals are banned by
               <span className="mono"> scripts/check-design-tokens.mjs</span>.
             </CardDescription>
@@ -156,7 +156,7 @@ export default function DesignPage() {
                 <span className="mono"> prefers-reduced-motion</span>.</li>
             </ul>
             <p className="muted mt-3 text-xs">
-              Every animation is applied with motion-safe: variants - nothing
+              Every animation is applied with motion-safe variants, so nothing
               moves for users who ask not to see motion.
             </p>
           </Card>
@@ -168,7 +168,7 @@ export default function DesignPage() {
             Two registers on purpose, never mixed inside one surface:
           </CardDescription>
           <ul className="mt-3 grid list-disc gap-2 pl-5 text-sm md:grid-cols-2">
-            <li className="muted">Product copy reads like a bank&rsquo;s - deposits,
+            <li className="muted">Product copy reads like a bank&rsquo;s: deposits,
               review desk, statements. No &ldquo;idempotent&rdquo; or
               &ldquo;atomic&rdquo; on customer screens.</li>
             <li className="muted">The machinery lives behind the &ldquo;About this

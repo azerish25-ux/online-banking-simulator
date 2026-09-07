@@ -43,7 +43,7 @@ export function classifyMoneyFailure(
       return {
         ambiguous: true,
         message:
-          "This " + what + " was submitted before under the same attempt id - it may have already gone through. "
+          "This " + what + " was submitted before under the same attempt id, so it may already have gone through. "
           + "Submitting it again fetches the original result and can never move money twice."
       };
     }
@@ -51,7 +51,7 @@ export function classifyMoneyFailure(
       return {
         ambiguous: true,
         message:
-          "Too many attempts right now - nothing was lost. Wait a moment and retry; "
+          "Too many attempts right now. Nothing was lost. Wait a moment and retry; "
           + "the retry cannot double-post."
       };
     }
@@ -60,7 +60,7 @@ export function classifyMoneyFailure(
         ambiguous: true,
         message:
           "The server could not confirm whether your " + what + " went through. "
-          + "The attempt is saved - retry to check; it can only post once."
+          + "The attempt is saved. Retry to check; it can only post once."
       };
     }
   }
@@ -74,7 +74,7 @@ export function classifyMoneyFailure(
     ambiguous: true,
     message:
       "We couldn't reach the server, so we can't confirm whether your " + what + " went through. "
-      + "The attempt is saved - retry to check; it can never double-post."
+      + "The attempt is saved. Retry to check; it can never double-post."
   };
 }
 
@@ -94,7 +94,7 @@ export function classifyReversalFailure(err: unknown): MoneyFailure {
     ambiguous: true,
     message:
       "The server could not confirm whether the reversal was recorded. "
-      + "Refresh the posted list to see the true state before acting again - "
-      + "a second reversal of the same transaction would be refused."
+      + "Refresh the posted list to see the true state before acting again. "
+      + "A second reversal of the same transaction would be refused."
   };
 }

@@ -112,9 +112,9 @@ describe("UnresolvedOperations recovery surface", () => {
     });
 
     // The unresolved row explains the state and names the reviewed intent.
-    expect(await screen.findByText(/Transfer - \$5\.00 to ...999999/)).toBeInTheDocument();
+    expect(await screen.findByText(/Transfer · \$5\.00 to ...999999/)).toBeInTheDocument();
     expect(screen.getByText(/the answer never arrived/)).toBeInTheDocument();
-    expect(screen.getByText(/money can never move twice/)).toBeInTheDocument();
+    expect(screen.getByText(/Money can never move twice/)).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /Check again/ }));
 
@@ -129,7 +129,7 @@ describe("UnresolvedOperations recovery surface", () => {
       memo: "Rent"
     });
     // The outcome is heard and the row is gone.
-    expect(await screen.findByText("Transfer posted - $5.00 to ...999999.")).toBeInTheDocument();
+    expect(await screen.findByText("Transfer posted. $5.00 to ...999999.")).toBeInTheDocument();
     expect(screen.queryByText("Unresolved operations")).not.toBeInTheDocument();
   });
 
@@ -155,7 +155,7 @@ describe("UnresolvedOperations recovery surface", () => {
       }
       return {};
     });
-    await screen.findByText(/Transfer - \$5\.00 to ...999999/);
+    await screen.findByText(/Transfer · \$5\.00 to ...999999/);
 
     await userEvent.click(screen.getByRole("button", { name: /Check again/ }));
 
@@ -167,7 +167,7 @@ describe("UnresolvedOperations recovery surface", () => {
       )
     );
     expect(listPendingOperations("u1")).toHaveLength(1);
-    expect(screen.getByText(/Transfer - \$5\.00 to ...999999/)).toBeInTheDocument();
+    expect(screen.getByText(/Transfer · \$5\.00 to ...999999/)).toBeInTheDocument();
   });
 
   it("clears the record and surfaces the server's words on a definitive rejection", async () => {
@@ -180,7 +180,7 @@ describe("UnresolvedOperations recovery surface", () => {
       }
       return {};
     });
-    await screen.findByText(/Transfer - \$5\.00 to ...999999/);
+    await screen.findByText(/Transfer · \$5\.00 to ...999999/);
 
     await userEvent.click(screen.getByRole("button", { name: /Check again/ }));
 

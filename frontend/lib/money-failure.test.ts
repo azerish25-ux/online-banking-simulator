@@ -26,21 +26,21 @@ describe("classifyMoneyFailure", () => {
     const failure = classifyMoneyFailure("transfer", new ApiError(503, "Server Error", "boom"));
     expect(failure.ambiguous).toBe(true);
     expect(failure.message).toContain("could not confirm");
-    expect(failure.message).toContain("retry to check");
+    expect(failure.message).toContain("Retry to check");
     expect(failure.message).toContain("post once");
   });
 
   it("treats a 429 as rate-limiting, never proof of rejection", () => {
     const failure = classifyMoneyFailure("deposit", new ApiError(429, "Too Many Requests", "slow down"));
     expect(failure.ambiguous).toBe(true);
-    expect(failure.message).toContain("nothing was lost");
+    expect(failure.message).toContain("Nothing was lost");
     expect(failure.message).toContain("cannot double-post");
   });
 
   it("treats a 409 key conflict as unknown - the operation may already exist", () => {
     const failure = classifyMoneyFailure("deposit", new ApiError(409, "Idempotency Conflict", "used"));
     expect(failure.ambiguous).toBe(true);
-    expect(failure.message).toContain("may have already gone through");
+    expect(failure.message).toContain("may already have gone through");
     expect(failure.message).toContain("can never move money twice");
   });
 
@@ -49,7 +49,7 @@ describe("classifyMoneyFailure", () => {
     expect(failure.message.toLowerCase()).not.toContain("check your balance");
     // The whole point: the attempt is saved and a retry is the safe check.
     expect(failure.message).toContain("attempt is saved");
-    expect(failure.message).toContain("retry");
+    expect(failure.message).toContain("Retry to check");
   });
 });
 
@@ -78,7 +78,7 @@ describe("classifyReversalFailure", () => {
       expect(failure.message).toContain("could not confirm whether the reversal was recorded");
       // The check is the posted list - NOT a blind retry.
       expect(failure.message).toContain("Refresh the posted list");
-      expect(failure.message).toContain("a second reversal of the same transaction would be refused");
+      expect(failure.message).toContain("A second reversal of the same transaction would be refused");
     }
   });
 });

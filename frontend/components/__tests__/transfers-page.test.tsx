@@ -121,7 +121,7 @@ describe("transfers page HELD outcome", () => {
     // to the legacy window.status global and toasted "Transfer posted.".
     await screen.findByRole("heading", { name: "Transfer submitted for review" });
     await waitFor(() =>
-      expect(screen.getByText(/it is sent once an operator approves it/)).toBeTruthy()
+      expect(screen.getByText(/It is sent once an operator approves it/)).toBeTruthy()
     );
     expect(screen.queryByText("Transfer posted.")).toBeNull();
 

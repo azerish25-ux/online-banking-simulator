@@ -63,12 +63,12 @@ export function OpenAccountDialog({
         {failure && <InlineAlert>{failure}</InlineAlert>}
         <Field label="Account type">
           <Select value={type} onChange={(e) => setType(e.target.value)}>
-            <option value="CHECKING">Checking - everyday money</option>
-            <option value="SAVINGS">Savings - earns monthly interest</option>
-            <option value="LOAN" disabled={hasLoan}>Loan - borrow up to $1,000 by sending money from it</option>
+            <option value="CHECKING">Checking (everyday money)</option>
+            <option value="SAVINGS">Savings (earns monthly interest)</option>
+            <option value="LOAN" disabled={hasLoan}>Loan (borrow up to $1,000 by sending money from it)</option>
           </Select>
           {hasLoan && (
-            <p className="muted mt-2 text-xs">You already have a loan open - settle it before taking out another.</p>
+            <p className="muted mt-2 text-xs">You already have a loan open. Settle it before taking out another.</p>
           )}
         </Field>
         <div className="flex justify-end gap-2">

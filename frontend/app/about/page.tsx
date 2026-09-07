@@ -21,7 +21,7 @@ export default function AboutPage() {
         </p>
         <h1 className="mt-2 text-3xl font-bold tracking-tight">{AboutThisDemo}</h1>
         <p className="muted mt-1 max-w-2xl text-sm">
-          What you can do here, what is simulated, and the machinery underneath -
+          What you can do here, what is simulated, and the machinery underneath,
           in plain words.
         </p>
 
@@ -29,9 +29,9 @@ export default function AboutPage() {
           <CardTitle>What this is</CardTitle>
           <CardDescription>
             {BrandName} is a working banking core with a full interface: checking,
-            savings and loan accounts; transfers with a review desk; monthly
+            savings, and loan accounts; transfers with a review desk; monthly
             interest; virtual cards; two-factor sign-in; and an operator console
-            with an audit trail. The money is simulated - no real funds move -
+            with an audit trail. The money is simulated, so no real funds move,
             but the software behaves like a bank&rsquo;s: balances are exact,
             transfers settle atomically, and every movement is recorded.
           </CardDescription>
@@ -43,7 +43,7 @@ export default function AboutPage() {
             <CardDescription>
               A transfer locks both accounts and settles in one step. If a send is
               interrupted and you retry it, the retry is recognised and the money
-              still moves exactly once - never twice. Tests prove this by racing
+              still moves exactly once, never twice. Tests prove this by racing
               transfers in opposite directions against a real database.
             </CardDescription>
           </Card>
@@ -51,9 +51,9 @@ export default function AboutPage() {
             <CardTitle>Large wires stop for a human</CardTitle>
             <CardDescription>
               A transfer of $10,000 or more is never sent on submit. It is held in
-              the operators&rsquo; review queue - <em>Review queue</em> under
-              Operations - until an operator approves it (money moves) or
-              declines it (nothing ever leaves your account). Flagged deposits
+              the operators&rsquo; review queue (<em>Review queue</em> under
+              Operations) until an operator approves it, which moves the money, or
+              declines it, which leaves your account untouched. Flagged deposits
               credit on arrival and just need acknowledging.
             </CardDescription>
           </Card>
@@ -89,7 +89,7 @@ export default function AboutPage() {
             <CardDescription>
               Deposits arrive through a demo rail instead of a real payment
               network, notifications go to an in-app center (with an email stub
-              in the logs), and virtual cards are issued for show - there is no
+              in the logs), and virtual cards are issued for show. There is no
               card payment rail. Recipients must hold an account here, because
               the demo never dials out to real banks.
             </CardDescription>
@@ -97,7 +97,7 @@ export default function AboutPage() {
         </div>
 
         <div className="mt-6 rounded-md border border-line p-5">
-          <p className="caps text-content-muted">Residual risks, honestly</p>
+          <p className="caps text-content-muted">Residual risks</p>
           <ul className="muted mt-3 list-disc space-y-2 pl-5 text-sm">
             <li>
               The browser holds a short-lived access token that the app&rsquo;s routing
@@ -107,7 +107,7 @@ export default function AboutPage() {
             </li>
             <li>
               Login throttling and TOTP budgets are in-memory, so they are
-              single-instance by design - a load-balanced deployment would move
+              single-instance by design. A load-balanced deployment would move
               them to a shared store.
             </li>
             <li>

@@ -75,7 +75,7 @@ test("TOTP round trip: enable, challenge at next login, disable", async ({ page 
     )
   );
   await expect(page.getByText("ON", { exact: true })).toBeVisible();
-  await expect(page.getByText(/Active - a six-digit code is required/)).toBeVisible();
+  await expect(page.getByText(/Active: a six-digit code is required/)).toBeVisible();
 
   // --- Sign out: the next login must challenge before any session exists.
   await logout(page);

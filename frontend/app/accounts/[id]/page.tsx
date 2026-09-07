@@ -49,7 +49,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
   // is a direct page action, so it keeps its corner toast.
   useResultToast(issue, {
     success: {
-      toast: { message: "Virtual card issued. Copy it now - it is never shown again." },
+      toast: { message: "Virtual card issued. Copy it now. It will not be shown again." },
       run: (card) => setIssued(card)
     }
   });
@@ -84,7 +84,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
         <div className="mt-3">
           <LoadFailed
             title="Couldn't load this account"
-            description="The request failed - your money is safe. Try again in a moment."
+            description="The request did not go through. Try again in a moment."
             onRetry={() => account.refetch()}
           />
         </div>
@@ -100,7 +100,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
           {isOutstandingLoan ? (
             // A drawn loan is debt - same "amount you owe" treatment as the cards.
             <>
-              <p className="label muted mt-1 text-xs">Outstanding loan - amount you owe</p>
+              <p className="label muted mt-1 text-xs">Outstanding loan (amount you owe)</p>
               <p className="mt-1 text-4xl font-bold tabular-nums text-rose">{usdFromCents(-decimalToCents(account.data.balance))}</p>
               <p className="muted text-sm">Repay by sending money to this account from another of yours. Interest accrues monthly on what you owe.</p>
             </>
@@ -124,7 +124,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
               </div>
               {issued && (
                 <div className="mb-3 rounded-md border border-success-border bg-success-surface p-4" role="status">
-                  <p className="text-sm font-medium text-mint">Copy now - shown only once.</p>
+                  <p className="text-sm font-medium text-mint">Copy now. This number is shown only once.</p>
                   <p className="mono mt-2 text-xl tracking-widest">{issued.pan}</p>
                   <p className="mono muted text-sm">CVV {issued.cvv} · Exp {issued.expMonth}/{issued.expYear}</p>
                 </div>
@@ -194,7 +194,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
           freezeCandidate ? (
             <>
               Card <span className="mono">•••• {freezeCandidate.last4}</span> will stop working until you
-              unfreeze it. You can unfreeze any time - this is not permanent.
+              unfreeze it. You can unfreeze it at any time. This is not permanent.
             </>
           ) : null
         }

@@ -76,7 +76,7 @@ describe("ActivitySection - the console reversal workbench", () => {
 
     // The reversal row is labelled, linked to its parent, and quotes the reason.
     expect(await screen.findByText("Reversal")).toBeInTheDocument();
-    expect(screen.getByText(/Reverses t1 - “Customer confirmed double charge”/)).toBeInTheDocument();
+    expect(screen.getByText(/Reverses t1: “Customer confirmed double charge”/)).toBeInTheDocument();
     // The original row is untouched history but visibly marked as reversed.
     expect(screen.getByText("Reversed")).toBeInTheDocument();
     // Neither row offers a second reversal.

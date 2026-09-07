@@ -146,7 +146,7 @@ describe("ReversalAction dialog", () => {
     await waitFor(() =>
       expect(screen.queryByText("Reverse this transaction?")).not.toBeInTheDocument()
     );
-    expect(await screen.findByText(/Reversed - \$90\.00 moved back from/)).toBeInTheDocument();
+    expect(await screen.findByText(/Reversed\. \$90\.00 moved back from/)).toBeInTheDocument();
   });
 
   it("shows a definitive refusal inline and keeps the dialog open", async () => {
@@ -175,7 +175,7 @@ describe("ReversalAction dialog", () => {
       /The server could not confirm whether the reversal was recorded/
     );
     expect(screen.getByRole("alert")).toHaveTextContent(
-      /a second reversal of the same transaction would be refused/
+      /A second reversal of the same transaction would be refused/
     );
     // The dialog stays so the operator can see the row still needs a decision.
     expect(screen.getByText("Reverse this transaction?")).toBeInTheDocument();

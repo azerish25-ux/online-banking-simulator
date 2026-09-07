@@ -91,7 +91,7 @@ export default function SettingsPage() {
     }
   });
   useResultToast(cancelSetup, {
-    success: { toast: { message: "Setup cancelled - your current settings are unchanged." } }
+    success: { toast: { message: "Setup cancelled. Your current settings are unchanged." } }
   });
   useResultToast(disable, {
     error: false,
@@ -152,7 +152,7 @@ export default function SettingsPage() {
       await navigator.clipboard.writeText(pendingSetup.secret);
       push("Secret copied.", "success");
     } catch {
-      push("Couldn't copy - select the secret manually.", "error");
+      push("Couldn't copy. Select the secret manually.", "error");
     }
   }
 
@@ -176,7 +176,7 @@ export default function SettingsPage() {
               <CardTitle>Authenticator app (TOTP)</CardTitle>
               <CardDescription>
                 {totpEnabled
-                  ? "Active - a six-digit code is required when you log in."
+                  ? "Active: a six-digit code is required when you log in."
                   : "Add a second factor so a stolen password alone can't open your account."}
               </CardDescription>
             </div>
@@ -309,7 +309,7 @@ export default function SettingsPage() {
       <Modal open={disableOpen} onClose={() => setDisableOpen(false)} title="Turn off two-factor?">
         <p className="text-sm">
           Enter your password and a current authenticator code to confirm. This weakens your account
-          security - consider re-enabling it afterwards.
+          security. Consider re-enabling it afterwards.
         </p>
         <div className="mt-4 space-y-4">
           <Field label="Password" error={disableError?.includes("credential") ? disableError : undefined}>

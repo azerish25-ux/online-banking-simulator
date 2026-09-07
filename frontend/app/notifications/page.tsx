@@ -47,7 +47,7 @@ export default function NotificationsPage() {
       {notifications.isError && notifications.data == null ? (
         <LoadFailed
           title="Couldn't load notifications"
-          description="Nothing changed on your side - the request failed. Try again."
+          description="Nothing changed on your side. The request failed. Try again."
           onRetry={() => notifications.refetch()}
         />
       ) : notifications.isLoading && notifications.data == null ? (

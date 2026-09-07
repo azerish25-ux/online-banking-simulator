@@ -90,7 +90,7 @@ export default function TransfersPage() {
   // settle transition and reads the current form through `lastIntent`, so a
   // refetch after the send can never replay the receipt or the toast.
   useResultToast(beneficiaries, {
-    error: { message: "Couldn't load your beneficiaries - type the IBAN manually." }
+    error: { message: "Couldn't load your beneficiaries. Type the IBAN manually." }
   });
   useResultToast(transfer, {
     // Truthful failure copy (interrupted-response UX): a definitive rejection
@@ -103,7 +103,7 @@ export default function TransfersPage() {
     success: {
       toast: (d) =>
         d.status === "HELD"
-          ? { message: "Transfer submitted for review - it is sent once an operator approves it.", tone: "info" }
+          ? { message: "Transfer submitted for review. It is sent once an operator approves it.", tone: "info" }
           : { message: "Transfer posted." },
       run: (d) => {
         // A transfer always has a destination; the schema marks toIban
@@ -145,7 +145,7 @@ export default function TransfersPage() {
       <h1 className="text-2xl font-bold tracking-tight">Send money</h1>
       <p className="muted mt-1 max-w-2xl text-sm">
         Transfers post right away. Amounts of $10,000 or more go to the review
-        desk first - nothing leaves your account until an operator approves them.
+        desk first. Nothing leaves your account until an operator approves them.
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
@@ -161,14 +161,14 @@ export default function TransfersPage() {
             <Field
               label="Recipient IBAN"
               error={formState.errors.toIban?.message}
-              hint="The recipient needs an account opened here - add a beneficiary to fill it in one tap."
+              hint="The recipient needs an account opened here. Add a beneficiary to fill it in one tap."
             >
               <Input placeholder="DE..." autoComplete="off" {...register("toIban")} />
             </Field>
             <Field
               label="Amount (USD)"
               error={formState.errors.amount?.message}
-              hint="Transfers of $10,000 or more are held for review - no money moves until an operator approves."
+              hint="Transfers of $10,000 or more are held for review. No money moves until an operator approves."
             >
               <Input placeholder="10.00" inputMode="decimal" {...register("amount")} />
             </Field>
@@ -221,7 +221,7 @@ export default function TransfersPage() {
               </dl>
               <p className="muted mt-3 text-xs">
                 Confirm to submit exactly this. Amounts of $10,000 or more go to the review
-                desk first - nothing leaves your account until an operator approves.
+                desk first. Nothing leaves your account until an operator approves.
               </p>
               <div className="mt-3 flex justify-end gap-2">
                 <Button type="button" variant="secondary" onClick={() => setReview(null)}>
@@ -272,7 +272,7 @@ export default function TransfersPage() {
               </CardDescription>
               {receipt.status === "HELD" && (
                 <p className="muted mt-2 text-sm">
-                  No money has moved yet - the transfer is queued for operator review.
+                  No money has moved yet. The transfer is queued for operator review.
                 </p>
               )}
               <p className="mono muted mt-2 text-xs">id {receipt.id}</p>

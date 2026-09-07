@@ -18,15 +18,14 @@ export default function Home() {
         <p className="caps text-brass-400">{BrandName} · demo core</p>
 
         <h1 className="display mt-5 max-w-3xl text-5xl font-semibold leading-[1.05] tracking-tight md:text-6xl">
-          Everything moves,
-          <span className="block text-brass-300">and it all adds up.</span>
+          Checking, savings, loans, transfers,
+          <span className="block text-brass-300">interest, cards, and an operator console.</span>
         </h1>
 
         <p className="muted mt-6 max-w-xl text-base leading-relaxed">
-          A complete banking core - checking, savings, loans, transfers with a
-          review desk, monthly interest, virtual cards and an operator console -
-          built on Next.js and Spring Boot. Not a mock: the numbers on this page
-          are served by the running system.
+          A working banking core built with Next.js and Spring Boot. This is
+          not a mockup. The numbers on this page are served by the running
+          system.
         </p>
 
         <div className="mt-8 flex flex-wrap gap-3">
@@ -43,15 +42,15 @@ export default function Home() {
         <div className="mt-14 grid gap-px overflow-hidden rounded-md border border-line bg-line md:grid-cols-3">
           <Feature
             title="Transfers that settle exactly once"
-            body="A transfer locks both accounts and settles in one step. Retry an interrupted send as often as you like - the money still moves exactly once, never twice."
+            body="A transfer locks both accounts and settles in one step. You can retry an interrupted send as often as you like. The money still moves exactly once, never twice."
           />
           <Feature
-            title="Large wires stop for a human"
-            body="Sends of $10,000 or more are held, not sent. An operator approves or declines them in the review queue - you can watch it happen in the product."
+            title="Large transfers stop for a human"
+            body="Sends of $10,000 or more are held rather than sent. An operator approves or declines them in the review queue, and you can follow the decision in the product."
           />
           <Feature
             title="Every move leaves a record"
-            body="Each deposit, transfer and approval writes an audit row with amounts and account numbers - browsable by operators, and visible to you as statements."
+            body="Each deposit, transfer, and approval writes an audit row with amounts and account numbers. Operators can browse them, and you see your own as statements."
           />
         </div>
 

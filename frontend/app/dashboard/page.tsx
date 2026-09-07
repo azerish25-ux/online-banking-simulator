@@ -89,7 +89,7 @@ export default function DashboardPage() {
         <Card>
           <EmptyState
             title="No accounts yet"
-            description="Open a checking, savings or loan account to get started - deposits and transfers land here."
+            description="Open a checking, savings, or loan account to get started. Deposits and transfers land here."
           />
         </Card>
       ) : (
@@ -97,7 +97,7 @@ export default function DashboardPage() {
           <Card>
             <CardDescription>
               {hasLoan
-                ? "Net position across all your accounts - loans count as debt"
+                ? "Net position across all your accounts. Loans count as debt."
                 : accs && accs.length > 1
                   ? "Total across your " + accs.length + " accounts, all in USD"
                   : "Available balance (USD)"}
@@ -118,7 +118,7 @@ export default function DashboardPage() {
                 </div>
                 {isOutstandingLoan ? (
                   <>
-                    <p className="label muted mt-2 text-xs">Outstanding loan - amount you owe</p>
+                    <p className="label muted mt-2 text-xs">Outstanding loan (amount you owe)</p>
                     <p className="mt-1 text-2xl font-semibold tabular-nums text-rose">{usdFromCents(-decimalToCents(a.balance))}</p>
                   </>
                 ) : (
@@ -186,7 +186,7 @@ export default function DashboardPage() {
         </div>
         <CardDescription className="mb-3">
           {accs && accs.length > 1
-            ? "For your first account only - pick any account in Activity for its own view."
+            ? "For your first account only. Pick any account in Activity for its own view."
             : "Money in and out of this account."}
         </CardDescription>
         {summary.data == null ? (

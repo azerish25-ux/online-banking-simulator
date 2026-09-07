@@ -63,7 +63,7 @@ export default function TransferReceiptPage({ params }: { params: Promise<{ id: 
         <div className="mt-4">
           <LoadFailed
             title="Couldn't load this receipt"
-            description="The request failed - your money is safe. Try again in a moment."
+            description="The request did not go through. Try again in a moment."
             onRetry={() => receipt.refetch()}
           />
         </div>
@@ -102,21 +102,21 @@ export default function TransferReceiptPage({ params }: { params: Promise<{ id: 
             </div>
             <div className="flex justify-between gap-4">
               <dt className="label text-content-muted">Posted</dt>
-              <dd className="text-right">{fullTime(tx.postedAt) ?? "Not yet - no money has moved"}</dd>
+              <dd className="text-right">{fullTime(tx.postedAt) ?? "Not yet posted"}</dd>
             </div>
           </dl>
 
           <p className="mt-4 rounded-md border border-line bg-ink-800/60 px-3 py-2 text-sm">
             {tx.status === "HELD" ? (
-              <>This transfer is awaiting operator review - no money has moved yet. Once an
-                operator approves it, the posting time above will appear here; if they decline
+              <>This transfer is awaiting operator review. No money has moved yet. Once an
+                operator approves it, the posting time above will appear here. If they decline
                 it, nothing moves.</>
             ) : tx.status === "CANCELLED" ? (
-              <>This transfer was declined and never settled - no money moved.</>
+              <>This transfer was declined and never settled. No money moved.</>
             ) : tx.status === "POSTED" ? (
-              <>Settled - the money moved on {fullTime(tx.postedAt) ?? "posting"}.</>
+              <>Settled. The money moved on {fullTime(tx.postedAt) ?? "posting"}.</>
             ) : (
-              <>Status “{String(tx.status ?? "unknown")}” is not recognized - verify before acting.</>
+              <>Status “{String(tx.status ?? "unknown")}” is not recognized. Verify before acting.</>
             )}
           </p>
 

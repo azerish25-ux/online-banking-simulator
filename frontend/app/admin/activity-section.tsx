@@ -27,7 +27,7 @@ export function ActivitySection() {
     <Card>
       <CardTitle>Posted flow &amp; reversals</CardTitle>
       <CardDescription>
-        Settled money moves. Reverse a posted transfer or deposit here - the reason is mandatory.
+        Settled money moves. Reverse a posted transfer or deposit here. The reason is mandatory.
       </CardDescription>
       {recent.isError && recent.data == null ? (
         <LoadFailed
@@ -49,7 +49,7 @@ export function ActivitySection() {
               isReversal && !t.toIban ? "funding rail" : (maskIban(t.toIban) ?? "-");
             const route = (maskIban(t.fromIban) ?? "DEP") + " → " + dest;
             const reversalLine = isReversal
-              ? "Reverses " + shortId(t.reversesTransactionId) + " - “" + (t.reversalReason ?? "") + "”"
+              ? "Reverses " + shortId(t.reversesTransactionId) + ": “" + (t.reversalReason ?? "") + "”"
               : null;
             return (
               <li key={t.id} className="rounded-md border border-line p-3">
