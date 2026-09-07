@@ -2,13 +2,18 @@ package com.bank.platform.ledger;
 
 import com.bank.platform.common.Brand;
 import com.bank.platform.common.Money;
+import com.ibm.icu.text.ArabicShaping;
+import com.ibm.icu.text.ArabicShapingException;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.text.Bidi;
+import java.text.BreakIterator;
 import java.time.Instant;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -35,20 +40,24 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
  * descriptions wrap onto continuation lines, the column heading repeats on
  * every page, and each page carries a page number.
  *
- * <p>Honest limits: DejaVu Sans covers Latin/Cyrillic/Greek and the Arabic
- * block as ISOLATED letterforms; contiguous RTL runs are pre-reversed into
- * visual order (see {@link #reverseRtlRuns}) so a Persian memo reads
- * right-to-left with every word letter-perfect and the extracted text layer
- * stays faithful, but this renderer does not perform Arabic/Persian
- * contextual joining (shaping) or full bidirectional reordering of
- * mixed-direction lines (PDFBox provides neither) - a documented limit of
- * this simulator, matching the F20 acceptance (StatementUnicodePdfTest).
- * Text extraction and the financial figures are exact.
+ * <p>RTL text ( section 10) is shaped and ordered with the ICU4J
+ * ArabicShaping + {@link Bidi} pipeline (UAX #9/#11): Arabic/Persian
+ * letters become joined presentation forms in correct visual order, with
+ * mixed-direction lines (identifiers, digits, punctuation) resolved by
+ * reordered runs. Oversized unbroken tokens are wrapped at grapheme-cluster
+ * boundaries so no content is dropped or clipped against the amount column.
  */
 public final class StatementPdfRenderer {
 
   /** The embedded broad-coverage font, bundled with its OFL license. */
   private static final String FONT_RESOURCE = "/fonts/DejaVuSans.ttf";
+
+  /**
+   * ICU ArabicShaping (UAX #11): joins Arabic/Persian letters into contextual
+   * presentation forms. Reused across render calls - the shaper is stateless.
+   */
+  private static final ArabicShaping ARABIC_SHAPER =
+      new ArabicShaping(ArabicShaping.LETTERS_SHAPE);
 
   /** Renders the statement to PDF bytes. */
   public byte[] render(StatementService.Statement statement) {
@@ -93,8 +102,9 @@ public final class StatementPdfRenderer {
 
       // Pre-lay every row into measured, wrapped display lines. A line carries
       // {date, amount, description, measuredAmountWidth} - date and amount are
-      // printed only on the first line of their row. RTL runs are reversed
-      // into visual order (isolated letterforms; see reverseRtlRuns).
+      // printed only on the first line of their row. Logical text is wrapped
+      // first; each wrapped line is then shaped + reordered into display order
+      // (toDisplayOrder) right before it is drawn.
       List<String[]> display = new ArrayList<>();
       for (StatementService.StatementRow tx : posted) {
         boolean in = account.id().equals(tx.toAccountId());
@@ -104,7 +114,10 @@ public final class StatementPdfRenderer {
         String date = tx.postedAt().atZone(ZoneOffset.UTC).toLocalDate().toString();
         String amount = (in ? "+" : "-") + Money.plain(tx.amount());
         float amountWidth = textWidth(font, amount, size);
-        List<String> lines = wrap(font, size, reverseRtlRuns(desc), descWidth);
+        // Wrap the LOGICAL text (grapheme-safe); each wrapped display line is
+        // then shaped+reordered independently, so a break never lands inside
+        // a grapheme and never inverts mid-run ordering.
+        List<String> lines = wrap(font, size, desc, descWidth);
         if (lines.isEmpty()) {
           lines.add("");
         }
@@ -112,7 +125,7 @@ public final class StatementPdfRenderer {
           display.add(new String[] {
               i == 0 ? date : "",
               i == 0 ? amount : "",
-              lines.get(i),
+              toDisplayOrder(lines.get(i)),
               i == 0 ? String.valueOf(amountWidth) : ""});
         }
       }
@@ -190,23 +203,38 @@ public final class StatementPdfRenderer {
   /**
    * Wraps on word boundaries to fit {@code maxWidth} points (measured), and
    * never silently truncates a name or description - anything too long to
-   * fit one line continues on the next. A single unbreakable token wider
-   * than the column is emitted whole (never chopped mid-word).
+   * fit one line continues on the next. Widths are measured on the line's
+   * DISPLAY order (the string the pen draws), so RTL shaping never makes a
+   * wrapped line overflow the amount column.
+   *
+   * A single unbreakable token wider than the column is wrapped at
+   * GRAPHEME-CLUSTER boundaries (BreakIterator): content is never dropped and
+   * a cluster (a base letter with its combining marks, an emoji with its
+   * variation selectors/ZWJ sequence) is never split mid-glyph.
    */
-  private static List<String> wrap(PDType0Font font, float size, String text, float maxWidth)
+  static List<String> wrap(PDType0Font font, float size, String text, float maxWidth)
       throws IOException {
     List<String> out = new ArrayList<>();
     String[] words = text.split(" ");
     StringBuilder current = new StringBuilder();
     for (String word : words) {
-      String trial = current.isEmpty() ? word : current + " " + word;
-      if (textWidth(font, trial, size) > maxWidth && !current.isEmpty()) {
+      // A word that would overflow the CURRENT line ends that line first -
+      // the word itself starts the next one, never a space-straddling
+      // fragment.
+      if (!current.isEmpty()
+          && displayWidth(font, size, current + " " + word) > maxWidth) {
         out.add(current.toString());
         current.setLength(0);
-        current.append(word);
+      }
+      // A word wider than a WHOLE line cannot fit anywhere: grapheme-wrap it
+      // across its own measured lines instead of emitting one overflowing row
+      // (the old clip/overlap defect).
+      if (displayWidth(font, size, word) > maxWidth) {
+        out.addAll(graphemeChunks(font, size, word, maxWidth));
+      } else if (current.length() > 0) {
+        current.append(' ').append(word);
       } else {
-        current.setLength(0);
-        current.append(trial);
+        current.append(word);
       }
     }
     if (!current.isEmpty()) {
@@ -216,45 +244,106 @@ public final class StatementPdfRenderer {
   }
 
   /**
-   * Reverses each contiguous right-to-left (Arabic block) run - characters AND
-   * word order - into visual order. The embedded font prints ISOLATED
-   * letterforms (no joining), so for a Persian memo to read right-to-left the
-   * glyph stream must carry the run in reverse; text extraction then reflects
-   * that RTL order with every word's letters exact. LTR content between runs
-   * (IBANs, Western digits, punctuation) keeps its order. True bidi/shaping
-   * would need a shaping engine - a documented limit.
+   * Splits one unbreakable token into the fewest measured chunks that each
+   * fit {@code maxWidth}, breaking ONLY between grapheme clusters - never
+   * inside a cluster (combining marks stay with their base letter).
    */
-  private static String reverseRtlRuns(String value) {
-    if (value == null) {
-      return "";
-    }
-    int[] points = value.codePoints().toArray();
-    StringBuilder out = new StringBuilder(value.length());
-    int i = 0;
-    while (i < points.length) {
-      int start = i;
-      boolean rtl = isRtl(points[i]);
-      while (i < points.length && isRtl(points[i]) == rtl) {
-        i++;
+  private static List<String> graphemeChunks(PDType0Font font, float size, String token,
+      float maxWidth) throws IOException {
+    List<String> chunks = new ArrayList<>();
+    BreakIterator it = BreakIterator.getCharacterInstance(Locale.ROOT);
+    it.setText(token);
+    int start = it.first();
+    int end = it.next();
+    StringBuilder line = new StringBuilder();
+    while (end != BreakIterator.DONE) {
+      String grapheme = token.substring(start, end);
+      if (!line.isEmpty()
+          && displayWidth(font, size, line.toString() + grapheme) > maxWidth) {
+        chunks.add(line.toString());
+        line.setLength(0);
       }
-      if (rtl) {
-        for (int j = i - 1; j >= start; j--) {
-          out.appendCodePoint(points[j]);
-        }
-      } else {
-        for (int j = start; j < i; j++) {
-          out.appendCodePoint(points[j]);
-        }
-      }
+      line.append(grapheme);
+      start = end;
+      end = it.next();
     }
-    return out.toString();
+    if (line.length() > 0) {
+      chunks.add(line.toString());
+    }
+    return chunks.isEmpty() ? List.of(token) : chunks;
   }
 
-  /** Arabic block, Syriac/Thaana/other RTL scripts, and Arabic presentation forms. */
-  private static boolean isRtl(int cp) {
-    return (cp >= 0x0590 && cp <= 0x08FF)
-        || (cp >= 0xFB1D && cp <= 0xFDFF)
-        || (cp >= 0xFE70 && cp <= 0xFEFF);
+  /** The measured width of one logical line in the order the pen draws it. */
+  private static float displayWidth(PDType0Font font, float size, String logical)
+      throws IOException {
+    return textWidth(font, toDisplayOrder(logical), size);
+  }
+
+  /**
+   * section 10: replace the old character-run reversal with a
+   * supported bidirectional + shaping pipeline. Each logical line is (1)
+   * SHAPED with ICU ArabicShaping - Arabic/Persian letters become joined
+   * presentation forms, so a Persian memo renders as connected script, not
+   * isolated letterforms - then (2) REORDERED with ICU {@code Bidi} into the
+   * glyph order the pen draws (left to right across the page).
+   *
+   * The visual map (UAX #9, character by character) directly yields that
+   * order: appending the shaped character at each visual position produces
+   * the string the pen draws - RTL runs come out reversed so the joining
+   * computed for logical neighbors lands on the glyphs that ARE neighbors on
+   * the page, LTR runs (IBANs, digits, punctuation) stay in order, and
+   * nested runs are handled by the engine. A pure-LTR line is untouched
+   * (fast path). PDFBox's own extractor maps the presentation forms back to
+   * base letters, so the PDF text layer stays faithful to the original memo.
+   */
+  static String toDisplayOrder(String logical) {
+    if (logical == null || logical.isEmpty()) {
+      return logical == null ? "" : logical;
+    }
+    String shaped;
+    try {
+      shaped = ARABIC_SHAPER.shape(logical);
+    } catch (ArabicShapingException ex) {
+      // Never let a shaping anomaly drop the row - render unshaped rather
+      // than losing content (the text layer stays faithful either way).
+      shaped = logical;
+    }
+    // java.text.Bidi resolves the UAX #9 levels. Each maximal run of one
+    // level is one atomic item that CARRIES its level (reorderVisually
+    // permutes the items but not a separate level array, so the level must
+    // travel with the text). Reordering places the items in visual order;
+    // an RTL run's characters are then emitted in reverse so the joining ICU
+    // computed for the logical neighbors lands on the glyphs that ARE
+    // neighbors on the page, while LTR runs (IBANs, digits, punctuation)
+    // keep their order. Pure-LTR lines take the fast path below.
+    record Run(String text, byte level) {}
+    Bidi bidi = new Bidi(shaped, Bidi.DIRECTION_DEFAULT_LEFT_TO_RIGHT);
+    if (bidi.baseIsLeftToRight() && !bidi.isMixed()) {
+      // Pure LTR: nothing to reorder; the fast path also keeps the cost of
+      // the level computation off every ordinary English statement row.
+      return shaped;
+    }
+    // One run per resolved level (logical order); every run CARRIES its own
+    // level because Bidi.reorderVisually permutes the objects but leaves a
+    // separate level array untouched - so the RTL decision must travel with
+    // the text, not sit in an array that ends up paired with the wrong run.
+    int count = bidi.getRunCount();
+    Object[] runs = new Object[count];
+    byte[] levels = new byte[count];
+    for (int r = 0; r < count; r++) {
+      String text = shaped.substring(bidi.getRunStart(r), bidi.getRunLimit(r));
+      byte level = (byte) bidi.getRunLevel(r);
+      runs[r] = new Run(text, level);
+      levels[r] = level;
+    }
+    Bidi.reorderVisually(levels, 0, runs, 0, count);
+    StringBuilder out = new StringBuilder(shaped.length() + 8);
+    for (Object item : runs) {
+      Run run = (Run) item;
+      boolean rtl = (run.level() & 1) == 1;
+      out.append(rtl ? new StringBuilder(run.text()).reverse() : run.text());
+    }
+    return out.toString();
   }
 
   /**

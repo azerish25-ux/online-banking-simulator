@@ -168,12 +168,13 @@ class PostingTimeTest {
     org.junit.jupiter.api.Assertions.assertTrue(janCsv.contains("15000.0000"),
         "January statement shows the January posting");
 
-    // A second review of the same row cannot re-settle it: it is already
-    // POSTED, so the operator endpoint merely acknowledges the (still flagged)
-    // row - money does not move a second time.
+    // A second review of the same row is a stale decision (section 16): the case was
+    // already settled AND reviewed, so the operator endpoint answers 409 and
+    // the losing console refreshes to the winner's POSTED outcome - money
+    // cannot move a second time.
     mvc.perform(post("/api/v1/admin/transactions/{id}/review", heldId)
             .header("Authorization", "Bearer " + client.adminToken()))
-        .andExpect(status().isOk());
+        .andExpect(status().isConflict());
     JsonNode aliceAcct = mvc.perform(get("/api/v1/accounts")
             .header("Authorization", "Bearer " + alice))
         .andExpect(status().isOk())

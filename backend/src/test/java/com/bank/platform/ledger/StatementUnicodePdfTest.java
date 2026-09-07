@@ -60,8 +60,10 @@ class StatementUnicodePdfTest {
     String bobIban = client.accountIban(bob);
 
     // Fund, then move money with memos that exercise the failure modes: an
-    // accented name, a Persian phrase (isolated-form rendering - the renderer
-    // does not shape/bidi), and a long spaced memo that must WRAP, not truncate.
+    // accented name, a Persian phrase (shaped + bidi-ordered by the ICU
+    // pipeline - the PDF's own extractor maps presentation forms back to base
+    // letters and reorders to logical text, so the layer stays faithful), and
+    // a long spaced memo that must WRAP, not truncate.
     client.deposit(alice, aliceId, "100000.00"); // max deposit amount
     String persianMemo = "پرداخت به فروشگاه تهران برای صورتحساب مهر";
     String accentedMemo = "Rent São Paulo - Café Müller réservé";
@@ -86,14 +88,11 @@ class StatementUnicodePdfTest {
       assertTrue(compact(text).contains(compact(needle)),
           "memo must survive exactly (no truncation or mangling):\n" + text);
     }
-    // Persian renders as isolated letterforms in right-to-left word order (no
-    // shaping engine): every WORD is preserved letter-perfect - assert the
-    // extracted word set equals the original memo's word set.
-    String[] persian = {"پرداخت", "به", "فروشگاه", "تهران", "برای", "صورتحساب", "مهر"};
-    for (String word : persian) {
-      assertTrue(compact(text).contains(word),
-          "every Persian word must survive letter-perfect:\n" + text + " missing " + word);
-    }
+    // Persian renders shaped and bidi-ordered; PDFBox's extractor unshapes
+    // the presentation forms and restores logical order, so the WHOLE memo
+    // must come back letter-perfect in its original logical sequence.
+    assertTrue(compact(text).contains(compact(persianMemo)),
+        "the Persian memo must survive exactly, in logical order:\n" + text);
     // The account masthead carries the accented account-holder context too.
     assertTrue(text.contains("Müller") || text.contains("Müller-Jöhn"), text);
     // Financial values on the same lines as RTL memos stay exact.
@@ -105,6 +104,37 @@ class StatementUnicodePdfTest {
       assertEquals(1, doc.getNumberOfPages());
       assertEquals(1, occurrences(text, "Description"), "one page carries one heading");
     }
+  }
+
+  @Test
+  void longUnbrokenTokenWrapsAtGraphemeBoundariesWithoutDroppingContent() throws Exception {
+    String alice = client.register("stmt-token@example.com", "Long Token");
+    String bob = client.register("stmt-token-b@example.com", "Token B");
+    String aliceId = client.accountId(alice);
+    String bobIban = client.accountIban(bob);
+    client.deposit(alice, aliceId, "5000.00");
+
+    // One UNBROKEN token far wider than the description column (no spaces to
+    // wrap at): the renderer must split it at grapheme boundaries and print
+    // every character - a single overflowed line would clip it. Mixing a
+    // Persian token exercises shaping + grapheme wrap together.
+    String asciiToken = "EEREW-198273645-QWERTYUIOPASDFGHJKLZXCVBNM-"
+        + "InternationalBankSettlementReferenceNumber-2026-09";
+    String persianToken = "پرداخت-نهایی-سپرده-گذاری-بلندمدت-صورتحساب";
+    transfer(alice, bobIban, "1200.00", asciiToken);
+    transfer(alice, bobIban, "1300.00", persianToken);
+
+    byte[] bytes = statementPdf(alice, aliceId);
+    String text = text(bytes);
+    // No character of either token may be dropped or mangled by the wrap.
+    assertTrue(compact(text).contains(asciiToken),
+        "the whole unbroken token must survive:\n" + text);
+    assertTrue(compact(text).contains(compact(persianToken)),
+        "the whole unbroken Persian token must survive, shaped:\n" + text);
+    assertEquals(-1, text.indexOf('?'), "no substitution glyphs:\n" + text);
+    // The renderer itself never clips: StatementPdfTextWrapTest proves each
+    // wrapped line is MEASURED to fit the description column (grapheme-safe),
+    // so an overflowing row cannot be hiding behind a complete text layer.
   }
 
   @Test

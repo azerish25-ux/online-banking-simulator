@@ -33,7 +33,8 @@ import org.springframework.transaction.support.TransactionTemplate;
  * <ul>
  *   <li>{@link StatementCsvRenderer} - formula-safe CSV serialization;</li>
  *   <li>{@link StatementPdfRenderer} - the A4/PDF layout engine (measured
- *       wrapping, RTL run pre-reversal, page footer and true page count).</li>
+ *       wrapping, ICU-shaping + bidi RTL text, page footer and true page
+ *       count).</li>
  * </ul>
  *
  * No domain class in this service does byte-level rendering.
@@ -244,10 +245,10 @@ public class StatementService {
 
   /**
    * Renders the statement to PDF bytes - see {@link StatementPdfRenderer} for
-   * the layout engine (measured wrapping, RTL run pre-reversal, page footer
-   * and true page count). The renderer is pure: it reads only the immutable
-   * {@link Statement}, so rendering the same statement twice produces
-   * identical bytes even after money moves in the database (F05).
+   * the layout engine (measured wrapping, ICU-shaping + bidi RTL text, page
+   * footer and true page count). The renderer is pure: it reads only the
+   * immutable {@link Statement}, so rendering the same statement twice
+   * produces identical bytes even after money moves in the database (F05).
    */
   public byte[] renderPdf(Statement statement) {
     return pdf.render(statement);

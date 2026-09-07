@@ -64,6 +64,16 @@
       <artifactId>pdfbox</artifactId>
       <version>3.0.8</version>
     </dependency>
+    <!-- Unicode Arabic shaping + bidirectional text ( section 10): the
+         statement renderer shapes Arabic/Persian letters into joined
+         presentation forms before drawing, instead of hand-reversing
+         isolated letterforms. ICU4J is the maintained reference
+         implementation of UAX #9/#11 used by the JVM ecosystem. -->
+    <dependency>
+      <groupId>com.ibm.icu</groupId>
+      <artifactId>icu4j</artifactId>
+      <version>76.1</version>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-webmvc</artifactId>
