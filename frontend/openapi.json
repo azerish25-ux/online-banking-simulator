@@ -226,6 +226,26 @@
         "required" : [ "amount" ],
         "type" : "object"
       },
+      "DepositResponse" : {
+        "properties" : {
+          "account" : {
+            "$ref" : "#/components/schemas/AccountResponse"
+          },
+          "idempotencyKey" : {
+            "type" : "string"
+          },
+          "operationId" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "status" : {
+            "enum" : [ "POSTED", "HELD", "CANCELLED" ],
+            "type" : "string"
+          }
+        },
+        "required" : [ "account", "idempotencyKey", "operationId", "status" ],
+        "type" : "object"
+      },
       "DuplicateRow" : {
         "properties" : {
           "count" : {
@@ -412,6 +432,60 @@
           }
         },
         "required" : [ "type" ],
+        "type" : "object"
+      },
+      "OperationListItem" : {
+        "properties" : {
+          "amount" : {
+            "type" : "string"
+          },
+          "createdAt" : {
+            "type" : "string"
+          },
+          "currency" : {
+            "type" : "string"
+          },
+          "fromIban" : {
+            "type" : [ "string", "null" ]
+          },
+          "id" : {
+            "format" : "uuid",
+            "type" : "string"
+          },
+          "idempotencyKey" : {
+            "type" : "string"
+          },
+          "kind" : {
+            "enum" : [ "TRANSFER", "DEPOSIT", "INTEREST" ],
+            "type" : "string"
+          },
+          "memo" : {
+            "type" : [ "string", "null" ]
+          },
+          "postedAt" : {
+            "type" : [ "string", "null" ]
+          },
+          "status" : {
+            "enum" : [ "POSTED", "HELD", "CANCELLED" ],
+            "type" : "string"
+          },
+          "toIban" : {
+            "type" : [ "string", "null" ]
+          }
+        },
+        "required" : [ "amount", "createdAt", "currency", "fromIban", "id", "idempotencyKey", "kind", "memo", "postedAt", "status", "toIban" ],
+        "type" : "object"
+      },
+      "OperationListResponse" : {
+        "properties" : {
+          "items" : {
+            "items" : {
+              "$ref" : "#/components/schemas/OperationListItem"
+            },
+            "type" : "array"
+          }
+        },
+        "required" : [ "items" ],
         "type" : "object"
       },
       "PageAuditResponse" : {
@@ -1229,7 +1303,7 @@
             "content" : {
               "*/*" : {
                 "schema" : {
-                  "$ref" : "#/components/schemas/AccountResponse"
+                  "$ref" : "#/components/schemas/DepositResponse"
                 }
               }
             },
@@ -2326,6 +2400,14 @@
           "schema" : {
             "type" : "string"
           }
+        }, {
+          "in" : "query",
+          "name" : "accountId",
+          "required" : false,
+          "schema" : {
+            "format" : "uuid",
+            "type" : "string"
+          }
         } ],
         "responses" : {
           "200" : {
@@ -2333,6 +2415,34 @@
               "*/*" : {
                 "schema" : {
                   "$ref" : "#/components/schemas/TransactionResponse"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "transfer-controller" ]
+      }
+    },
+    "/api/v1/operations/recent" : {
+      "get" : {
+        "operationId" : "recentOperations",
+        "parameters" : [ {
+          "in" : "query",
+          "name" : "limit",
+          "required" : false,
+          "schema" : {
+            "default" : 25,
+            "format" : "int32",
+            "type" : "integer"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "$ref" : "#/components/schemas/OperationListResponse"
                 }
               }
             },

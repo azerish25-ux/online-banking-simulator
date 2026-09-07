@@ -119,14 +119,38 @@ public class TransferController {
    * the operation - a foreign or unknown key is indistinguishable (404), so
    * probing never discloses another user's row. A client that lost the
    * response resolves its key here before offering another submit.
+   *
+   * <p>Because keys are namespaced to their originating account, a key-only
+   * lookup can match several DIFFERENT operations of one caller (one per
+   * owned account). Passing the originating {@code accountId} makes the
+   * lookup unambiguous; when several matches exist and no account is given
+   * the server answers 409 with the candidates rather than picking an
+   * arbitrary one.
    */
   @GetMapping("/operations")
   public TransactionResponse operation(
-      Authentication authentication, @RequestParam String key) {
-    Transaction tx = money.operationStatus(authentication.getName(), key)
+      Authentication authentication, @RequestParam String key,
+      @RequestParam(required = false) UUID accountId) {
+    Transaction tx = money.operationStatus(authentication.getName(), key, accountId)
         .orElseThrow(() -> new TransactionNotFoundException(
             "No operation found for this idempotency key"));
     return TransactionMapper.toResponse(tx, statements.ibanMap(List.of(tx)));
+  }
+
+  /**
+   * Authorized recovery list (F06 namespace fix): the caller's own recent
+   * keyed transfers and deposits, newest first, bounded - including
+   * completed-but-unacknowledged postings. After a lost response, a reload
+   * or a re-login the owner can rediscover what a key actually did without
+   * relying on browser storage.
+   */
+  @GetMapping("/operations/recent")
+  public TransferDtos.OperationListResponse recentOperations(
+      Authentication authentication, @RequestParam(defaultValue = "25") int limit) {
+    List<Transaction> rows = money.recentOperations(authentication.getName(), limit);
+    Map<UUID, String> ibans = statements.ibanMap(rows);
+    return new TransferDtos.OperationListResponse(
+        rows.stream().map(tx -> TransactionMapper.toOperationListItem(tx, ibans)).toList());
   }
 
   /**

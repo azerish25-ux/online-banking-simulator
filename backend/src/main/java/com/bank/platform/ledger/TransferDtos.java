@@ -68,5 +68,27 @@ public final class TransferDtos {
    */
   public record TransactionHistoryPage(
       List<TransactionResponse> items, long total, String nextCursor) {}
+
+  /**
+   * One recoverable operation in the authorized list (F06). Unlike the
+   * history/feed shapes it carries the idempotency key itself: recovery means
+   * being able to resume the EXACT same operation after a lost response or a
+   * cleared browser record, which a key-less row cannot do.
+   */
+  public record OperationListItem(
+      UUID id,
+      @Schema(nullable = true) String fromIban,
+      @Schema(nullable = true) String toIban,
+      String amount, String currency,
+      @Schema(nullable = true) String memo,
+      TxKind kind, TxStatus status, String createdAt,
+      @Schema(nullable = true) String postedAt,
+      String idempotencyKey) {}
+
+  /**
+   * The authorized recovery list (F06): the caller's own keyed operations
+   * over a bounded recent window, newest first.
+   */
+  public record OperationListResponse(List<OperationListItem> items) {}
 }
 

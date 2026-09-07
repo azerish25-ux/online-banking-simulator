@@ -696,6 +696,22 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/operations/recent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get: operations["recentOperations"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/transactions": {
         parameters: {
             query?: never;
@@ -833,6 +849,14 @@ export interface components {
         DepositRequest: {
             amount: string;
         };
+        DepositResponse: {
+            account: components["schemas"]["AccountResponse"];
+            idempotencyKey: string;
+            /** Format: uuid */
+            operationId: string;
+            /** @enum {string} */
+            status: "POSTED" | "HELD" | "CANCELLED";
+        };
         DuplicateRow: {
             count: string;
             kind: string;
@@ -899,6 +923,25 @@ export interface components {
         };
         OpenAccountRequest: {
             type: string;
+        };
+        OperationListItem: {
+            amount: string;
+            createdAt: string;
+            currency: string;
+            fromIban: string | null;
+            /** Format: uuid */
+            id: string;
+            idempotencyKey: string;
+            /** @enum {string} */
+            kind: "TRANSFER" | "DEPOSIT" | "INTEREST";
+            memo: string | null;
+            postedAt: string | null;
+            /** @enum {string} */
+            status: "POSTED" | "HELD" | "CANCELLED";
+            toIban: string | null;
+        };
+        OperationListResponse: {
+            items: components["schemas"]["OperationListItem"][];
         };
         PageAuditResponse: {
             content: components["schemas"]["AuditResponse"][];
@@ -1301,7 +1344,7 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "*/*": components["schemas"]["AccountResponse"];
+                    "*/*": components["schemas"]["DepositResponse"];
                 };
             };
         };
@@ -2171,6 +2214,7 @@ export interface operations {
         parameters: {
             query: {
                 key: string;
+                accountId?: string;
             };
             header?: never;
             path?: never;
@@ -2185,6 +2229,28 @@ export interface operations {
                 };
                 content: {
                     "*/*": components["schemas"]["TransactionResponse"];
+                };
+            };
+        };
+    };
+    recentOperations: {
+        parameters: {
+            query?: {
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "*/*": components["schemas"]["OperationListResponse"];
                 };
             };
         };

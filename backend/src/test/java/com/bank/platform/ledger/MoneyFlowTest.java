@@ -59,7 +59,7 @@ class MoneyFlowTest {
             .content("""
                 {"amount":"500.00"}"""))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.balance").value("500.0000"));
+        .andExpect(jsonPath("$.account.balance").value("500.0000"));
 
     // Alice sends $120 to Bob with an idempotency key.
     MvcResult first = mvc.perform(post("/api/v1/transfers")
@@ -165,7 +165,7 @@ class MoneyFlowTest {
             .content("""
                 {"amount":"0.0006"}"""))
         .andExpect(status().isOk())
-        .andExpect(jsonPath("$.balance").value("0.0006"));
+        .andExpect(jsonPath("$.account.balance").value("0.0006"));
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
             .header("Idempotency-Key", "tx-" + System.nanoTime())

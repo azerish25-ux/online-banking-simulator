@@ -1,71 +1,161 @@
 /**
- * Minimum unresolved-operation identity (F06). When a money mutation ends
- * ambiguously (network drop, 5xx, 429, timeout) the client does NOT know
- * whether the server committed - so it must not mint a fresh idempotency key
- * for the next attempt. This store keeps just the *key* of the unresolved
- * operation, bound to the user who initiated it, so a retry after a route
- * change or a full reload reuses the same key and the server deduplicates.
+ * Minimum unresolved-operation identities (F06 lifecycle). When a money
+ * mutation ends ambiguously (network drop, 5xx, 429, timeout, killed tab)
+ * the client does NOT know whether the server committed - so it must never
+ * mint a fresh idempotency key for the next attempt. This store keeps the
+ * recoverable identity of EVERY unresolved operation the current tab has
+ * dispatched - one record per operation, never one slot per user - so two
+ * pending transfers and a deposit can coexist, and resolving one never
+ * erases the others.
  *
- * Nothing financial lives here: no amounts, no history, no credentials. The
- * server owns the canonical operation payload and result; the key only lets
- * the client ask the server about it. Cleared at the logout/expiry boundary
- * (see api.ts clearToken) so one user's unresolved identity never survives
- * into another user's session.
+ * What lives here:
+ *   - userId  - who initiated the operation (recovery is owner-scoped)
+ *   - kind    - "transfer" | "deposit"
+ *   - key     - the idempotency key (client operation id) the request carried
+ *   - accountId - the ORIGINATING account: the server key namespace, so a
+ *     status lookup can be scoped to exactly the account the key is unique on
+ *   - a minimal reviewed-intent summary (amount/to) purely so a reloaded
+ *     page can describe what it is offering to check - the server owns the
+ *     canonical payload
+ *
+ * Nothing credential-like or historical lives here. The store is cleared at
+ * the logout/expiry boundary (credentials and per-session data leave with the
+ * session); recovery after reauthentication does NOT depend on it - the
+ * authorized server list (GET /api/v1/operations/recent) makes
+ * completed-but-unacknowledged operations discoverable on its own.
  */
 
-const STORAGE_KEY = "bank.pending-ops.v1";
+const STORAGE_KEY = "bank.pending-ops.v2";
 
 export interface PendingOperation {
   /** The user whose session initiated the operation. */
   userId: string;
-  /** The idempotency key of the unresolved operation. */
-  key: string;
   /** Which mutation kind the key belongs to - one key names one intent type. */
   kind: "transfer" | "deposit";
+  /** The idempotency key (client operation id) of the unresolved operation. */
+  key: string;
+  /** Originating account id - the server-side key namespace for lookups. */
+  accountId?: string;
+  /** Reviewed-intent context so a reloaded page can describe the operation. */
+  amount?: string;
+  toIban?: string;
+  /** When the operation was dispatched (UTC epoch millis). */
+  createdAt: number;
 }
 
-function readAll(): Record<string, PendingOperation> {
+type Store = Record<string, Record<string, PendingOperation>>;
+
+function isValid(op: unknown): op is PendingOperation {
+  if (!op || typeof op !== "object") return false;
+  const record = op as Record<string, unknown>;
+  return typeof record.userId === "string"
+      && (record.kind === "transfer" || record.kind === "deposit")
+      && typeof record.key === "string"
+      && record.key.length > 0
+      && typeof record.createdAt === "number";
+}
+
+function readAll(): Store {
   if (typeof window === "undefined" || typeof sessionStorage === "undefined") {
     return {};
   }
   try {
     const raw = sessionStorage.getItem(STORAGE_KEY);
-    return raw ? (JSON.parse(raw) as Record<string, PendingOperation>) : {};
+    if (!raw) return {};
+    const parsed: unknown = JSON.parse(raw);
+    if (!parsed || typeof parsed !== "object") return {};
+    const store: Store = {};
+    // Validate on read: a corrupted or foreign-shaped record is discarded,
+    // never trusted as a recovery identity.
+    for (const [userId, bucket] of Object.entries(parsed as Record<string, unknown>)) {
+      if (!bucket || typeof bucket !== "object") continue;
+      const clean: Record<string, PendingOperation> = {};
+      for (const [opId, op] of Object.entries(bucket as Record<string, unknown>)) {
+        if (isValid(op) && op.userId === userId) clean[opId] = op;
+      }
+      if (Object.keys(clean).length > 0) store[userId] = clean;
+    }
+    return store;
   } catch {
     return {};
   }
 }
 
-function writeAll(all: Record<string, PendingOperation>): void {
+function writeAll(store: Store): void {
   if (typeof window === "undefined" || typeof sessionStorage === "undefined") {
     return;
   }
   try {
-    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(all));
+    sessionStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   } catch {
-    // Storage full/blocked: the in-memory key in the hook still covers retries
-    // within the page - persistence is a reload-safety enhancement only.
+    // Storage full/blocked: the in-memory key in the hook still covers
+    // retries within the page, and the authorized server recovery list makes
+    // the operation findable after a reload even when this store is empty -
+    // a storage failure never downgrades a recoverable payment into an
+    // unsafe in-memory-only one.
   }
 }
 
-export function readPendingOperation(userId: string, kind: PendingOperation["kind"]): PendingOperation | null {
-  const pending = readAll()[userId];
-  return pending && pending.kind === kind ? pending : null;
+/** Stable record id for one operation: namespaced by user + kind + key. */
+function opId(op: Pick<PendingOperation, "userId" | "kind" | "key">): string {
+  return op.userId + ":" + op.kind + ":" + op.key;
 }
 
-export function writePendingOperation(op: PendingOperation): void {
-  const all = readAll();
-  all[op.userId] = op;
-  writeAll(all);
+/** Writes one operation record (new or refreshed). */
+export function upsertPendingOperation(op: PendingOperation): void {
+  const store = readAll();
+  const id = opId(op);
+  const bucket = store[op.userId] ?? {};
+  bucket[id] = op;
+  store[op.userId] = bucket;
+  writeAll(store);
 }
 
-export function clearPendingOperation(userId: string): void {
-  const all = readAll();
-  delete all[userId];
-  writeAll(all);
+/** All unresolved records of one user (the recovery list for that session). */
+export function listPendingOperations(userId: string): PendingOperation[] {
+  const bucket = readAll()[userId];
+  if (!bucket) return [];
+  return Object.values(bucket)
+      .filter((op) => op.userId === userId)
+      .sort((a, b) => a.createdAt - b.createdAt);
 }
 
-/** Logout/session-expiry boundary: no unresolved identity survives the session. */
+/** One specific operation record, addressed by user + kind + key. */
+export function findPendingOperation(
+  userId: string,
+  kind: PendingOperation["kind"],
+  key: string
+): PendingOperation | null {
+  const bucket = readAll()[userId];
+  if (!bucket) return null;
+  const op = bucket[opId({ userId, kind, key })];
+  return op && isValid(op) ? op : null;
+}
+
+/** Removes exactly ONE operation record - never another user's or kind's. */
+export function removePendingOperation(
+  userId: string,
+  kind: PendingOperation["kind"],
+  key: string
+): void {
+  const store = readAll();
+  const bucket = store[userId];
+  if (!bucket) return;
+  delete bucket[opId({ userId, kind, key })];
+  if (Object.keys(bucket).length === 0) {
+    delete store[userId];
+  } else {
+    store[userId] = bucket;
+  }
+  writeAll(store);
+}
+
+/**
+ * Logout/session-expiry boundary: this per-session store (which is scoped to
+ * the signing user) leaves with the session. Financial recovery is NOT lost:
+ * the owner can rediscover completed-but-unacknowledged operations through
+ * the authorized server list after reauthentication.
+ */
 export function clearAllPendingOperations(): void {
   if (typeof window === "undefined" || typeof sessionStorage === "undefined") {
     return;

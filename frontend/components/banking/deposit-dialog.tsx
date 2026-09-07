@@ -82,10 +82,12 @@ export function DepositDialog({
     error: false,
     onFailure: (message) => setError(message),
     success: {
-      toast: (landed) => ({
+      // The deposit answer nests the account under the recoverable operation
+      // identity (F06 lifecycle), so the toast unwraps it.
+      toast: (result) => ({
         message:
-          "Deposited " + usd(lastAmount.current) + " to " + landed.type
-          + " " + (maskIban(landed.iban) ?? "") + "."
+          "Deposited " + usd(lastAmount.current) + " to " + result.account.type
+          + " " + (maskIban(result.account.iban) ?? "") + "."
       }),
       run: () => {
         onClose();

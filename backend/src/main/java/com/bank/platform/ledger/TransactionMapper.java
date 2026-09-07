@@ -1,5 +1,6 @@
 package com.bank.platform.ledger;
 
+import com.bank.platform.ledger.TransferDtos.OperationListItem;
 import com.bank.platform.ledger.TransferDtos.TransactionResponse;
 import com.bank.platform.ledger.TransferDtos.TransferResponse;
 import java.util.Map;
@@ -23,6 +24,22 @@ public final class TransactionMapper {
         tx.getCreatedAt().toString(),
         tx.getPostedAt() == null ? null : tx.getPostedAt().toString(),
         tx.isFlagged(), tx.isReviewed());
+  }
+
+  /** The recovery-list shape: transaction fields plus the idempotency key. */
+  public static OperationListItem toOperationListItem(Transaction tx, Map<UUID, String> ibans) {
+    return new OperationListItem(
+        tx.getId(),
+        tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
+        tx.getToAccountId() == null ? null : ibans.getOrDefault(tx.getToAccountId(), tx.getToAccountId().toString()),
+        tx.getAmount().toPlainString(),
+        tx.getCurrency(),
+        tx.getMemo(),
+        tx.getKind(),
+        tx.getStatus(),
+        tx.getCreatedAt().toString(),
+        tx.getPostedAt() == null ? null : tx.getPostedAt().toString(),
+        tx.getIdempotencyKey());
   }
 
   public static TransferResponse toTransferResponse(Transaction tx, Map<UUID, String> ibans) {

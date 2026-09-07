@@ -1,6 +1,8 @@
 package com.bank.platform.accounts;
 
 import com.bank.platform.ledger.MoneyService;
+import com.bank.platform.ledger.Transaction;
+import com.bank.platform.ledger.TxStatus;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -57,15 +59,33 @@ public class AccountController {
   /**
    * Every user-submitted funding must carry an idempotency key (F06); the
    * service enforces it (the header is read here and forwarded). An identical
-   * replay returns the account's current state; reusing the key for a
-   * different amount is a 409 conflict.
+   * replay returns the account's current state AND the original operation's
+   * identity; reusing the key for a different amount is a 409 conflict.
    */
   @PostMapping("/{id}/deposit")
-  public AccountResponse deposit(
+  public DepositResponse deposit(
       Authentication authentication, @PathVariable UUID id, @Valid @RequestBody DepositRequest request,
       @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
-    return AccountMapper.toResponse(
-        money.deposit(authentication.getName(), id, new BigDecimal(request.amount()), idempotencyKey));
+    MoneyService.DepositOutcome outcome =
+        money.deposit(authentication.getName(), id, new BigDecimal(request.amount()), idempotencyKey);
+    Transaction op = outcome.operation();
+    return new DepositResponse(
+        AccountMapper.toResponse(outcome.account()),
+        op.getId(),
+        op.getIdempotencyKey(),
+        op.getStatus());
   }
+
+  /**
+   * A deposit answers with a recoverable operation identity, not just the
+   * updated balance: {@code operationId} backs a durable receipt lookup
+   * (GET /transfers/{id}), the idempotency key lets the client resolve an
+   * ambiguous retry, and {@code status} states the authoritative result.
+   */
+  public record DepositResponse(
+      AccountResponse account,
+      UUID operationId,
+      String idempotencyKey,
+      TxStatus status) {}
 
 }

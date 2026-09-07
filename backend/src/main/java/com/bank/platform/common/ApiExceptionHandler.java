@@ -8,6 +8,7 @@ import com.bank.platform.beneficiaries.BeneficiaryExistsException;
 import com.bank.platform.beneficiaries.BeneficiaryNotFoundException;
 import com.bank.platform.ledger.IdempotencyConflictException;
 import com.bank.platform.ledger.InsufficientFundsException;
+import com.bank.platform.ledger.OperationKeyAmbiguousException;
 import com.bank.platform.ledger.TransactionNotFoundException;
 import com.bank.platform.ledger.TransferValidationException;
 import jakarta.validation.ConstraintViolationException;
@@ -144,6 +145,17 @@ public class ApiExceptionHandler {
   @ExceptionHandler(IdempotencyConflictException.class)
   public ResponseEntity<ApiProblem> idempotencyConflict(IdempotencyConflictException ex) {
     return problem(HttpStatus.CONFLICT, "Idempotency Conflict", ex.getMessage());
+  }
+
+  /**
+   * A key-only recovery lookup matched several of the caller's own operations
+   * on different originating accounts. Not a "pick the first row" situation:
+   * the caller must scope the lookup to the originating account. 409 names
+   * the ambiguity explicitly.
+   */
+  @ExceptionHandler(OperationKeyAmbiguousException.class)
+  public ResponseEntity<ApiProblem> operationKeyAmbiguous(OperationKeyAmbiguousException ex) {
+    return problem(HttpStatus.CONFLICT, "Ambiguous Operation Key", ex.getMessage());
   }
 
   @ExceptionHandler(AccessDeniedException.class)

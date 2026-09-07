@@ -16,6 +16,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.YearMonth;
 import java.time.ZoneOffset;
@@ -23,6 +24,7 @@ import java.util.HexFormat;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -91,13 +93,22 @@ public class MoneyService {
   }
 
   /**
+   * The result of a funding attempt: the (possibly unchanged) account plus
+   * the operation row that carries this deposit's recoverable identity - the
+   * transaction id, its idempotency key and status. A replay returns the
+   * ORIGINAL operation row, never a second credit, so the caller always has
+   * something durable to point a receipt at.
+   */
+  public record DepositOutcome(Account account, Transaction operation) {}
+
+  /**
    * Simulated external rail (ATM/teller). Only the owning customer can fund
    * their own account. Caches are invalidated AFTER commit, never before
    * (F07): registering the clear inside the transaction defers it to the
    * after-commit hook, so a rolled-back deposit evicts nothing.
    */
   @Transactional
-  public Account deposit(String email, UUID accountId, BigDecimal amount, String idempotencyKey) {
+  public DepositOutcome deposit(String email, UUID accountId, BigDecimal amount, String idempotencyKey) {
     // Validate the *settled* amount first: values that round to zero at the
     // ledger's 4-decimal scale would violate the DB amount > 0 check and
     // surface as a 500. The key is enforced after - direct service callers
@@ -114,8 +125,18 @@ public class MoneyService {
     Optional<Transaction> existing = transactions
         .findFirstByIdempotencyKeyAndToAccountIdAndFromAccountIdIsNull(key, account.getId());
     if (existing.isPresent()) {
+      if (existing.get().getRequestHash() == null) {
+        // A row created before canonical intent hashing existed (pre-V20)
+        // cannot prove the retried payload is the same intent. Never auto-
+        // replay it, never double-post: a conflict that names the review
+        // history is the only honest answer.
+        throw new IdempotencyConflictException(
+            "This idempotency key predates canonical intent hashing; its exact "
+                + "amount cannot be verified. Review the account history before "
+                + "retrying with a new key.");
+      }
       if (hash.equals(existing.get().getRequestHash())) {
-        return account;
+        return new DepositOutcome(account, existing.get());
       }
       throw new IdempotencyConflictException(
           "Idempotency key was already used for a different deposit");
@@ -170,7 +191,7 @@ public class MoneyService {
     User depositor = userOf(email);
     events.depositPosted(depositor, tx, account);
     invalidation.clearSynchronized("summaries", "public-stats");
-    return account;
+    return new DepositOutcome(account, tx);
   }
 
   /**
@@ -232,7 +253,17 @@ public class MoneyService {
     Optional<Transaction> stored = transactions.findByFromAccountIdAndIdempotencyKey(fromId, key);
     if (stored.isPresent()) {
       Transaction existing = stored.get();
-      if (sameIntent(existing, toId, hash)) {
+      if (existing.getRequestHash() == null) {
+        // Legacy rows (pre-V20) carry no canonical intent hash. Reconstructing
+        // the intent from the destination alone is not proof - a changed
+        // amount under the same key must never replay silently. Surface a
+        // conflict that points at review, never a second posting.
+        throw new IdempotencyConflictException(
+            "This idempotency key predates canonical intent hashing; its exact "
+                + "amount, currency and memo cannot be verified. Review the "
+                + "transfer history before retrying with a new key.");
+      }
+      if (hash.equals(existing.getRequestHash())) {
         // An idempotent replay returns the original row, whatever the retried
         // payload says; the row is the authoritative answer and money never
         // moves twice for one key.
@@ -319,9 +350,24 @@ public class MoneyService {
    * operation by its idempotency key. Ownership is originator-scoped - a
    * deposit's key lives on the funded account, a transfer's on the sender's -
    * so probing a key that belongs to someone else simply finds nothing.
+   *
+   * <p>The key namespace is the originating ACCOUNT (unique on (from, key)
+   * for transfers and (to, key) for deposits), so a key-only lookup over
+   * every account the caller owns can legitimately match several DIFFERENT
+   * operations (one per owned account). Recovery therefore prefers the
+   * account-scoped variant: pass the originating account to make the lookup
+   * namespace identical to the uniqueness namespace - at most one row. When
+   * no account is supplied and the key matches several distinct operations,
+   * that is a genuine ambiguity and is surfaced as such, never resolved by
+   * picking an arbitrary row.
    */
   @Transactional(readOnly = true)
   public Optional<Transaction> operationStatus(String email, String key) {
+    return operationStatus(email, key, null);
+  }
+
+  @Transactional(readOnly = true)
+  public Optional<Transaction> operationStatus(String email, String key, UUID accountId) {
     User owner = userOf(email);
     List<UUID> owned = accounts.findByUserIdOrderByCreatedAtAsc(owner.getId()).stream()
         .map(Account::getId)
@@ -329,8 +375,45 @@ public class MoneyService {
     if (owned.isEmpty()) {
       return Optional.empty();
     }
+    if (accountId != null) {
+      // The originating account must belong to the caller, and the row must
+      // live in that account's key namespace - foreign or unknown resolves
+      // to nothing (404), never to another user's operation.
+      if (!owned.contains(accountId)) {
+        return Optional.empty();
+      }
+      return transactions.findOperationByKeyAndAccount(key, accountId);
+    }
     List<Transaction> hits = transactions.findOperationsByKey(key, owned);
-    return hits.isEmpty() ? Optional.empty() : Optional.of(hits.get(0));
+    if (hits.isEmpty()) {
+      return Optional.empty();
+    }
+    if (hits.size() > 1) {
+      throw new OperationKeyAmbiguousException(key, hits);
+    }
+    return Optional.of(hits.get(0));
+  }
+
+  /**
+   * Authorized recovery list (F06 namespace fix): the caller's own keyed
+   * operations over the last week, newest first, bounded. Completed-but-
+   * unacknowledged postings are included, so an operation whose response was
+   * lost - even one whose browser record was cleared at logout - stays
+   * discoverable after reauthentication.
+   */
+  @Transactional(readOnly = true)
+  public List<Transaction> recentOperations(String email, int limit) {
+    User owner = userOf(email);
+    List<UUID> owned = accounts.findByUserIdOrderByCreatedAtAsc(owner.getId()).stream()
+        .map(Account::getId)
+        .toList();
+    if (owned.isEmpty()) {
+      return List.of();
+    }
+    int capped = Math.min(Math.max(limit, 1), 100);
+    Instant since = clock.instant().minus(Duration.ofDays(7));
+    return transactions.findRecentOperationsByOwner(owned,
+        List.of(TxKind.TRANSFER, TxKind.DEPOSIT), since, PageRequest.of(0, capped));
   }
 
   /**
@@ -423,19 +506,6 @@ public class MoneyService {
     } catch (NoSuchAlgorithmException impossible) {
       throw new IllegalStateException("SHA-256 unavailable", impossible);
     }
-  }
-
-  /**
-   * A stored keyed row matches the incoming request when it was recorded with
-   * the same canonical intent. Rows created before the request-hash column
-   * existed (V20) have no hash and fall back to the destination comparison -
-   * the only evidence they carry.
-   */
-  private boolean sameIntent(Transaction existing, UUID toId, String hash) {
-    if (existing.getRequestHash() == null) {
-      return toId.equals(existing.getToAccountId());
-    }
-    return hash.equals(existing.getRequestHash());
   }
 
   /**

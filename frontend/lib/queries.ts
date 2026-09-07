@@ -10,9 +10,9 @@ import {
 import * as React from "react";
 import { ApiError, api } from "./api";
 import {
-  clearPendingOperation,
-  readPendingOperation,
-  writePendingOperation
+  listPendingOperations,
+  removePendingOperation,
+  upsertPendingOperation
 } from "./pending-op";
 import type {
   Account,
@@ -21,10 +21,12 @@ import type {
   Beneficiary,
   CardItem,
   DayTotal,
+  Deposit,
   HistoryPage,
   IssuedCard,
   MonthPoint,
   NotificationItem,
+  OperationList,
   Page,
   PublicStats,
   Tx,
@@ -43,6 +45,9 @@ import type {
 export const queryKeys = {
   me: ["me"] as const,
   accounts: ["accounts"] as const,
+  accountDetail: (id: string) => ["account", id] as const,
+  // The authorized recovery list - the caller's own recent keyed operations.
+  recentOperations: ["operations", "recent"] as const,
   // The cursor (blank = newest page) is part of the key: two different
   // positions in the same feed are two different result sets and must not
   // collide in the cache.
@@ -167,6 +172,21 @@ export function usePublicStats(): UseQueryResult<PublicStats, ApiError> {
 }
 
 /**
+ * A deposit answer (F06 lifecycle): the updated account plus the recoverable
+ * operation identity (transaction id, idempotency key, authoritative status)
+ * that backs the durable receipt lookup. Aliased straight off the generated
+ * OpenAPI schema - one authoritative definition, no parallel shape.
+ */
+export type DepositResult = Deposit;
+
+export function useRecentOperations(limit = 25): UseQueryResult<OperationList, ApiError> {
+  return useQuery({
+    queryKey: queryKeys.recentOperations,
+    queryFn: () => api<OperationList>("/v1/operations/recent?limit=" + limit)
+  });
+}
+
+/**
  * Definitive client rejections (validation, insufficient funds) mean the
  * server recorded nothing, so the key was NOT consumed and the next attempt
  * may mint a fresh one. 409 (key already names a different operation) and
@@ -184,27 +204,89 @@ function currentUserId(qc: ReturnType<typeof useQueryClient>): string | undefine
 }
 
 /**
- * Operation key lifecycle shared by deposit and transfer. One key per logical
- * intent: minted on the first attempt, reused across ambiguous retries
- * (network drop, 5xx, 429 - even across a reload, via sessionStorage), and
- * dropped only when the intent is resolved: definitive 4xx, success, or the
- * user edited the form into a NEW intent.
+ * Operation key lifecycle shared by deposit and transfer (F06 lifecycle).
+ * One key per SUBMITTED operation. A key is minted on the first dispatch and
+ * reused only when this page is retrying the SAME submitted operation:
+ *
+ *  - an in-page retry keeps {@code keyRef} (set on the first attempt);
+ *  - after a reload the page has no ref, so a stored pending record whose
+ *    originating account AND reviewed intent (amount/destination when the
+ *    draft still carries them) match the current submit is resumed with its
+ *    own key;
+ *  - a genuinely different draft (edited amount/destination/account) never
+ *    inherits an older operation's key - the older record stays in the store
+ *    (still recoverable) and the new submission mints a fresh key.
+ *
+ * The identity is persisted BEFORE the financial request is dispatched, so a
+ * killed page or tab can never lose the record of what it sent.
  */
 function nextOperationKey(
   qc: ReturnType<typeof useQueryClient>,
   kind: "transfer" | "deposit",
-  keyRef: React.MutableRefObject<string | null>
+  keyRef: React.MutableRefObject<string | null>,
+  intent: { accountId: string; amount: string; toIban?: string }
 ): { key: string; userId?: string } {
   const userId = currentUserId(qc);
-  const pending = userId ? readPendingOperation(userId, kind) : null;
-  const key = keyRef.current ?? pending?.key ?? crypto.randomUUID();
+  if (keyRef.current) {
+    return { key: keyRef.current, userId };
+  }
+  if (userId) {
+    const sameIntent = listPendingOperations(userId).find((op) => {
+      if (op.kind !== kind) return false;
+      if (op.accountId && op.accountId !== intent.accountId) return false;
+      if (op.amount && op.amount !== intent.amount) return false;
+      // A transfer's destination is part of the reviewed intent; a deposit
+      // has none, so only compare when both sides carry one.
+      if (kind === "transfer" && op.toIban && intent.toIban && op.toIban !== intent.toIban) {
+        return false;
+      }
+      return true;
+    });
+    if (sameIntent) {
+      keyRef.current = sameIntent.key;
+      return { key: sameIntent.key, userId };
+    }
+  }
+  const key = crypto.randomUUID();
   keyRef.current = key;
   return { key, userId };
 }
 
+/** Records the dispatched identity BEFORE the request goes out (F06). */
+function persistBeforeDispatch(
+  qc: ReturnType<typeof useQueryClient>,
+  kind: "transfer" | "deposit",
+  key: string,
+  intent: { accountId: string; amount: string; toIban?: string }
+): void {
+  const userId = currentUserId(qc);
+  if (!userId) return;
+  upsertPendingOperation({
+    userId,
+    kind,
+    key,
+    accountId: intent.accountId,
+    amount: intent.amount,
+    toIban: kind === "transfer" ? intent.toIban : undefined,
+    createdAt: Date.now()
+  });
+}
+
+/** Drops exactly ONE resolved operation record (never another's). */
+function finishPendingOperation(
+  qc: ReturnType<typeof useQueryClient>,
+  kind: "transfer" | "deposit",
+  key: string | null
+): void {
+  const userId = currentUserId(qc);
+  if (userId && key) {
+    removePendingOperation(userId, kind, key);
+  }
+}
+
 /** Deposit → refresh accounts, history, summary, and the public hero. */
 export type DepositMutation = UseMutationResult<
-  Account,
+  DepositResult,
   ApiError,
   { accountId: string; amount: string }
 > & { resetIdempotencyKey: () => void };
@@ -212,48 +294,57 @@ export type DepositMutation = UseMutationResult<
 export function useDeposit(): DepositMutation {
   const qc = useQueryClient();
   const keyRef = React.useRef<string | null>(null);
+  // Editing a draft is NOT resolving a submitted operation: the ref (in-page
+  // retry memory) drops so the next submit mints a fresh key for the new
+  // intent, but any pending record of an earlier ambiguous attempt survives
+  // in the store - still recoverable, never silently erased by an edit.
   const resetIdempotencyKey = React.useCallback(() => {
     keyRef.current = null;
-    const userId = currentUserId(qc);
-    if (userId) clearPendingOperation(userId);
-  }, [qc]);
-  const mutation = useMutation<Account, ApiError, { accountId: string; amount: string }>({
+  }, []);
+  const mutation = useMutation<DepositResult, ApiError, { accountId: string; amount: string }>({
     mutationFn: ({ accountId, amount }) => {
       // Every user-submitted funding must carry an idempotency key (F06); an
       // identical replay returns the original result, never a second credit.
-      const { key, userId } = nextOperationKey(qc, "deposit", keyRef);
+      const intent = { accountId, amount };
+      const { key, userId } = nextOperationKey(qc, "deposit", keyRef, intent);
+      // Persist the identity BEFORE the request: a killed tab must not lose
+      // the record of what it sent.
+      persistBeforeDispatch(qc, "deposit", key, intent);
       void userId;
-      return api<Account>("/v1/accounts/" + accountId + "/deposit", {
+      return api<DepositResult>("/v1/accounts/" + accountId + "/deposit", {
         method: "POST",
         headers: { "Idempotency-Key": key },
         body: JSON.stringify({ amount })
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      // The server answered authoritatively: resolve THIS operation's record.
+      const key = keyRef.current;
+      finishPendingOperation(qc, "deposit", key);
       keyRef.current = null;
-      const userId = currentUserId(qc);
-      if (userId) clearPendingOperation(userId);
+      // Invalidate the funded account's detail as well as the lists that read
+      // from it (a deposit changes the detail of the account it funded).
       void qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      void qc.invalidateQueries({ queryKey: ["account", variables.accountId] });
       void qc.invalidateQueries({ queryKey: ["transactions"] });
       void qc.invalidateQueries({ queryKey: ["summary"] });
       void qc.invalidateQueries({ queryKey: ["public-stats"] });
       // A deposit posts a DEPOSIT_POSTED notification for this user.
       void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
+      void qc.invalidateQueries({ queryKey: queryKeys.recentOperations });
     },
     onError: (err) => {
+      const key = keyRef.current;
       if (isDefinitiveRejection(err)) {
+        // Definitive rejection (validation, funds): the server recorded
+        // nothing and this operation identity is free.
+        finishPendingOperation(qc, "deposit", key);
         keyRef.current = null;
-        const userId = currentUserId(qc);
-        if (userId) clearPendingOperation(userId);
         return;
       }
-      // Ambiguous outcome (network, 5xx, 429, 409): keep the key so a retry
-      // - even after a reload - deduplicates on the server. Persist the
-      // minimum unresolved identity, bound to the active user.
-      const userId = currentUserId(qc);
-      if (userId && keyRef.current) {
-        writePendingOperation({ userId, key: keyRef.current, kind: "deposit" });
-      }
+      // Ambiguous outcome (network, 5xx, 429, 409): the record was persisted
+      // BEFORE dispatch - the store already carries this operation, and a
+      // retry (even after a reload) deduplicates on the server.
     }
   });
   return Object.assign(mutation, { resetIdempotencyKey });
@@ -283,14 +374,24 @@ export type TransferMutation = UseMutationResult<Tx, ApiError, TransferInput> & 
 export function useTransfer(): TransferMutation {
   const qc = useQueryClient();
   const keyRef = React.useRef<string | null>(null);
+  // Editing a draft is NOT resolving a submitted operation: the ref (in-page
+  // retry memory) drops so the next submit mints a fresh key for the new
+  // intent, but any pending record of an earlier ambiguous attempt survives
+  // in the store - still recoverable, never silently erased by an edit.
   const resetIdempotencyKey = React.useCallback(() => {
     keyRef.current = null;
-    const userId = currentUserId(qc);
-    if (userId) clearPendingOperation(userId);
-  }, [qc]);
+  }, []);
   const mutation = useMutation<Tx, ApiError, TransferInput>({
     mutationFn: (input) => {
-      const { key, userId } = nextOperationKey(qc, "transfer", keyRef);
+      const intent = {
+        accountId: input.fromAccountId,
+        amount: input.amount,
+        toIban: input.toIban
+      };
+      const { key, userId } = nextOperationKey(qc, "transfer", keyRef, intent);
+      // Persist the identity BEFORE the request: a killed tab must not lose
+      // the record of what it sent.
+      persistBeforeDispatch(qc, "transfer", key, intent);
       void userId;
       return api<Tx>("/v1/transfers", {
         method: "POST",
@@ -298,33 +399,39 @@ export function useTransfer(): TransferMutation {
         body: JSON.stringify({ ...input, memo: input.memo || undefined })
       });
     },
-    onSuccess: () => {
+    onSuccess: (_data, variables) => {
+      const key = keyRef.current;
+      finishPendingOperation(qc, "transfer", key);
       keyRef.current = null;
-      const userId = currentUserId(qc);
-      if (userId) clearPendingOperation(userId);
+      // Invalidate both legs' account details when the destination is one of
+      // the caller's own accounts (self/own-account transfers move money on
+      // both sides).
+      const ownAccounts = qc.getQueryData<Account[]>(queryKeys.accounts) ?? [];
+      const toOwned = ownAccounts.find((a) => a.iban === variables.toIban);
       void qc.invalidateQueries({ queryKey: queryKeys.accounts });
+      void qc.invalidateQueries({ queryKey: ["account", variables.fromAccountId] });
+      if (toOwned) {
+        void qc.invalidateQueries({ queryKey: ["account", toOwned.id] });
+      }
       void qc.invalidateQueries({ queryKey: ["transactions"] });
       void qc.invalidateQueries({ queryKey: ["summary"] });
       void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
       void qc.invalidateQueries({ queryKey: ["public-stats"] });
+      void qc.invalidateQueries({ queryKey: queryKeys.recentOperations });
     },
     onError: (err) => {
       if (isDefinitiveRejection(err)) {
         // Definitive rejection (validation, funds): the server recorded
-        // nothing and the key is free - start a fresh intent.
+        // nothing and this operation identity is free.
+        const key = keyRef.current;
+        finishPendingOperation(qc, "transfer", key);
         keyRef.current = null;
-        const userId = currentUserId(qc);
-        if (userId) clearPendingOperation(userId);
         return;
       }
       // Ambiguous outcome (network drop, 5xx, 429, or a 409 conflict whose
       // original operation the retry will fetch): never discard the key - a
       // retry must deduplicate against whatever the server actually did. The
-      // key survives a reload via the pending-op store (F06).
-      const userId = currentUserId(qc);
-      if (userId && keyRef.current) {
-        writePendingOperation({ userId, key: keyRef.current, kind: "transfer" });
-      }
+      // record was persisted BEFORE dispatch, so it survives a reload too.
     }
   });
   return Object.assign(mutation, { resetIdempotencyKey });

@@ -26,7 +26,10 @@ function withClient(ui: React.ReactElement) {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false }, mutations: { retry: false } }
   });
-  return render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>);
+  // Seed the signed-in identity so the pending-op store can bind records to
+  // the user who dispatched them (recovery is owner-scoped).
+  client.setQueryData(queryKeys.me, { id: "u1" } as never);
+  return { client, ...render(<QueryClientProvider client={client}>{ui}</QueryClientProvider>) };
 }
 
 afterEach(() => {
@@ -126,6 +129,73 @@ describe("query hooks", () => {
     expect(keys[1]).toBe(keys[0]);
   });
 
+  it("reuses the stored key after a full reload (lost response, same intent)", async () => {
+    const user = userEvent.setup();
+    setToken("tok");
+    vi.mocked(api)
+      // First attempt: the server committed but the response was lost (5xx).
+      .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"))
+      // Retry after the "reload": dedupe against the original posting.
+      .mockResolvedValueOnce({ id: "t1", toIban: "DE999", amount: "5.00", flagged: false });
+
+    // First "page life": the attempt fails ambiguously and the page goes away.
+    const first = withClient(<TransferSender />);
+    const send = screen.getByRole("button", { name: "send" });
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    const beforeReload = sentKeys();
+    expect(beforeReload[0]).toBeTruthy();
+    first.unmount();
+    cleanup();
+
+    // "Reload": a brand-new hook instance, no in-memory ref - only the store.
+    // Re-submitting the SAME reviewed intent must resume the SAME key, so the
+    // server replays the original operation instead of posting a second one.
+    withClient(<TransferSender />);
+    await user.click(screen.getByRole("button", { name: "send" }));
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    const keys = sentKeys();
+    expect(keys[1]).toBe(keys[0]);
+  });
+
+  it("editing the draft into a NEW intent mints a fresh key and keeps the old record", async () => {
+    const user = userEvent.setup();
+    setToken("tok");
+    vi.mocked(api).mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"));
+    const first = withClient(<TransferSender />);
+    await user.click(screen.getByRole("button", { name: "send" }));
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    const oldKey = sentKeys()[0];
+    first.unmount();
+    cleanup();
+
+    // A DIFFERENT amount is a different intent: it must NOT inherit the older
+    // operation's key (that would 409), and the older pending record must
+    // survive (still recoverable) rather than being erased by the edit.
+    vi.mocked(api).mockResolvedValueOnce({ id: "t2", toIban: "DE999", amount: "9.00", flagged: false });
+    function DifferentAmountSender() {
+      const transfer = useTransfer();
+      return (
+        <button
+          type="button"
+          onClick={() =>
+            transfer.mutate({ fromAccountId: "a1", toIban: "DE999", amount: "9.00" })
+          }
+        >
+          send9
+        </button>
+      );
+    }
+    withClient(<DifferentAmountSender />);
+    await user.click(screen.getByRole("button", { name: "send9" }));
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    const keys = sentKeys();
+    expect(keys[1]).not.toBe(oldKey);
+    // The older unresolved record is still in the store.
+    const { listPendingOperations } = await import("./pending-op");
+    expect(listPendingOperations("u1").map((o) => o.key)).toContain(oldKey);
+  });
+
   it("starts a fresh key after success or a definitive 4xx", async () => {
     const user = userEvent.setup();
     setToken("tok");
@@ -167,7 +237,14 @@ describe("query hooks", () => {
     vi.mocked(api).mockImplementation(async (path) => {
       paths.push(path);
       if (path.includes("unread-count")) return { unread: 1 };
-      return { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" };
+      // The deposit endpoint now answers with the recoverable operation
+      // envelope (F06 lifecycle), not a bare account.
+      return {
+        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
+        operationId: "op-d1",
+        idempotencyKey: "dep-k",
+        status: "POSTED"
+      };
     });
     withClient(
       <>
@@ -194,7 +271,12 @@ describe("query hooks", () => {
       // Transient 5xx: the deposit may or may not have posted - the retry must
       // reuse the same key so the server never double-credits.
       .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"))
-      .mockResolvedValueOnce({ id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" });
+      .mockResolvedValueOnce({
+        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
+        operationId: "op-d2",
+        idempotencyKey: "dep-k",
+        status: "POSTED"
+      });
     withClient(<DepositSender />);
     const send = screen.getByRole("button", { name: "deposit" });
     await user.click(send);
@@ -215,10 +297,20 @@ describe("query hooks", () => {
       // A 409 means the key already names an operation - never discard it: a
       // retry must resolve the original result, not mint a competing op.
       .mockRejectedValueOnce(new ApiError(409, "Idempotency Conflict", "already used"))
-      .mockResolvedValueOnce({ id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" })
+      .mockResolvedValueOnce({
+        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
+        operationId: "op-d3",
+        idempotencyKey: "dep-k",
+        status: "POSTED"
+      })
       // A definitive rejection (validation) records nothing: the key is free.
       .mockRejectedValueOnce(new ApiError(400, "Transfer Rejected", "limit"))
-      .mockResolvedValueOnce({ id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" });
+      .mockResolvedValueOnce({
+        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
+        operationId: "op-d4",
+        idempotencyKey: "dep-k",
+        status: "POSTED"
+      });
     withClient(<DepositSender />);
     const send = screen.getByRole("button", { name: "deposit" });
 

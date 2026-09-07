@@ -8,6 +8,9 @@ type Schemas = components["schemas"];
 // the schemas shorter, domain-flavoured names.
 export type Account = Schemas["AccountResponse"];
 export type Tx = Schemas["TransactionResponse"];
+export type Deposit = Schemas["DepositResponse"];
+export type OperationListItem = Schemas["OperationListItem"];
+export type OperationList = Schemas["OperationListResponse"];
 export type Beneficiary = Schemas["BeneficiaryResponse"];
 export type NotificationItem = Schemas["NotificationResponse"];
 export type CardItem = Schemas["CardResponse"];

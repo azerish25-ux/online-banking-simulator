@@ -189,6 +189,36 @@ public interface TransactionRepository
   List<Transaction> findOperationsByKey(@Param("key") String key, @Param("owned") List<UUID> owned);
 
   /**
+   * Operation lookup scoped to ONE originating account (F06 namespace fix):
+   * the database uniqueness lives on (from_account_id, key) for transfers and
+   * (to_account_id, key) for deposits, so restricting the lookup to the
+   * originating account makes the replay/lookup namespace exactly the
+   * uniqueness namespace - at most one row can ever match.
+   */
+  @Query("select t from Transaction t where t.idempotencyKey = :key "
+      + "and ((t.fromAccountId is not null and t.fromAccountId = :accountId) "
+      + "or (t.fromAccountId is null and t.toAccountId = :accountId))")
+  Optional<Transaction> findOperationByKeyAndAccount(@Param("key") String key,
+      @Param("accountId") UUID accountId);
+
+  /**
+   * Bounded, newest-first recovery list of the originator's own keyed
+   * operations (transfers + deposits only - the engine never keys its own
+   * rows) created since {@code since}. Completed-but-unacknowledged postings
+   * are deliberately included: losing the response must not lose the
+   * financial record, so an owner can always rediscover what a key did even
+   * when their browser storage was cleared at logout.
+   */
+  @Query("select t from Transaction t where t.idempotencyKey is not null "
+      + "and t.kind in :kinds "
+      + "and ((t.fromAccountId is not null and t.fromAccountId in :owned) "
+      + "or (t.fromAccountId is null and t.toAccountId in :owned)) "
+      + "and t.createdAt >= :since order by t.createdAt desc, t.seq desc")
+  List<Transaction> findRecentOperationsByOwner(@Param("owned") List<UUID> owned,
+      @Param("kinds") List<TxKind> kinds, @Param("since") Instant since,
+      Pageable pageable);
+
+  /**
    * Raw DB-assigned seq of one row, read straight from the table. The paging
    * query maps entities, and an entity that is already in the persistence
    * context keeps its in-memory state - where {@code seq} is still null

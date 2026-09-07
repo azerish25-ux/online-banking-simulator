@@ -60,6 +60,49 @@ class DepositOperationTest {
   }
 
   @Test
+  void depositResponseCarriesARecoverableOperationIdentity() throws Exception {
+    String alice = client.register("op-dep-identity@example.com", "Op Deposit Identity");
+    String aliceId = client.accountId(alice);
+    String key = "dep-identity-" + UUID.randomUUID();
+
+    // The response names the operation (id + key + authoritative status), not
+    // only the updated balance, so a receipt and a status recovery exist even
+    // when the client loses the page.
+    MvcResult created = mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
+            .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", key)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"amount\":\"250.00\"}"))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode body = objectMapper.readTree(created.getResponse().getContentAsString());
+    String operationId = body.get("operationId").asText();
+    assertEquals(key, body.get("idempotencyKey").asText());
+    assertEquals("POSTED", body.get("status").asText());
+    assertEquals("250.0000", body.get("account").get("balance").asText());
+
+    // The operation identity resolves through the authorized receipt lookup.
+    mvc.perform(get("/api/v1/transfers/" + operationId)
+            .header("Authorization", "Bearer " + alice))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.kind").value("DEPOSIT"))
+        .andExpect(jsonPath("$.amount").value("250.0000"));
+
+    // An identical replay returns the SAME operation identity - the row the
+    // money actually posted under, never a new one.
+    MvcResult replay = mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
+            .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", key)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"amount\":\"250.00\"}"))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode replayBody = objectMapper.readTree(replay.getResponse().getContentAsString());
+    assertEquals(operationId, replayBody.get("operationId").asText(),
+        "a replay resolves to the original operation, never a fresh identity");
+  }
+
+  @Test
   void changedAmountUnderSameKeyIsAConflict() throws Exception {
     String alice = client.register("op-dep-b@example.com", "Op Deposit B");
     String aliceId = client.accountId(alice);
@@ -155,7 +198,8 @@ class DepositOperationTest {
             .content("{\"amount\":\"%s\"}".formatted(amount)))
         .andExpect(status().isOk())
         .andReturn();
-    return objectMapper.readTree(result.getResponse().getContentAsString()).get("balance").asText();
+    return objectMapper.readTree(result.getResponse().getContentAsString())
+        .path("account").get("balance").asText();
   }
 
   private JsonNode operation(String token, String key) throws Exception {
