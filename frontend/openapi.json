@@ -232,6 +232,22 @@
         "required" : [ "date", "depositVolume", "deposits", "interestEvents", "interestNet", "transferVolume", "transfers" ],
         "type" : "object"
       },
+      "DecisionRequest" : {
+        "properties" : {
+          "expectedReviewed" : {
+            "type" : "boolean"
+          },
+          "expectedStatus" : {
+            "type" : "string"
+          },
+          "reason" : {
+            "maxLength" : 400,
+            "minLength" : 0,
+            "type" : "string"
+          }
+        },
+        "type" : "object"
+      },
       "DepositRequest" : {
         "properties" : {
           "amount" : {
@@ -1875,6 +1891,15 @@
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecisionRequest"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {
@@ -1938,6 +1963,15 @@
             "type" : "string"
           }
         } ],
+        "requestBody" : {
+          "content" : {
+            "application/json" : {
+              "schema" : {
+                "$ref" : "#/components/schemas/DecisionRequest"
+              }
+            }
+          }
+        },
         "responses" : {
           "200" : {
             "content" : {

@@ -831,29 +831,52 @@ export function useAdminUserAccounts(userId: string): UseQueryResult<Account[], 
   });
 }
 
-export function useReviewTransaction(): UseMutationResult<Tx, ApiError, string> {
+export type DecisionInput = {
+  id: string;
+  reason: string;
+  expectedStatus: Tx["status"];
+  expectedReviewed: boolean;
+};
+
+/**
+ * Operator decision ( section 16). Every decision carries the bounded
+ * REQUIRED reason plus the case state the console displayed; when the row is
+ * no longer in that state the server answers 409 and the queue refetches to
+ * the winning decision. A lost race must never keep the optimistic toast.
+ */
+function useDecision(path: "review" | "decline"): UseMutationResult<Tx, ApiError, DecisionInput> {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id) => api<Tx>("/v1/admin/transactions/" + id + "/review", { method: "POST" }),
+    mutationFn: ({ id, reason, expectedStatus, expectedReviewed }) =>
+      api<Tx>("/v1/admin/transactions/" + id + "/" + path, {
+        method: "POST",
+        body: JSON.stringify({ reason, expectedStatus, expectedReviewed })
+      }),
     onSuccess: () => {
       // Invalidate every queue page (a prefix match): resolving an item can
       // shift rows across page boundaries.
       void qc.invalidateQueries({ queryKey: ["admin", "review-queue"] });
       void qc.invalidateQueries({ queryKey: ["transactions"] });
+    },
+    onError: (err) => {
+      // A stale-decision 409 must refresh immediately so the losing console
+      // renders the winner's authoritative state, not its stale row.
+      if (err instanceof ApiError && err.status === 409) {
+        void qc.invalidateQueries({ queryKey: ["admin", "review-queue"] });
+        void qc.invalidateQueries({ queryKey: ["transactions"] });
+      }
     }
   });
 }
 
+/** Approves a HELD transfer (settles it) or acknowledges a flagged POSTED deposit. */
+export function useReviewTransaction(): UseMutationResult<Tx, ApiError, DecisionInput> {
+  return useDecision("review");
+}
+
 /** Declines a HELD transfer; nothing has moved, so no money ever leaves the sender. */
-export function useDeclineTransaction(): UseMutationResult<Tx, ApiError, string> {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id) => api<Tx>("/v1/admin/transactions/" + id + "/decline", { method: "POST" }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["admin", "review-queue"] });
-      void qc.invalidateQueries({ queryKey: ["transactions"] });
-    }
-  });
+export function useDeclineTransaction(): UseMutationResult<Tx, ApiError, DecisionInput> {
+  return useDecision("decline");
 }
 
 /**

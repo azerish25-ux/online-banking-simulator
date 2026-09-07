@@ -155,13 +155,67 @@ class OpsReviewTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].entityId").value(heldId));
 
-    // A second decision on the same row is rejected - nothing settles twice.
+    // A second decision on the same row is a stale-decision CONFLICT (409,
+    // section 16): the losing operator is told the case already moved so the queue
+    // refreshes to the winning outcome - never an optimistic second toast.
     mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/decline")
             .header("Authorization", "Bearer " + admin))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isConflict());
     mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/review")
             .header("Authorization", "Bearer " + admin))
-        .andExpect(status().isBadRequest());
+        .andExpect(status().isConflict());
+  }
+
+  @Test
+  void staleExpectedStateAnswersConflictAndMatchingStateSettles() throws Exception {
+    String admin = login("admin-test@bank.local", "admin-test-123");
+    String alice = register("ops-race@example.com", "Ops Race");
+    String bob = register("ops-race-b@example.com", "Ops Race B");
+    String aliceId = accountId(alice);
+    String bobIban = accountIban(bob);
+    deposit(alice, aliceId, "30000.00");
+    String heldId = transfer(alice, bobIban, "12000.00", true);
+
+    // Two operators race. The loser's console still shows the case HELD and
+    // unreviewed, so its body carries the state it SAW. The winner settles
+    // first with a matching expected state.
+    String body = """
+        {"reason":"Approved after funds verification","expectedStatus":"HELD","expectedReviewed":false}""";
+    mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/review")
+            .header("Authorization", "Bearer " + admin)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.status").value("POSTED"))
+        .andExpect(jsonPath("$.reviewed").value(true));
+
+    // The loser's console now answers a stale decision: 409 naming the case's
+    // CURRENT state, so the queue refreshes to the winning outcome instead of
+    // preserving an optimistic toast (section 16).
+    mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/review")
+            .header("Authorization", "Bearer " + admin)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content(body))
+        .andExpect(status().isConflict())
+        .andExpect(jsonPath("$.title").value("Decision Conflict"));
+
+    // A reviewed-state mismatch is equally stale (posted deposit was already
+    // acknowledged by the other operator).
+    mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/decline")
+            .header("Authorization", "Bearer " + admin)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"reason":"Late decline","expectedStatus":"HELD","expectedReviewed":false}"""))
+        .andExpect(status().isConflict());
+
+    // A decision reason is recorded on the audit trail - bounded and plain,
+    // never a sensitive payload dump.
+    mvc.perform(get("/api/v1/admin/audit-logs").header("Authorization", "Bearer " + admin)
+            .param("action", "TRANSFER_APPROVED"))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.content[0].entityId").value(heldId))
+        .andExpect(jsonPath("$.content[0].metadata.reason")
+            .value("Approved after funds verification"));
   }
 
   private String register(String email, String name) throws Exception {

@@ -233,15 +233,35 @@ public class AdminController {
       @io.swagger.v3.oas.annotations.media.Schema(nullable = true) String memoSnippet,
       String reviewedAt) {}
 
+  /**
+   * Operator decision bodies ( section 16): a bounded REQUIRED reason
+   * plus the case state the operator saw. A body that omits them is accepted
+   * only for programmatic callers (a bounded default reason is recorded); the
+   * console always sends the exact state it displayed, so a stale decision
+   * answers 409 instead of overwriting another operator's outcome.
+   */
+  public record DecisionRequest(
+      @jakarta.validation.constraints.Size(max = 400) String reason,
+      String expectedStatus,
+      Boolean expectedReviewed) {}
+
   @PostMapping("/transactions/{id}/review")
-  public TransactionResponse review(Authentication authentication, @PathVariable UUID id) {
-    Transaction tx = adminService.reviewTransaction(authentication.getName(), id);
+  public TransactionResponse review(Authentication authentication, @PathVariable UUID id,
+      @RequestBody(required = false) @jakarta.validation.Valid DecisionRequest request) {
+    Transaction tx = adminService.reviewTransaction(authentication.getName(), id,
+        request == null ? null : request.reason(),
+        request == null ? null : request.expectedStatus(),
+        request == null ? null : request.expectedReviewed());
     return operatorResponse(tx);
   }
 
   @PostMapping("/transactions/{id}/decline")
-  public TransactionResponse decline(Authentication authentication, @PathVariable UUID id) {
-    Transaction tx = adminService.declineTransaction(authentication.getName(), id);
+  public TransactionResponse decline(Authentication authentication, @PathVariable UUID id,
+      @RequestBody(required = false) @jakarta.validation.Valid DecisionRequest request) {
+    Transaction tx = adminService.declineTransaction(authentication.getName(), id,
+        request == null ? null : request.reason(),
+        request == null ? null : request.expectedStatus(),
+        request == null ? null : request.expectedReviewed());
     return operatorResponse(tx);
   }
 

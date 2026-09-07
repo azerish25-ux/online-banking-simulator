@@ -64,10 +64,11 @@ public class LedgerEventsService {
   }
 
   /** A HELD transfer was approved and settled; the sender and recipient are notified. */
-  public void transferApproved(User actor, Transaction tx, Account from, Account to) {
+  public void transferApproved(User actor, Transaction tx, Account from, Account to, String decisionReason) {
     audits.save(AuditLog.of(actor.getId(), "TRANSFER_APPROVED", "Transaction", tx.getId().toString(),
         "amount", tx.getAmount().toPlainString(),
-        "from", from.getIban(), "to", to.getIban()));
+        "from", from.getIban(), "to", to.getIban(),
+        "reason", boundedReason(decisionReason)));
     users.findById(from.getUserId()).ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
         "TRANSFER_SENT", "Money sent",
         "Sent " + Money.usd(tx.getAmount()) + " to " + to.getIban() + "."));
@@ -77,10 +78,11 @@ public class LedgerEventsService {
   }
 
   /** A HELD transfer was declined: no money moved, and only the sender is told. */
-  public void transferDeclined(User actor, Transaction tx) {
+  public void transferDeclined(User actor, Transaction tx, String decisionReason) {
     audits.save(AuditLog.of(actor.getId(), "TRANSFER_DECLINED", "Transaction", tx.getId().toString(),
         "amount", tx.getAmount().toPlainString(),
-        "from", ibanOf(tx.getFromAccountId()), "to", ibanOf(tx.getToAccountId())));
+        "from", ibanOf(tx.getFromAccountId()), "to", ibanOf(tx.getToAccountId()),
+        "reason", boundedReason(decisionReason)));
     accounts.findById(tx.getFromAccountId()).ifPresent(from -> users.findById(from.getUserId())
         .ifPresent(owner -> notifications.notify(owner.getId(), owner.getEmail(),
             "TRANSFER_DECLINED", "Transfer declined",
@@ -123,5 +125,15 @@ public class LedgerEventsService {
 
   private String ibanOf(UUID accountId) {
     return accounts.findById(accountId).map(Account::getIban).orElse("");
+  }
+
+  /** Decision reasons are bounded, rendered-safe metadata - never whole
+   *  request payloads ( section 16). */
+  private static String boundedReason(String reason) {
+    if (reason == null) {
+      return "Operator decision";
+    }
+    String trimmed = reason.trim();
+    return trimmed.length() > 400 ? trimmed.substring(0, 400) : trimmed;
   }
 }

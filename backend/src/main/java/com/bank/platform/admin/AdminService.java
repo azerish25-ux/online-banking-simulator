@@ -8,11 +8,11 @@ import com.bank.platform.accounts.AccountStatusChange;
 import com.bank.platform.accounts.AccountStatusChangeRepository;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
+import com.bank.platform.ledger.DecisionConflictException;
 import com.bank.platform.ledger.HeldTransferService;
 import com.bank.platform.ledger.Transaction;
 import com.bank.platform.ledger.TransactionNotFoundException;
 import com.bank.platform.ledger.TransactionRepository;
-import com.bank.platform.ledger.TransferValidationException;
 import com.bank.platform.ledger.TxStatus;
 import com.bank.platform.auth.Role;
 import com.bank.platform.auth.User;
@@ -51,7 +51,11 @@ public class AdminService {
   }
 
   /**
-   * Operator decision on a queue item.
+   * Operator decision on a queue item ( section 16). Every decision
+   * carries a bounded, required-in-the-UI reason and the case state the
+   * operator SAW ({@code expectedStatus}/{@code expectedReviewed}); when the
+   * row is no longer in that state a {@link DecisionConflictException} (409)
+   * tells the losing console to refresh and show the winning decision.
    *
    * A HELD transfer (large transfer awaiting review) is APPROVED: money moves
    * under locks inside the same transaction, the row becomes POSTED, and both
@@ -61,32 +65,76 @@ public class AdminService {
    * acknowledged here: there is no money to settle, so the flag is cleared.
    */
   @Transactional
-  public Transaction reviewTransaction(String adminEmail, UUID transactionId) {
+  public Transaction reviewTransaction(String adminEmail, UUID transactionId,
+      String decisionReason, String expectedStatus, Boolean expectedReviewed) {
     User admin = operatorOf(adminEmail);
     Transaction tx = transactions.findById(transactionId)
         .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+    requireExpected(tx, expectedStatus, expectedReviewed);
 
     if (tx.getStatus() == TxStatus.HELD) {
-      return heldTransfers.settleHeldTransfer(adminEmail, transactionId);
+      requireNotSelfReview(admin, tx);
+      return heldTransfers.settleHeldTransfer(adminEmail, transactionId, decisionReason);
     }
 
     // Only posted flagged rows (e.g. a large simulated deposit that credits on
     // arrival) are acknowledged; a CANCELLED or already-resolved row is not a
-    // live queue item anymore.
-    if (tx.getStatus() != TxStatus.POSTED || !tx.isFlagged()) {
-      throw new TransferValidationException("Nothing to review here");
+    // live queue item anymore - and an already-reviewed one is a race loss.
+    if (tx.getStatus() != TxStatus.POSTED || !tx.isFlagged() || tx.isReviewed()) {
+      throw new DecisionConflictException(transactionId, tx.getStatus().name(), tx.isReviewed());
     }
     tx.setReviewed(true);
     transactions.save(tx);
     audits.save(AuditLog.of(admin.getId(), "TRANSACTION_REVIEWED", "Transaction", tx.getId().toString(),
-        "transaction", tx.getId().toString()));
+        "amount", tx.getAmount().toPlainString(),
+        "account", tx.getToAccountId() == null ? "" : tx.getToAccountId().toString(),
+        "reason", defaultReason(decisionReason)));
     return tx;
   }
 
   /** Declines a HELD transfer - the lifecycle logic lives in the ledger. */
   @Transactional
-  public Transaction declineTransaction(String adminEmail, UUID transactionId) {
-    return heldTransfers.declineHeldTransfer(adminEmail, transactionId);
+  public Transaction declineTransaction(String adminEmail, UUID transactionId,
+      String decisionReason, String expectedStatus, Boolean expectedReviewed) {
+    User admin = operatorOf(adminEmail);
+    Transaction tx = transactions.findById(transactionId)
+        .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+    requireExpected(tx, expectedStatus, expectedReviewed);
+    if (tx.getStatus() != TxStatus.HELD) {
+      throw new DecisionConflictException(transactionId, tx.getStatus().name(), tx.isReviewed());
+    }
+    requireNotSelfReview(admin, tx);
+    return heldTransfers.declineHeldTransfer(adminEmail, transactionId, decisionReason);
+  }
+
+  /** A stale expected state means the case already moved - surface it as a conflict. */
+  private static void requireExpected(Transaction tx, String expectedStatus, Boolean expectedReviewed) {
+    if (expectedStatus != null && !expectedStatus.equals(tx.getStatus().name())) {
+      throw new DecisionConflictException(tx.getId(), tx.getStatus().name(), tx.isReviewed());
+    }
+    if (expectedReviewed != null && expectedReviewed != tx.isReviewed()) {
+      throw new DecisionConflictException(tx.getId(), tx.getStatus().name(), tx.isReviewed());
+    }
+  }
+
+  /** An operator cannot approve/decline a transfer they originated themselves. */
+  private void requireNotSelfReview(User admin, Transaction tx) {
+    if (tx.getFromAccountId() != null) {
+      accounts.findById(tx.getFromAccountId()).ifPresent(from -> {
+        if (from.getUserId().equals(admin.getId())) {
+          throw new AccessDeniedException("An operator cannot review their own transfer");
+        }
+      });
+    }
+  }
+
+  /** API/legacy callers without a typed reason get one bounded default. */
+  static String defaultReason(String reason) {
+    if (reason == null) {
+      return "Operator decision";
+    }
+    String trimmed = reason.trim();
+    return trimmed.isEmpty() ? "Operator decision" : trimmed;
   }
 
   @Transactional

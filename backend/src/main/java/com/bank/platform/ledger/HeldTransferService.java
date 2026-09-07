@@ -95,12 +95,15 @@ public class HeldTransferService {
    * owner for the whole held-transfer flow.
    */
   @Transactional
-  public Transaction settleHeldTransfer(String actorEmail, UUID transactionId) {
+  public Transaction settleHeldTransfer(String actorEmail, UUID transactionId, String decisionReason) {
     User actor = userOf(actorEmail);
     Transaction tx = transactions.findById(transactionId)
         .orElseThrow(() -> new TransactionNotFoundException(transactionId));
     if (tx.getStatus() != TxStatus.HELD || tx.getFromAccountId() == null || tx.getToAccountId() == null) {
-      throw new TransferValidationException("Only held transfers can be settled");
+      // Not a settleable case: another operator already decided it (POSTED /
+      // CANCELLED) or the row is malformed. A decided row is a 409 - the
+      // losing operator must see the winning outcome, not an error toast.
+      throw new DecisionConflictException(transactionId, tx.getStatus().name(), tx.isReviewed());
     }
     // Settlement time (F04): reported/statement months cut here, and this is
     // the moment the money actually moved - approval can land well after the
@@ -108,7 +111,12 @@ public class HeldTransferService {
     // HELD→POSTED flip so the transition and its time cannot diverge.
     Instant postedAt = clock.instant();
     if (transactions.resolveAwaitingReview(transactionId, TxStatus.HELD, TxStatus.POSTED, postedAt) == 0) {
-      throw new TransferValidationException("Transfer was already resolved by someone else");
+      // The atomic flip lost: someone else settled (or cancelled) this HELD
+      // row between our read and the flip. Surface the CURRENT state so the
+      // losing console can refresh and show the winner's decision (F16).
+      Transaction current = transactions.findById(transactionId)
+          .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+      throw new DecisionConflictException(transactionId, current.getStatus().name(), current.isReviewed());
     }
 
     LedgerMovementService.Moved moved = movement.move(tx.getFromAccountId(), tx.getToAccountId(), tx.getAmount());
@@ -132,7 +140,7 @@ public class HeldTransferService {
         JournalService.Posting.account(tx.getFromAccountId(), tx.getAmount().negate()),
         JournalService.Posting.account(tx.getToAccountId(), tx.getAmount()));
 
-    events.transferApproved(actor, tx, moved.from(), moved.to());
+    events.transferApproved(actor, tx, moved.from(), moved.to(), decisionReason);
     // Evict only after this settlement commits (F07) - a rollback must not
     // clear caches for an approval that never happened.
     invalidation.clearSynchronized("summaries", "public-stats");
@@ -145,15 +153,17 @@ public class HeldTransferService {
    * money left their account.
    */
   @Transactional
-  public Transaction declineHeldTransfer(String actorEmail, UUID transactionId) {
+  public Transaction declineHeldTransfer(String actorEmail, UUID transactionId, String decisionReason) {
     User actor = userOf(actorEmail);
     Transaction tx = transactions.findById(transactionId)
         .orElseThrow(() -> new TransactionNotFoundException(transactionId));
     if (tx.getStatus() != TxStatus.HELD) {
-      throw new TransferValidationException("Only held transfers can be declined");
+      throw new DecisionConflictException(transactionId, tx.getStatus().name(), tx.isReviewed());
     }
     if (transactions.resolveAwaitingReview(transactionId, TxStatus.HELD, TxStatus.CANCELLED, null) == 0) {
-      throw new TransferValidationException("Transfer was already resolved by someone else");
+      Transaction current = transactions.findById(transactionId)
+          .orElseThrow(() -> new TransactionNotFoundException(transactionId));
+      throw new DecisionConflictException(transactionId, current.getStatus().name(), current.isReviewed());
     }
     tx.setStatus(TxStatus.CANCELLED);
     tx.setReviewed(true);
@@ -162,7 +172,7 @@ public class HeldTransferService {
     // commit so the same transaction never observes a half-declined row.
     invalidation.clearSynchronized("summaries", "public-stats");
 
-    events.transferDeclined(actor, tx);
+    events.transferDeclined(actor, tx, decisionReason);
     return tx;
   }
 

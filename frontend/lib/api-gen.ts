@@ -870,6 +870,11 @@ export interface components {
             /** Format: int64 */
             transfers: number;
         };
+        DecisionRequest: {
+            expectedReviewed?: boolean;
+            expectedStatus?: string;
+            reason?: string;
+        };
         DepositRequest: {
             amount: string;
         };
@@ -1730,7 +1735,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {
@@ -1778,7 +1787,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody?: {
+            content: {
+                "application/json": components["schemas"]["DecisionRequest"];
+            };
+        };
         responses: {
             /** @description OK */
             200: {

@@ -8,17 +8,30 @@ import { Pager } from "../../components/ui/pager";
 import { LoadFailed } from "../../components/ui/load-failed";
 import { Skeleton } from "../../components/ui/skeleton";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
+import { Field } from "../../components/ui/input";
+import { Textarea } from "../../components/ui/textarea";
 import { useResultToast } from "../../components/feedback/use-result-toast";
 import { ReversalAction } from "../../components/admin/reverse-transaction";
 import { useAdminReviewQueue, useDeclineTransaction, useReviewTransaction } from "../../lib/queries";
+import { ApiError } from "../../lib/api";
 import { fmtDate, maskIban, usd } from "../../lib/format";
 import type { Tx } from "../../lib/api-types";
 
+/** What an operator is deciding about one queue case (section 16). */
+type DecisionAction = "approve" | "decline" | "acknowledge";
+
 /**
- * Operator queue: HELD rows are intents - approving settles the transfer,
- * declining cancels it, so no money moves until an operator decides. A
- * flagged-but-POSTED row (large deposit) already credited, so it only needs
- * acknowledging to leave the queue.
+ * Operator queue ( section 16): HELD rows are intents - approving
+ * settles the transfer, declining cancels it, so no money moves until an
+ * operator decides. A flagged-but-POSTED row (large deposit) already credited,
+ * so it only needs acknowledging to leave the queue.
+ *
+ * Every decision is an exact review: the operator must type a bounded reason
+ * and the dialog shows what the decision does. The request carries the case
+ * state the operator SAW ({@code expectedStatus}/{@code expectedReviewed}); if
+ * another operator already decided, the server answers 409 and this console
+ * explains the winning decision and refreshes instead of preserving an
+ * optimistic success toast.
  */
 export function ReviewQueueSection() {
   const [queuePage, setQueuePage] = React.useState(0);
@@ -28,12 +41,13 @@ export function ReviewQueueSection() {
   const rows = queue.data?.content ?? [];
   const totalPages = queue.data?.totalPages ?? 1;
   const openCount = queue.data?.totalElements ?? rows.length;
-  const [declineCandidate, setDeclineCandidate] = React.useState<Tx | null>(null);
+  const [decision, setDecision] = React.useState<{ tx: Tx; action: DecisionAction } | null>(null);
+  const [reason, setReason] = React.useState("");
+  const [staleConflict, setStaleConflict] = React.useState<string | null>(null);
   // Per-row busy: one pending decision disables THAT row's buttons only - an
-  // unrelated row stays actionable (F11). TanStack exposes the in-flight id.
-  const reviewBusyId = review.isPending ? review.variables : undefined;
-  const declineBusyId = decline.isPending ? decline.variables : undefined;
-  const busy = (id: string) => reviewBusyId === id || declineBusyId === id;
+  // unrelated row stays actionable (F11).
+  const decisionBusyId = review.isPending ? review.variables?.id : decline.isPending ? decline.variables?.id : undefined;
+  const busy = (id: string) => decisionBusyId === id;
 
   // Clearing the last row of a page steps back so the operator is not left
   // staring at an empty page while older items still await review.
@@ -45,13 +59,22 @@ export function ReviewQueueSection() {
     rowsAtPageStart.current = rows.length;
   }, [rows.length, queuePage]);
 
-  // Result → toast wiring lives in the shared owner. Success copy derives
-  // from the AUTHORITATIVE response (F11): approve and acknowledge settle
-  // through the same review mutation, and what actually happened - the row's
-  // returned kind/status - decides the words, never which button was clicked.
-  // If another operator already settled the case, the response still says the
-  // true outcome and the queue refreshes underneath.
+  // Success copy derives from the AUTHORITATIVE response (F11): approve and
+  // acknowledge settle through the same review mutation, and what actually
+  // happened - the row's returned kind/status - decides the words, never which
+  // button was clicked.
   useResultToast(review, {
+    error: (err) => {
+      // A stale 409 is not a generic failure: another operator's decision won.
+      // Say so and let the queue refetch show the winning outcome.
+      if (err instanceof ApiError && err.status === 409) {
+        return {
+          message:
+            "This case was already decided by another operator. The queue refreshed to show the winning decision."
+        };
+      }
+      return { message: err.message };
+    },
     success: {
       toast: (settled) => {
         const flaggedDeposit = settled.kind === "DEPOSIT" || !settled.fromIban;
@@ -61,17 +84,126 @@ export function ReviewQueueSection() {
         return settled.status === "POSTED"
           ? { message: "Approved. Transfer settled." }
           : { message: "Review recorded. Case is now " + String(settled.status) + "." };
+      },
+      run: () => {
+        setDecision(null);
+        setReason("");
+        setStaleConflict(null);
       }
     }
   });
   useResultToast(decline, {
+    error: (err) => {
+      if (err instanceof ApiError && err.status === 409) {
+        return {
+          message:
+            "This case was already decided by another operator. The queue refreshed to show the winning decision."
+        };
+      }
+      return { message: err.message };
+    },
     success: {
-      toast: () => ({
-        message: "Declined. No money moved."
-      }),
-      run: () => setDeclineCandidate(null)
+      toast: () => ({ message: "Declined. No money moved." }),
+      run: () => {
+        setDecision(null);
+        setReason("");
+        setStaleConflict(null);
+      }
     }
   });
+
+  // 409 on a decision → refetch so the losing console renders the winner's
+  // authoritative state instead of a stale row.
+  const queueRefetch = queue.refetch;
+  React.useEffect(() => {
+    const err = review.error ?? decline.error;
+    if (err instanceof ApiError && err.status === 409) {
+      void queueRefetch();
+    }
+  }, [review.error, decline.error, queueRefetch]);
+
+  const openDecision = (tx: Tx, action: DecisionAction) => {
+    setStaleConflict(null);
+    setReason("");
+    setDecision({ tx, action });
+  };
+
+  const confirmDecision = () => {
+    if (!decision) return;
+    const clean = reason.trim();
+    if (!clean) return; // confirm stays disabled until a reason is typed
+    setStaleConflict(null);
+    const body = {
+      id: decision.tx.id,
+      reason: clean,
+      // The state THIS console displayed - the server's stale check (section 16).
+      expectedStatus: decision.tx.status,
+      expectedReviewed: decision.tx.reviewed
+    };
+    if (decision.action === "decline") {
+      decline.mutate(body);
+    } else {
+      review.mutate(body);
+    }
+  };
+
+  const ruleText = (t: Tx): string => {
+    if (t.status === "HELD") {
+      return t.kind === "DEPOSIT"
+        ? "Large deposit held for review; nothing credited yet"
+        : "Amount at or above the review threshold; funds are not reserved and nothing has moved";
+    }
+    return t.kind === "DEPOSIT" || !t.fromIban
+      ? "Large deposit flagged on arrival; already credited"
+      : "Large transfer flagged after settling";
+  };
+
+  const decisionCopy: Record<DecisionAction, { title: string; confirmLabel: string; body: (t: Tx) => React.ReactNode }> = {
+    approve: {
+      title: "Approve and settle this transfer?",
+      confirmLabel: "Approve transfer",
+      body: (t) => (
+        <>
+          <p>
+            {usd(t.amount)} will move from <span className="mono">{maskIban(t.fromIban ?? "")}</span> to{" "}
+            <span className="mono">{maskIban(t.toIban ?? "")}</span>. Sender funds are re-checked at
+            approval; the sender and recipient are both notified.
+          </p>
+          <p className="muted mt-2">
+            Nothing has moved while the case was held - approving settles it now. Declining instead
+            cancels the intent and no money ever moves.
+          </p>
+        </>
+      )
+    },
+    decline: {
+      title: "Decline this transfer?",
+      confirmLabel: "Decline transfer",
+      body: (t) => (
+        <>
+          <p>
+            {usd(t.amount)} from <span className="mono">{maskIban(t.fromIban ?? "")}</span> will be
+            cancelled. It never settles and no money moves. The sender is notified of the decision.
+          </p>
+          <p className="muted mt-2">
+            Sender funds were never reserved or taken while the case was held.
+          </p>
+        </>
+      )
+    },
+    acknowledge: {
+      title: "Acknowledge this flagged deposit?",
+      confirmLabel: "Acknowledge deposit",
+      body: (t) => (
+        <>
+          <p>
+            {usd(t.amount)} credited to <span className="mono">{maskIban(t.toIban ?? "")}</span> when
+            the deposit arrived. Acknowledging clears the flag - no money moves again.
+          </p>
+        </>
+      )
+    }
+  };
 
   return (
     <Card>
@@ -97,61 +229,60 @@ export function ReviewQueueSection() {
             return (
               <li key={t.id} className="rounded-md border border-divider p-3">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="text-sm">
-                    <span className="label">
-                      {isHeld ? "Transfer held · awaiting approval" : isDeposit ? "Deposit flagged · credited" : "Transfer flagged · settled"}
-                    </span>
-                    <span className="mono ml-2">
-                      {isDeposit
-                        ? (maskIban(t.toIban) ?? "-")
-                        : (maskIban(t.fromIban) ?? "-") + " → " + (maskIban(t.toIban) ?? "-")}
-                    </span>
-                    <span className="ml-2 font-semibold tabular-nums">{usd(t.amount)}</span>
-                    <span className="muted ml-2 text-xs">{fmtDate(t.createdAt)}</span>
+                  <div className="min-w-0 text-sm">
+                    <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
+                      <Badge tone={isHeld ? "warning" : "neutral"}>
+                        {isHeld ? "Held" : isDeposit ? "Flagged deposit" : "Flagged transfer"}
+                      </Badge>
+                      <span className="font-semibold tabular-nums">{usd(t.amount)}</span>
+                      <span className="mono muted text-xs">
+                        {isDeposit
+                          ? maskIban(t.toIban ?? "")
+                          : maskIban(t.fromIban ?? "") + " → " + maskIban(t.toIban ?? "")}
+                      </span>
+                      <span className="muted text-xs">{fmtDate(t.createdAt)}</span>
+                    </div>
+                    <p className="muted mt-1 text-xs">{ruleText(t)}</p>
                   </div>
-                  {isHeld ? (
-                    <div className="flex shrink-0 gap-2">
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        disabled={busy(t.id)}
-                        onClick={() => setDeclineCandidate(t)}
-                      >
-                        Decline
-                      </Button>
-                      <Button
-                        size="sm"
-                        disabled={busy(t.id)}
-                        onClick={() => review.mutate(t.id)}
-                      >
-                        Approve
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="flex shrink-0 gap-2">
-                      <Button
-                        size="sm"
-                        variant="secondary"
-                        disabled={busy(t.id)}
-                        onClick={() => review.mutate(t.id)}
-                      >
-                        Acknowledge
-                      </Button>
-                      <ReversalAction tx={t} />
-                    </div>
-                  )}
+                  <div className="flex shrink-0 gap-2">
+                    {isHeld ? (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={busy(t.id)}
+                          onClick={() => openDecision(t, "decline")}
+                        >
+                          Decline
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={busy(t.id)}
+                          onClick={() => openDecision(t, "approve")}
+                        >
+                          Approve
+                        </Button>
+                      </>
+                    ) : (
+                      <>
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          disabled={busy(t.id)}
+                          onClick={() => openDecision(t, "acknowledge")}
+                        >
+                          Acknowledge
+                        </Button>
+                        <ReversalAction tx={t} />
+                      </>
+                    )}
+                  </div>
                 </div>
                 {t.memo ? (
                   <p className="muted mt-1 text-sm">
                     <span className="label">Memo:</span> {t.memo}
                   </p>
                 ) : null}
-                {isHeld && (
-                  <p className="muted mt-1 text-xs">
-                    Sender funds are re-checked on approval; declining cancels the intent and
-                    nothing ever moves.
-                  </p>
-                )}
               </li>
             );
           })}
@@ -159,25 +290,41 @@ export function ReviewQueueSection() {
       )}
 
       <ConfirmDialog
-        open={declineCandidate != null}
-        title="Decline this transfer?"
-        confirmLabel="Decline transfer"
-        busy={decline.isPending}
+        open={decision != null}
+        title={decision ? decisionCopy[decision.action].title : ""}
+        confirmLabel={decision ? decisionCopy[decision.action].confirmLabel : ""}
+        busy={review.isPending || decline.isPending}
+        confirmDisabled={reason.trim().length === 0}
+        error={staleConflict}
         body={
-          declineCandidate ? (
-            <>
-              {usd(declineCandidate.amount)} from{" "}
-              <span className="mono">{maskIban(declineCandidate.fromIban ?? "")}</span> will be
-              cancelled. It never settles and no money moves. The sender is notified of the
-              decision.
-            </>
+          decision ? (
+            <div className="space-y-3">
+              {decisionCopy[decision.action].body(decision.tx)}
+              <Field
+                label="Decision reason"
+                hint="Required. Preserved in the audit trail; never the full case payload."
+              >
+                <Textarea
+                  value={reason}
+                  maxLength={400}
+                  placeholder={
+                    decision.action === "decline"
+                      ? "e.g. Sender could not confirm the instruction"
+                      : "e.g. Funds verified; pattern matches customer's history"
+                  }
+                  onChange={(e) => setReason(e.target.value)}
+                />
+              </Field>
+            </div>
           ) : null
         }
-        onClose={() => setDeclineCandidate(null)}
-        onConfirm={() => {
-          if (!declineCandidate) return;
-          decline.mutate(declineCandidate.id);
+        onClose={() => {
+          if (!review.isPending && !decline.isPending) {
+            setDecision(null);
+            setStaleConflict(null);
+          }
         }}
+        onConfirm={confirmDecision}
       />
       {openCount > 0 && (
         <div className="mt-3">

@@ -6,6 +6,7 @@ import com.bank.platform.auth.EmailTakenException;
 import com.bank.platform.auth.TooManyTotpAttemptsException;
 import com.bank.platform.beneficiaries.BeneficiaryExistsException;
 import com.bank.platform.beneficiaries.BeneficiaryNotFoundException;
+import com.bank.platform.ledger.DecisionConflictException;
 import com.bank.platform.ledger.IdempotencyConflictException;
 import com.bank.platform.ledger.InsufficientFundsException;
 import com.bank.platform.ledger.OperationKeyAmbiguousException;
@@ -156,6 +157,16 @@ public class ApiExceptionHandler {
   @ExceptionHandler(OperationKeyAmbiguousException.class)
   public ResponseEntity<ApiProblem> operationKeyAmbiguous(OperationKeyAmbiguousException ex) {
     return problem(HttpStatus.CONFLICT, "Ambiguous Operation Key", ex.getMessage());
+  }
+
+  /**
+   * An operator tried to decide a case another operator already decided
+   * ( section 16): 409 so the losing console refreshes and shows the
+   * winning decision instead of preserving an optimistic success toast.
+   */
+  @ExceptionHandler(DecisionConflictException.class)
+  public ResponseEntity<ApiProblem> decisionConflict(DecisionConflictException ex) {
+    return problem(HttpStatus.CONFLICT, "Decision Conflict", ex.getMessage());
   }
 
   @ExceptionHandler(AccessDeniedException.class)
