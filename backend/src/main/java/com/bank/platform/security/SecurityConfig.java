@@ -52,7 +52,7 @@ public class SecurityConfig {
             .addHeaderWriter(new StaticHeadersWriter(
                 "Permissions-Policy", "camera=(), microphone=(), geolocation=()")))
         .authorizeHttpRequests(auth -> auth
-            .requestMatchers("/api/health", "/api/public/stats", "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/mfa/verify", "/actuator/health", "/actuator/info", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
+            .requestMatchers("/api/health", "/api/e2e/identity", "/api/public/stats", "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/refresh", "/api/v1/auth/logout", "/api/v1/auth/mfa/verify", "/actuator/health", "/actuator/info", "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html")
             .permitAll()
             .anyRequest()
             .authenticated())

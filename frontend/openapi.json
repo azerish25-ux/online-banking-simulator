@@ -1201,6 +1201,33 @@
   },
   "openapi" : "3.1.0",
   "paths" : {
+    "/api/e2e/identity" : {
+      "get" : {
+        "operationId" : "identity",
+        "parameters" : [ {
+          "in" : "header",
+          "name" : "X-E2E-Marker",
+          "required" : false,
+          "schema" : {
+            "type" : "string"
+          }
+        } ],
+        "responses" : {
+          "200" : {
+            "content" : {
+              "*/*" : {
+                "schema" : {
+                  "additionalProperties" : { },
+                  "type" : "object"
+                }
+              }
+            },
+            "description" : "OK"
+          }
+        },
+        "tags" : [ "e-2e-identity-controller" ]
+      }
+    },
     "/api/health" : {
       "get" : {
         "operationId" : "health",

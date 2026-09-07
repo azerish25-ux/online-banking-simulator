@@ -52,8 +52,12 @@ jobs:
       - working-directory: frontend
         run: npx playwright install chromium
       # smoke.spec.ts runs backend-less; a11y + banking need the full stack (banking-e2e job).
+      # E2E_BACKENDLESS tells the global-setup preflight there is no backend/database to
+      # identify for this job (section 19).
       - working-directory: frontend
         run: npx playwright test smoke.spec.ts
+        env:
+          E2E_BACKENDLESS: "1"
 
   docker:
     runs-on: ubuntu-latest
@@ -240,8 +244,17 @@ jobs:
       # browser suite runs past real expiries: every spec's authed calls must
       # silently refresh + retry (session.spec.ts waits out the TTL on purpose;
       # the other specs would fail outright if silent refresh were broken).
-      - working-directory: backend
+      # E2E_MARKER is the RUN-SPECIFIC identity the playwright global-setup
+      # preflight demands (section 19): the same value must reach the backend boot and
+      # the Playwright step below, so a leftover/stale server is refused
+      # before the first seed instead of silently receiving the suite's data.
+      - name: Boot backend with the run marker
+        working-directory: backend
         run: PG_PASSWORD=ci-secret JWT_SECRET=ci-jwt-secret-0123456789abcdef-0123456789abcdef APP_JWT_ACCESS_SECONDS=3 java -jar target/platform-*.jar & echo $! > app.pid
+        env:
+          E2E_MARKER: e2e-${{ github.run_id }}-${{ github.run_attempt }}
+      - name: Wait for backend health
+        run: for i in $(seq 1 36); do curl -sf http://localhost:8080/api/health && break || sleep 5; done
       - run: for i in $(seq 1 36); do curl -sf http://localhost:8080/api/health && break || sleep 5; done
       # Seed the two demo users the a11y specs log in with (idempotent on re-run).
       - run: |
@@ -258,6 +271,9 @@ jobs:
         run: npx playwright install chromium
       - working-directory: frontend
         run: E2E_ACCESS_TTL_SECONDS=3 npx playwright test
+        env:
+          E2E_MARKER: e2e-${{ github.run_id }}-${{ github.run_attempt }}
+          E2E_EXPECT_DB: bankdb
       - name: Stop backend
         working-directory: backend
         run: kill $(cat app.pid)

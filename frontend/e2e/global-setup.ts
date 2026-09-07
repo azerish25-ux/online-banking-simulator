@@ -1,60 +1,129 @@
 import { request } from "@playwright/test";
 
 /**
- * Identity preflight for the browser suite (N02 / section 11.3): the
- * suite must never run against a stale or unrelated application and pass.
+ * Identity preflight for the browser suite ( section 19): the suite must
+ * never seed or write against a stale, leftover or unrelated application and
+ * pass green. A health body and a CSP header do not identify the actual
+ * database or source build, so before ANY seeding step this setup demands a
+ * RUN-SPECIFIC MARKER from the backend's marker-gated identity endpoint
+ * (`/api/e2e/identity`), which also names the live database connection.
  *
- * Two cases:
+ * The backend must be booted with the SAME `E2E_MARKER` value this run uses
+ * (CI sets one per job). A leftover server from an earlier run - the
+ * documented two-deposit incident - carries an older or absent marker and is
+ * REFUSED here, before the first write.
  *
- * 1. E2E_BASE_URL is set (an EPHEMERAL stack - a second frontend the caller
- *    built and started, or CI's own job): that server is not something this
- *    run booted, so probe it before any assertion runs -
- *    `/backend/health` must reach a live backend through the rewrite (the
- *    canonical proxy boundary the whole suite depends on), and `/login` must
- *    answer HTML carrying the per-request nonce Content-Security-Policy the
- *    current code enforces. A mismatch aborts the run with the probed URL and
- *    what failed, instead of reporting green against the wrong app.
+ * Two stack shapes:
  *
- * 2. E2E_BASE_URL is unset: playwright.config.ts starts a FRESH server on
- *    :3000 from this checkout's build (reuseExistingServer is false - an
- *    occupied port is a loud startup error, never a silent reuse), so the
- *    app under test is this build by construction and nothing further to
- *    probe here.
+ * 1. E2E_BASE_URL is set (an EPHEMERAL stack the caller built and started):
+ *    the probe goes THROUGH that frontend's `/backend` rewrite, proving the
+ *    same backend the browser will actually hit, and `/login` must answer the
+ *    per-request nonce CSP this checkout's proxy enforces (frontend build
+ *    identity).
+ *
+ * 2. E2E_BASE_URL is unset: playwright.config.ts starts a FRESH frontend on
+ *    :3000 from this checkout's build (`reuseExistingServer: false` - an
+ *    occupied port is a loud startup error, never silent reuse), so the
+ *    frontend is this build by construction. The backend probe goes DIRECTLY
+ *    to the backend origin (BACKEND_URL, default :8080 - the same default the
+ *    frontend proxy rewrites to).
  */
 export default async function globalSetup(): Promise<void> {
-  const base = process.env.E2E_BASE_URL;
-  if (!base) {
+  // Backend-less runs (smoke.spec.ts checks the built frontend only) have no
+  // backend to identify; the frontend is still this checkout's build because
+  // the webServer refuses to reuse a stale :3000. Everything else demands the
+  // run marker before any seed or destructive step.
+  if (process.env.E2E_BACKENDLESS === "1") {
+    process.stdout.write(
+      "E2E preflight (backend-less): no database to verify; the frontend under "
+        + "test is the webServer this config boots from this checkout.\n"
+    );
     return;
   }
+  const marker = process.env.E2E_MARKER;
+  if (!marker) {
+    throw new Error(
+      "E2E identity preflight requires a run-specific E2E_MARKER: boot the backend "
+        + "with E2E_MARKER=<this-run's marker> and export the SAME value for Playwright. "
+        + "Without it the suite cannot prove it is talking to THIS run's database, not a "
+        + "stale or working one."
+    );
+  }
+
+  const base = process.env.E2E_BASE_URL;
+  // The identity endpoint is always reached through the SAME path the
+  // browser's API calls use: the frontend rewrite when one is under test,
+  // otherwise the backend origin the local proxy targets.
+  const identityUrl = base
+    ? base + "/backend/e2e/identity"
+    : (process.env.BACKEND_URL ?? "http://localhost:8080") + "/e2e/identity";
+
   const context = await request.newContext();
   try {
-    const health = await context.get(base + "/backend/health");
-    if (!health.ok()) {
+    const probe = await context.get(identityUrl, {
+      headers: { "X-E2E-Marker": marker }
+    });
+    if (probe.status() === 403 || probe.status() === 404) {
       throw new Error(
-        "E2E identity preflight failed: " + base + "/backend/health answered HTTP "
-          + health.status() + ". Is a CURRENT backend running behind this frontend's "
-          + "rewrite? The suite would otherwise fail (or pass) against the wrong app."
+        "E2E identity preflight REFUSED at " + identityUrl + " (HTTP " + probe.status()
+          + "): the backend there was not booted with E2E_MARKER=" + marker
+          + ". A stale or foreign server (e.g. a leftover from an earlier run) must never "
+          + "receive this suite's seeds - boot the intended backend with the current marker."
       );
     }
-    const login = await context.get(base + "/login");
-    if (!login.ok()) {
+    if (!probe.ok()) {
       throw new Error(
-        "E2E identity preflight failed: " + base + "/login answered HTTP "
-          + login.status() + " - expected a live document route."
+        "E2E identity preflight failed: " + identityUrl + " answered HTTP "
+          + probe.status() + ". Is a CURRENT backend running?"
       );
     }
-    const csp = login.headers()["content-security-policy"] ?? "";
-    if (!csp.includes("script-src") || !/nonce-[A-Za-z0-9+/=_-]+/.test(csp)) {
+    const identity = (await probe.json()) as {
+      marker?: string;
+      testMode?: boolean;
+      version?: string;
+      db?: { product?: string; url?: string; user?: string };
+    };
+    if (identity.marker !== marker || identity.testMode !== true || !identity.db) {
       throw new Error(
-        "E2E identity preflight failed: " + base + "/login does not carry the "
-          + "per-request nonce Content-Security-Policy this checkout enforces "
-          + "(proxy.ts). Refusing to run assertions against an unverified application."
+        "E2E identity preflight failed: " + identityUrl + " did not confirm THIS run's "
+          + "marker/test-mode/database identity (" + JSON.stringify(identity) + ")."
+      );
+    }
+    // Optional hard gate on the database the run expects (CI sets the
+    // disposable name; local disposable runs should too).
+    const expectedDb = process.env.E2E_EXPECT_DB;
+    if (expectedDb && !String(identity.db.url ?? "").includes(expectedDb)) {
+      throw new Error(
+        "E2E identity preflight refused the DATABASE: expected a disposable database "
+          + "whose URL contains '" + expectedDb + "' but " + identityUrl + " reports "
+          + identity.db.url + ". Refusing before the first write."
       );
     }
     process.stdout.write(
-      "E2E identity preflight passed: " + base
-        + " proxies a live backend and serves the nonce-CSP document headers.\n"
+      "E2E identity preflight passed: marker " + marker + " confirmed at " + identityUrl
+        + " (backend " + identity.version + " on " + identity.db.product + " "
+        + identity.db.url + " as " + identity.db.user + ").\n"
     );
+
+    // Frontend build identity is only probeable when a frontend is already
+    // running (ephemeral stack). Local runs boot :3000 from this checkout.
+    if (base) {
+      const login = await context.get(base + "/login");
+      if (!login.ok()) {
+        throw new Error(
+          "E2E identity preflight failed: " + base + "/login answered HTTP "
+            + login.status() + " - expected a live document route."
+        );
+      }
+      const csp = login.headers()["content-security-policy"] ?? "";
+      if (!csp.includes("script-src") || !/nonce-[A-Za-z0-9+/=_-]+/.test(csp)) {
+        throw new Error(
+          "E2E identity preflight failed: " + base + "/login does not carry the "
+            + "per-request nonce Content-Security-Policy this checkout enforces "
+            + "(proxy.ts). Refusing to run assertions against an unverified application."
+        );
+      }
+    }
   } finally {
     await context.dispose();
   }
