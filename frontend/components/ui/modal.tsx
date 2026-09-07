@@ -97,7 +97,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="panel w-full max-w-md p-5 border-line motion-safe:animate-dialog-in"
+        className="panel w-full max-w-md rounded-lg p-5 shadow-dialog motion-safe:animate-dialog-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -106,7 +106,7 @@ export function Modal({
             onClick={onClose}
             aria-label="Close dialog"
             ref={closeRef}
-            className="rounded-md px-2 py-1 text-content-muted hover:bg-ink-700 hover:text-content"
+            className="rounded px-2 py-1 text-content-secondary hover:bg-surface-subtle hover:text-content"
           >
               <X size={16} aria-hidden="true" />
           </button>

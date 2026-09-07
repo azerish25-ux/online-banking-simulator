@@ -3,21 +3,21 @@ import { cn } from "../../lib/cn";
 
 export function Table({ className, ...props }: React.TableHTMLAttributes<HTMLTableElement>) {
   return (
-    <div className="overflow-x-auto rounded-md border border-line">
+    <div className="overflow-x-auto rounded-md border border-divider">
       <table className={cn("w-full text-left text-sm", className)} {...props} />
     </div>
   );
 }
 
 export function THead({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <thead className={cn("border-b border-line text-content-muted", className)} {...props} />;
+  return <thead className={cn("border-b border-divider text-content-secondary", className)} {...props} />;
 }
 
 export function TRow({ className, ...props }: React.HTMLAttributes<HTMLTableRowElement>) {
   return (
     <tr
       className={cn(
-        "border-t border-line/70 first:border-t-0 hover:bg-ink-800/60",
+        "border-t border-divider/70 first:border-t-0 hover:bg-surface-subtle",
         className
       )}
       {...props}

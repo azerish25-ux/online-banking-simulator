@@ -14,7 +14,7 @@ export function Pager({
   if (totalPages <= 1) return null;
   return (
     <div className="mt-3 flex items-center justify-between text-sm">
-      <span className="text-content-muted">Page {page + 1} of {totalPages}</span>
+      <span className="text-content-secondary">Page {page + 1} of {totalPages}</span>
       <div className="flex gap-2">
         <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => onChange(page - 1)}>
           <ArrowLeft size={14} aria-hidden="true" /> Prev

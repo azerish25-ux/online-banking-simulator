@@ -88,7 +88,7 @@ export function ReversalAction({ tx }: { tx: Tx }) {
         error={failure}
         body={
           <div className="space-y-3">
-            <p className="text-content-soft">
+            <p className="text-content-secondary">
               {usd(tx.amount)} on <span className="mono">{route}</span> will move back along
               the original legs. The original stays in history; the reversal is a new linked
               posting. One reversal per transaction is allowed.

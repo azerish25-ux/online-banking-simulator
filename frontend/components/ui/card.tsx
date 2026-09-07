@@ -6,7 +6,8 @@ export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElemen
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h2 className={cn("display text-lg font-semibold tracking-tight", className)} {...props} />;
+  // Section title: 20/28 per the  spectype ramp.
+  return <h2 className={cn("text-xl leading-7 font-semibold tracking-tight", className)} {...props} />;
 }
 
 export function CardDescription({ className, ...props }: React.HTMLAttributes<HTMLParagraphElement>) {

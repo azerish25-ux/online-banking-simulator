@@ -7,8 +7,8 @@ export const Input = React.forwardRef<HTMLInputElement, React.InputHTMLAttribute
       <input
         ref={ref}
         className={cn(
-          "h-10 w-full rounded-md border border-line bg-ink-800/60 px-3 text-sm text-content",
-          "placeholder:text-content-faint focus:border-brass-500 focus:outline-none focus:ring-1 focus:ring-brass-500",
+          "h-11 w-full rounded border border-control bg-surface px-3 text-sm text-content shadow-panel",
+          "placeholder:text-content-faint focus:border-focus focus:outline-none focus:ring-1 focus:ring-focus",
           className
         )}
         {...props}
@@ -81,12 +81,12 @@ export function Field({
 
   return (
     <div>
-      <label htmlFor={id} className="label mb-1.5 block text-content-soft">
+      <label htmlFor={id} className="label mb-1.5 block text-content-secondary">
         {label}
       </label>
       {control}
       {error ? (
-        <p id={errorId} role="alert" className="mt-1.5 text-sm text-rose">
+        <p id={errorId} role="alert" className="mt-1.5 text-sm text-danger">
           {error}
         </p>
       ) : hint ? (

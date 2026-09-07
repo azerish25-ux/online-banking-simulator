@@ -34,7 +34,7 @@ export default function RegisterPage() {
     <AuthShell
       title="Create your account"
       subtitle="A checking account is opened automatically."
-      footer={<>Have an account? <Link className="text-brass-300" href={Routes.login}>Log in</Link></>}
+      footer={<>Have an account? <Link className="text-action" href={Routes.login}>Log in</Link></>}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Field label="Full name" error={formState.errors.fullName?.message}>

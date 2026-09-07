@@ -23,20 +23,23 @@ export function AuthShell({
   usePageTitle();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-900 p-4">
+    <div className="flex min-h-screen items-center justify-center bg-workspace px-4 py-8">
+      {/* Modest form width (~440px), readable labels, one primary action. */}
       <div className="w-full max-w-md">
-        <p className="display mb-6 text-center text-2xl font-semibold tracking-tight">
+        <p className="mb-2 text-center text-2xl font-semibold tracking-tight">
           <Link href="/">{BrandName}</Link>
         </p>
-        <p className="label -mt-4 mb-6 text-center text-brass-400">{DemoTagline}</p>
+        <p className="mb-6 text-center text-sm text-content-secondary">{DemoTagline}</p>
         <Card>
-          <h1 className="display text-xl font-semibold tracking-tight">{title}</h1>
+          <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">
+            {title}
+          </h1>
           {subtitle ? <p className="muted mt-1 text-sm">{subtitle}</p> : null}
-          <div className="mt-5">{children}</div>
+          <div className="mt-6">{children}</div>
         </Card>
         {footer ? <p className="muted mt-4 text-center text-sm">{footer}</p> : null}
-        <p className="mt-3 text-center text-xs">
-          <AboutDemoLink className="text-content-muted hover:text-content" />
+        <p className="mt-3 text-center text-sm">
+          <AboutDemoLink className="text-content-secondary hover:text-content" />
         </p>
       </div>
     </div>

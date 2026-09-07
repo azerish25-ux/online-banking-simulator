@@ -6,7 +6,6 @@ import { usd } from "../lib/format";
 /**
  * Client island inside the otherwise static landing page: pulls the one
  * public endpoint (cached server-side, evicted on register/transfer).
- * Figures are set in the display serif, like a printed statement.
  */
 export function HeroStats() {
   const query = usePublicStats();
@@ -24,8 +23,8 @@ export function HeroStats() {
     <dl className="grid gap-8 sm:grid-cols-3">
       {items.map((item) => (
         <div key={item.label}>
-          <dt className="caps muted">{item.label}</dt>
-          <dd className="display mt-2 text-4xl font-semibold tabular-nums text-brass-200">
+          <dt className="text-sm text-content-secondary">{item.label}</dt>
+          <dd className="mt-1 text-[28px] leading-[34px] font-semibold tabular-nums">
             {item.value}
           </dd>
         </div>

@@ -49,7 +49,7 @@ export default function LoginPage() {
     <AuthShell
       title="Log in"
       subtitle="Secure access to your accounts."
-      footer={<>No account? <Link className="text-brass-300" href={Routes.register}>Register</Link></>}
+      footer={<>No account? <Link className="text-action" href={Routes.register}>Register</Link></>}
     >
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Field label="Email" error={formState.errors.email?.message}>

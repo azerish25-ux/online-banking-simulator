@@ -57,7 +57,7 @@ export default function MfaChallengePage() {
       title="Two-factor check"
       subtitle="Enter the six-digit code from your authenticator app."
       footer={
-        <>Wrong device? <Link className="text-brass-300" href={Routes.login}>Log in again</Link></>
+        <>        Wrong device? <Link className="text-action" href={Routes.login}>Log in again</Link></>
       }
     >
       <form onSubmit={submit} className="space-y-4" noValidate>

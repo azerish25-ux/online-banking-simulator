@@ -5,8 +5,8 @@
  * Two leaks are banned in app/ and components/:
  *   1. Default Tailwind hues (slate, red, emerald, amber, sky, ...) - every
  *      color a view can name must come from tailwind.config.ts, which the
- *      project extends with `ink`, `brass`, `line`, `content`, `mint`,
- *      `rose`, `amber`, `sky`, and the status/outflow tokens.
+ *      project extends with the semantic workspace/surface/action/content
+ *      and status (success/warning/danger/info) tokens.
  *   2. Raw hex color literals - chart fills, borders, etc. reference the
  *      tokens (e.g. `fill-outflow`), never a copy of a value.
  *
@@ -22,8 +22,7 @@ const scanDirs = ["app", "components"];
 const extensions = /\.(ts|tsx|css)$/;
 
 // A default Tailwind hue used as a class utility (numeric step required, so
-// the bespoke `text-rose` / `text-amber` tokens - which have no step - stay
-// legal).
+// the bespoke semantic tokens - which have no numeric step - stay legal).
 const hueClass = /(?:bg|text|border|ring|fill|stroke|divide|outline|placeholder:text|from|via|to)-(?:slate|gray|neutral|stone|zinc|red|orange|amber|yellow|lime|green|emerald|teal|cyan|sky|blue|indigo|violet|purple|fuchsia|pink|rose)-\d/;
 const hexColor = /#[0-9a-fA-F]{6}\b|#[0-9a-fA-F]{3}\b/;
 

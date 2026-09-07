@@ -11,7 +11,7 @@ import { LoadFailed } from "../../../../components/ui/load-failed";
 import { Skeleton } from "../../../../components/ui/skeleton";
 import { TxStatusBadge } from "../../../../components/ui/tx-status-badge";
 import { useTransferReceipt } from "../../../../lib/queries";
-import { maskIban, usd } from "../../../../lib/format";
+import { maskIban, usdReview } from "../../../../lib/format";
 import { Routes } from "../../../../lib/routes";
 
 /**
@@ -47,7 +47,7 @@ export default function TransferReceiptPage({ params }: { params: Promise<{ id: 
   return (
     <AppShell>
       <p className="text-sm">
-        <Link href={Routes.transfers} className="text-brass-300 hover:underline">
+        <Link href={Routes.transfers} className="text-action hover:underline">
           <ArrowLeft size={14} aria-hidden="true" /> Back to transfers
         </Link>
       </p>
@@ -79,34 +79,34 @@ export default function TransferReceiptPage({ params }: { params: Promise<{ id: 
             Reference <span className="mono">{tx.id}</span>
           </CardDescription>
 
-          <p className="mt-4 text-3xl font-bold tabular-nums">{usd(tx.amount)}</p>
+          <p className="mt-4 text-[32px] leading-10 font-semibold tabular-nums">{usdReview(tx.amount)}</p>
 
-          <dl className="mt-4 space-y-2 border-t border-line pt-3 text-sm">
+          <dl className="mt-4 space-y-2 border-t border-divider pt-3 text-sm">
             {!isDeposit && tx.fromIban ? (
               <div className="flex justify-between gap-4">
-                <dt className="label text-content-muted">From</dt>
+                <dt className="label text-content-secondary">From</dt>
                 <dd className="mono text-right">{maskIban(tx.fromIban)}</dd>
               </div>
             ) : null}
             <div className="flex justify-between gap-4">
-              <dt className="label text-content-muted">{isDeposit ? "Deposited to" : "To"}</dt>
+              <dt className="label text-content-secondary">{isDeposit ? "Deposited to" : "To"}</dt>
               <dd className="mono text-right">{tx.toIban ? maskIban(tx.toIban) : "-"}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="label text-content-muted">Memo</dt>
+              <dt className="label text-content-secondary">Memo</dt>
               <dd className="text-right">{tx.memo || "-"}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="label text-content-muted">Requested</dt>
+              <dt className="label text-content-secondary">Requested</dt>
               <dd className="text-right">{fullTime(tx.createdAt) ?? "-"}</dd>
             </div>
             <div className="flex justify-between gap-4">
-              <dt className="label text-content-muted">Posted</dt>
+              <dt className="label text-content-secondary">Posted</dt>
               <dd className="text-right">{fullTime(tx.postedAt) ?? "Not yet posted"}</dd>
             </div>
           </dl>
 
-          <p className="mt-4 rounded-md border border-line bg-ink-800/60 px-3 py-2 text-sm">
+          <p className="mt-4 rounded-md border border-divider bg-surface-subtle px-3 py-2 text-sm">
             {tx.status === "HELD" ? (
               <>This transfer is awaiting operator review. No money has moved yet. Once an
                 operator approves it, the posting time above will appear here. If they decline

@@ -95,10 +95,10 @@ export function ReviewQueueSection() {
             const isHeld = t.status === "HELD";
             const isDeposit = t.kind === "DEPOSIT" || !t.fromIban;
             return (
-              <li key={t.id} className="rounded-md border border-line p-3">
+              <li key={t.id} className="rounded-md border border-divider p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-sm">
-                    <span className="label text-content-muted">
+                    <span className="label">
                       {isHeld ? "Transfer held · awaiting approval" : isDeposit ? "Deposit flagged · credited" : "Transfer flagged · settled"}
                     </span>
                     <span className="mono ml-2">
@@ -143,7 +143,7 @@ export function ReviewQueueSection() {
                 </div>
                 {t.memo ? (
                   <p className="muted mt-1 text-sm">
-                    <span className="label text-content-muted">Memo:</span> {t.memo}
+                    <span className="label">Memo:</span> {t.memo}
                   </p>
                 ) : null}
                 {isHeld && (

@@ -19,14 +19,14 @@ import { usd } from "../../lib/format";
  */
 export default function DesignPage() {
   return (
-    <div className="min-h-screen bg-ink-900">
+    <div className="min-h-screen bg-workspace">
       <div className="mx-auto max-w-5xl px-5 py-12">
         <p className="text-sm">
-          <Link href={Routes.home} className="text-brass-300 hover:underline">
+          <Link href={Routes.home} className="text-action hover:underline">
             <ArrowLeft size={14} aria-hidden="true" className="inline" /> {BrandName}
           </Link>
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">Design system</h1>
+        <h1 className="mt-2 text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Design system</h1>
         <p className="muted mt-1 text-sm">The primitives used across the app, kept as one source of truth for the UI.</p>
 
         <div className="mt-6 grid gap-4 md:grid-cols-2">
@@ -103,7 +103,7 @@ export default function DesignPage() {
           <Card>
             <CardTitle>Icons</CardTitle>
             <CardDescription>The icon set used across the app.</CardDescription>
-            <div className="mt-3 flex flex-wrap items-center gap-4 text-content-soft">
+            <div className="mt-3 flex flex-wrap items-center gap-4 text-content-secondary">
               <Bell size={18} aria-hidden="true" />
               <X size={18} aria-hidden="true" />
               <ArrowLeft size={18} aria-hidden="true" />
@@ -132,18 +132,18 @@ export default function DesignPage() {
               <span className="mono"> scripts/check-design-tokens.mjs</span>.
             </CardDescription>
             <div className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2">
-              <Swatch className="bg-ink-800" name="ink / surfaces" />
-              <Swatch className="bg-brass-400" name="brass / accent" />
-              <Swatch className="bg-content" name="content / text" />
-              <Swatch className="bg-content-muted" name="content-muted" />
+              <Swatch className="bg-surface-subtle" name="surface / wells" />
+              <Swatch className="bg-action" name="action / primary" />
+              <Swatch className="bg-content" name="content / primary text" />
+              <Swatch className="bg-content-secondary" name="content / secondary" />
               <Swatch className="bg-success-surface border-success-border" name="success surface" />
               <Swatch className="bg-danger-surface border-danger-border" name="danger surface" />
               <Swatch className="bg-warning-surface border-warning-border" name="warning surface" />
               <Swatch className="bg-info-surface border-info-border" name="info surface" />
             </div>
             <p className="muted mt-3 text-xs">
-              Text tones stay semantic too: mint / rose / amber / sky carry
-              success, danger, warning and info copy over the surfaces above.
+              Text tones stay semantic too: success / danger / warning / info
+              carry their meaning over the pale surfaces above.
             </p>
           </Card>
           <Card>
@@ -188,7 +188,7 @@ export default function DesignPage() {
 function Swatch({ className, name }: { className: string; name: string }) {
   return (
     <div className="flex items-center gap-2 text-sm">
-      <span className={"h-6 w-10 shrink-0 rounded-sm border border-line " + className} aria-hidden="true" />
+      <span className={"h-6 w-10 shrink-0 rounded-sm border border-divider " + className} aria-hidden="true" />
       <span className="muted">{name}</span>
     </div>
   );

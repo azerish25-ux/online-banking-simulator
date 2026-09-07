@@ -100,7 +100,7 @@ export default function ActivityPage() {
   if (accounts.isError && accounts.data == null) {
     return (
       <AppShell>
-        <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
+        <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Activity</h1>
         <p className="muted text-sm">Full transaction history with statement export.</p>
         <Card className="mt-4">
           <LoadFailed
@@ -115,7 +115,7 @@ export default function ActivityPage() {
   if (accounts.data == null) {
     return (
       <AppShell>
-        <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
+        <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Activity</h1>
         <Card className="mt-4"><Skeleton className="h-10" /><Skeleton className="mt-3 h-40" /></Card>
       </AppShell>
     );
@@ -123,7 +123,7 @@ export default function ActivityPage() {
   if (accounts.data.length === 0) {
     return (
       <AppShell>
-        <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
+        <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Activity</h1>
         <p className="muted text-sm">Full transaction history with statement export.</p>
         <Card className="mt-4">
           <EmptyState
@@ -139,7 +139,7 @@ export default function ActivityPage() {
     <AppShell>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Activity</h1>
+          <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Activity</h1>
           <p className="muted text-sm">Full transaction history with statement export.</p>
         </div>
         <div className="flex gap-2">
@@ -196,8 +196,8 @@ export default function ActivityPage() {
         ) : (
           <>
             {page.isError && page.data != null ? (
-              <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-line bg-ink-800/60 px-3 py-2 text-sm">
-                <p className="text-content-muted">Couldn&apos;t refresh. Showing the last loaded page.</p>
+              <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-divider bg-surface-subtle px-3 py-2 text-sm">
+                <p className="text-content-secondary">Couldn&apos;t refresh. Showing the last loaded page.</p>
                 <Button type="button" variant="ghost" size="sm" onClick={() => page.refetch()}>Retry</Button>
               </div>
             ) : null}
@@ -220,7 +220,7 @@ export default function ActivityPage() {
             </Table>
             {(index > 0 || hasNext) && (
               <div className="mt-3 flex items-center justify-between text-sm">
-                <span className="text-content-muted">Page {index + 1} of {totalPages}</span>
+                <span className="text-content-secondary">Page {index + 1} of {totalPages}</span>
                 <div className="flex gap-2">
                   <Button variant="secondary" size="sm" disabled={index === 0} onClick={newer}>
                     <ArrowLeft size={14} aria-hidden="true" /> Newer

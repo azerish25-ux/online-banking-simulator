@@ -53,8 +53,8 @@ export default function DashboardPage() {
     <AppShell>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-          <p className="muted text-sm">{user ? "Welcome back, " + user.fullName + "." : "Loading..."}</p>
+          <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Overview</h1>
+          <p className="muted mt-1 text-sm">{user ? "Welcome back, " + user.fullName + "." : "Loading..."}</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={() => setOpenOpen(true)}>Open account</Button>
@@ -102,7 +102,7 @@ export default function DashboardPage() {
                   ? "Total across your " + accs.length + " accounts, all in USD"
                   : "Available balance (USD)"}
             </CardDescription>
-            <p className="mt-1 text-3xl font-bold tabular-nums">{netUsd}</p>
+            <p className="mt-1 text-[32px] leading-10 font-semibold tabular-nums">{netUsd}</p>
           </Card>
           {accs.map((a) => {
             // A drawn loan (negative balance) is debt, so its card must not
@@ -118,8 +118,8 @@ export default function DashboardPage() {
                 </div>
                 {isOutstandingLoan ? (
                   <>
-                    <p className="label muted mt-2 text-xs">Outstanding loan (amount you owe)</p>
-                    <p className="mt-1 text-2xl font-semibold tabular-nums text-rose">{usdFromCents(-decimalToCents(a.balance))}</p>
+                    <p className="label mt-2 text-xs">Outstanding loan (amount you owe)</p>
+                    <p className="mt-1 text-2xl font-semibold tabular-nums text-danger">{usdFromCents(-decimalToCents(a.balance))}</p>
                   </>
                 ) : (
                   <>
@@ -141,7 +141,7 @@ export default function DashboardPage() {
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">
           <CardTitle>Recent activity</CardTitle>
-          <Link href={Routes.transfers} className="text-sm text-brass-300 hover:underline">
+          <Link href={Routes.transfers} className="text-sm text-action hover:underline">
             New transfer
           </Link>
         </div>
@@ -182,7 +182,7 @@ export default function DashboardPage() {
       <Card className="mx-auto mt-4 w-full max-w-3xl">
         <div className="mb-3 flex items-center justify-between">
           <CardTitle>Money flow · last 6 months</CardTitle>
-          <Link href={Routes.activity} className="text-sm text-brass-300 hover:underline">Full activity</Link>
+          <Link href={Routes.activity} className="text-sm text-action hover:underline">Full activity</Link>
         </div>
         <CardDescription className="mb-3">
           {accs && accs.length > 1

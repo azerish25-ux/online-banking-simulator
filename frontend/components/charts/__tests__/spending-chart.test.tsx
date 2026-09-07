@@ -1,12 +1,13 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 import { SpendingChart, type MonthPoint } from "../spending-chart";
 
 /**
- * F19: the chart must expose an accessible equivalent data table with the
- * EXACT values - tooltip/title-only figures are not enough. The data table is
- * visually hidden (sr-only) but a real <table>: rows = months, cells = exact
- * usd() renderings of the ledger decimal strings.
+ * F19/section 14: the chart must expose its EXACT values - tooltip/title-only figures
+ * are not enough. The data table is a real <table> that a visible toggle
+ * expands; while collapsed it stays sr-only so assistive technology reads the
+ * same figures the geometry approximates. Rows = months, cells = exact usd()
+ * renderings of the ledger decimal strings.
  */
 const SAMPLE: MonthPoint[] = [
   { month: "2026-01", inflow: "1250.00", outflow: "480.25" },
@@ -18,10 +19,22 @@ afterEach(cleanup);
 describe("SpendingChart accessible data table", () => {
   it("names the chart's data table through aria-describedby", () => {
     render(<SpendingChart data={SAMPLE} />);
-    const chart = screen.getByRole("img", { name: "Monthly money in and out" });
+    const chart = screen.getByRole("img", { name: "Monthly money in and out, in USD" });
     const described = chart.getAttribute("aria-describedby");
     expect(described).toBeTruthy();
     expect(document.getElementById(described as string)).not.toBeNull();
+  });
+
+  it("expands the exact-value table through a visible toggle", () => {
+    render(<SpendingChart data={SAMPLE} />);
+    const table = document.querySelector("table") as HTMLTableElement;
+    expect(table).not.toBeNull();
+    // Collapsed: visually hidden but still a real, accessible table.
+    expect(table.className).toContain("sr-only");
+    // Expanding makes the same table visible on the page (section 14).
+    fireEvent.click(screen.getByRole("button", { name: "Show exact values" }));
+    expect(table.className).not.toContain("sr-only");
+    expect(screen.getByRole("button", { name: "Hide exact values" })).toBeInTheDocument();
   });
 
   it("renders one exact-value row per month, including a zero month", () => {

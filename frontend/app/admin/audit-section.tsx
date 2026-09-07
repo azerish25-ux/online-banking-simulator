@@ -70,7 +70,7 @@ export function AuditSection() {
             {rows.map((a) => {
               const meta = metaSummary(a.metadata);
               return (
-                <li key={a.id} className="rounded-md border border-line px-3 py-2">
+                <li key={a.id} className="rounded-md border border-divider px-3 py-2">
                   <div className="flex items-center justify-between gap-2">
                     <span>
                       <Badge tone="neutral">{a.action}</Badge>{" "}

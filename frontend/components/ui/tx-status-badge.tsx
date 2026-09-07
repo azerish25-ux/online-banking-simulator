@@ -10,14 +10,17 @@ import { Badge } from "./badge";
  * POSTED.
  */
 export function TxStatusBadge({ status }: { status?: string | null }) {
+  // Sentence-case status text ( section 12/section 15): the label says what
+  // the state means, never an ALL-CAPS code. HELD rows are intents awaiting
+  // operator review (no money moved); CANCELLED never settled; POSTED moved.
   switch (status) {
     case "HELD":
-      return <Badge tone="warning">HELD · REVIEW</Badge>;
+      return <Badge tone="warning">Awaiting review</Badge>;
     case "CANCELLED":
-      return <Badge tone="danger">CANCELLED</Badge>;
+      return <Badge tone="danger">Cancelled</Badge>;
     case "POSTED":
-      return <Badge tone="success">POSTED</Badge>;
+      return <Badge tone="success">Posted</Badge>;
     default:
-      return <Badge tone="neutral">{status ? "UNKNOWN · " + status.toUpperCase() : "UNKNOWN"}</Badge>;
+      return <Badge tone="neutral">{status ? "Unknown · " + status : "Unknown"}</Badge>;
   }
 }

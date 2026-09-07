@@ -37,7 +37,7 @@ export default function NotificationsPage() {
     <AppShell>
       <div className="mb-4 flex items-end justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
+          <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Notifications</h1>
           <p className="muted text-sm">Money movement, cards and account events.</p>
         </div>
         <Button variant="secondary" onClick={markAll} disabled={markAllRead.isPending || items.length === 0}>
@@ -57,12 +57,12 @@ export default function NotificationsPage() {
       ) : (
         <>
           <Card>
-            <ul className="divide-y divide-line">
+            <ul className="divide-y divide-divider">
               {items.map((n) => (
                 <li key={n.id} className="flex items-start justify-between gap-3 py-3 first:pt-0 last:pb-0">
                   <div>
                     <p className="text-sm">
-                      {!n.read && <span role="img" aria-label="Unread" className="mr-2 inline-block h-2 w-2 rounded-full bg-brass-500" />}
+                      {!n.read && <span role="img" aria-label="Unread" className="mr-2 inline-block h-2 w-2 rounded-full bg-danger" />}
                       <strong>{n.title}</strong>
                     </p>
                     <p className="muted text-sm">{n.body}</p>

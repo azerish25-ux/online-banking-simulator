@@ -4,14 +4,18 @@
 
 :root {
   color-scheme: light;
-  --bg: #f1efe8;
-  --panel: #fdfcf7;
-  --line: #cfc8b4;
-  --text: #1a2130;
-  --muted: #4c5a70;
-  --brand: #6e521c;
-  --mint: #2e6b3f;
-  --rose: #9e2f22;
+  --bg: #f4f6f8;
+  --panel: #ffffff;
+  --line: #d3dae2;
+  --text: #172330;
+  --secondary: #536273;
+  --action: #193c60;
+  --action-hover: #12304e;
+  --focus: #165daa;
+  --success: #17613d;
+  --danger: #a32532;
+  --warning: #805300;
+  --info: #205a83;
 }
 
 html, body {
@@ -24,39 +28,31 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: rgba(178, 138, 66, 0.24); }
+::selection { background: rgba(25, 60, 96, 0.16); }
 
-/* Refined focus: dark bronze ring, visible on the light surfaces. */
+/* Refined focus: blue ring, visible on the light surfaces. */
 :focus-visible {
-  outline: 2px solid var(--brand);
+  outline: 2px solid var(--focus);
   outline-offset: 2px;
 }
 
 @layer components {
   .panel {
-    @apply rounded-lg border bg-ink-850 shadow-card;
+    @apply rounded-md border bg-surface;
     border-color: var(--line);
+    box-shadow: 0 1px 2px rgba(23, 35, 48, 0.05);
   }
-  .muted { color: var(--muted); }
-  .mono { @apply font-mono text-[13px]; }
+  .muted { color: var(--secondary); }
 
-  /* Serif display headlines - the private-bank voice. */
-  .display {
-    font-family: var(--font-display), Georgia, serif;
-    letter-spacing: -0.01em;
-  }
-
-  /* Small caps labels: eyebrows, stat headers, uppercase tags. */
-  .caps {
-    @apply text-[11px] uppercase;
-    letter-spacing: 0.08em;
+  .mono {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 13px;
   }
 
   /* Sentence-case micro labels: form field labels, table headers, captions.
-     Shared letter-spacing with .caps, but never uppercased - a `.caps
-     ...normal-case` pair is a mistake, not a style. */
+     Operational type, never an 11px uppercase eyebrow. */
   .label {
-    @apply text-[11px] font-medium;
-    letter-spacing: 0.08em;
+    @apply text-sm font-medium;
+    color: var(--secondary);
   }
 }

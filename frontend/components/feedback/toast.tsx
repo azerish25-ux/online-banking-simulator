@@ -41,7 +41,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
             key={t.id}
             role="status"
             className={cn(
-              "panel relative pr-10 text-sm motion-safe:animate-toast-in",
+              "panel relative pr-10 text-sm shadow-dialog motion-safe:animate-toast-in",
               "px-4 py-3",
               t.tone === "success" && "border-success-border",
               t.tone === "error" && "border-danger-border"
@@ -52,7 +52,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
               type="button"
               onClick={() => dismiss(t.id)}
               aria-label="Dismiss notification"
-              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded-md p-1.5 text-content-muted hover:bg-ink-700 hover:text-content"
+              className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-1.5 text-content-secondary hover:bg-surface-subtle hover:text-content"
             >
               <X size={14} aria-hidden="true" />
             </button>

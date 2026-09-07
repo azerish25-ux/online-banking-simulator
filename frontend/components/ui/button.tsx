@@ -3,18 +3,19 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "../../lib/cn";
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-md border text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50",
+  "inline-flex items-center justify-center gap-2 rounded border text-sm font-medium transition-colors duration-150 disabled:pointer-events-none disabled:opacity-50",
   {
     variants: {
       variant: {
-        primary: "border-brass-600 bg-brass-500 text-ink-950 hover:bg-brass-600 font-semibold",
-        secondary: "border-line bg-ink-700 text-content hover:bg-ink-600",
-        ghost: "border-transparent text-brass-300 hover:bg-ink-700",
-        danger: "border-danger-border bg-danger-surface text-rose hover:bg-danger-strong"
+        primary: "border-transparent bg-action text-white hover:bg-action-hover font-semibold",
+        secondary: "border-control bg-surface text-content hover:bg-surface-subtle",
+        ghost: "border-transparent text-action hover:bg-surface-subtle",
+        danger: "border-danger-border bg-danger-surface text-danger hover:bg-danger-strong"
       },
       size: {
         sm: "h-8 px-3",
-        md: "h-10 px-4",
+        // 44px primary-control height is this project's design target (section 17).
+        md: "h-11 px-5",
         lg: "h-12 px-6 text-base"
       }
     },

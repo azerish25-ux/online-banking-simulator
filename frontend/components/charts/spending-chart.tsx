@@ -4,18 +4,17 @@ import { usd } from "../../lib/format";
 export type MonthPoint = { month: string; inflow: string; outflow: string };
 
 /**
- * Hand-rolled SVG bar pair per month. Statement aesthetic: hairline grid,
- * brass for money in, slate-blue for money out, serif month labels. All
- * colors come from design tokens (brass-400 / outflow / line / content), so
- * the chart can never drift from the palette - no raw hex literals here.
+ * Hand-rolled SVG bar pair per month. Restrained financial colors: navy for
+ * money in, slate for money out, hairline grid - all from the design tokens.
  *
- * The values are NOT tooltip-only (F19): the exact decimal strings are ALSO
- * rendered into a real (visually hidden) data table - one row per month -
- * that the SVG names through aria-describedby, so assistive technology reads
- * the same figures the geometry approximates.
+ * Values are never tooltip-only (section 14): the exact decimal strings render into a
+ * real data table under the chart that a visible toggle expands, and the
+ * collapsed table stays in the accessibility tree so assistive technology
+ * reads the same figures the geometry approximates.
  */
 export function SpendingChart({ data }: { data: MonthPoint[] }) {
   const tableId = React.useId();
+  const [showValues, setShowValues] = React.useState(false);
   const max = Math.max(1, ...data.flatMap((d) => [parseFloat(d.inflow), parseFloat(d.outflow)]));
   const W = 560;
   const H = 200;
@@ -32,28 +31,28 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
         viewBox={"0 0 " + W + " " + H}
         className="w-full"
         role="img"
-        aria-label="Monthly money in and out"
+        aria-label="Monthly money in and out, in USD"
         aria-describedby={tableId}
       >
-        <title>Inflow versus outflow by month</title>
+        <title>Inflow versus outflow by month, in USD</title>
         {[0.25, 0.5, 0.75, 1].map((f) => (
           <line
             key={f}
             x1={pad} x2={W - pad}
             y1={H - pad - f * (H - pad * 2)} y2={H - pad - f * (H - pad * 2)}
-            className="stroke-line"
+            className="stroke-divider"
             strokeWidth="1"
             strokeDasharray="2 4"
           />
         ))}
         {/* The solid baseline is the zero axis: a $0 month shows its label with
-            no bar at all rather than a fake nonzero sliver (F19). */}
+            no bar at all rather than a fake nonzero sliver (section 14). */}
         <line
           x1={pad} x2={W - pad}
           y1={H - pad} y2={H - pad}
-          className="stroke-content-muted"
+          className="stroke-content-secondary"
           strokeWidth="1"
-          strokeOpacity="0.55"
+          strokeOpacity="0.6"
         />
         {data.map((d, i) => {
           const x = pad + group * i + group / 2;
@@ -61,43 +60,53 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           const outH = scale(parseFloat(d.outflow));
           return (
             <g key={d.month}>
-              <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-brass-500">
+              <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-action">
                 <title>{"In " + d.month + ": " + usd(d.inflow)}</title>
               </rect>
               <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(0, outH)} rx={1.5} className="fill-outflow">
                 <title>{"Out " + d.month + ": " + usd(d.outflow)}</title>
               </rect>
-              <text x={x} y={H - 8} textAnchor="middle" fontSize={11} className="fill-content-muted"
-                fontFamily="var(--font-display), Georgia, serif" fontStyle="italic">
+              <text x={x} y={H - 8} textAnchor="middle" fontSize={11} className="fill-content-secondary">
                 {monthLabel(d.month)}
               </text>
             </g>
           );
         })}
-        <g fontSize={11} className="fill-content-muted">
-          <rect x={pad} y={4} width={10} height={10} rx={1.5} className="fill-brass-500" />
+        <g fontSize={11} className="fill-content-secondary">
+          <rect x={pad} y={4} width={10} height={10} rx={1.5} className="fill-action" />
           <text x={pad + 14} y={13}>In</text>
           <rect x={pad + 52} y={4} width={10} height={10} rx={1.5} className="fill-outflow" />
           <text x={pad + 66} y={13}>Out</text>
         </g>
       </svg>
-      {/* The accessible equivalent data table (F19). Visually hidden but a real
-          <table>: exact values, never tooltip-only. */}
-      <table id={tableId} className="sr-only">
-        <caption>Monthly money in and out, by month</caption>
+      <div className="mt-2 flex items-center gap-3">
+        <button
+          type="button"
+          aria-expanded={showValues}
+          onClick={() => setShowValues((v) => !v)}
+          className="rounded border border-divider bg-surface px-3 py-1.5 text-sm text-content-secondary hover:bg-surface-subtle"
+        >
+          {showValues ? "Hide exact values" : "Show exact values"}
+        </button>
+        <span className="text-xs text-content-secondary">USD · by month</span>
+      </div>
+      {/* The exact-value data table (section 14): visible when toggled, and always in
+          the accessibility tree so values are never tooltip-only. */}
+      <table id={tableId} className={showValues ? "mt-3 w-full text-sm" : "sr-only"}>
+        <caption className="sr-only">Monthly money in and out, by month, in USD</caption>
         <thead>
-          <tr>
-            <th scope="col">Month</th>
-            <th scope="col">Money in</th>
-            <th scope="col">Money out</th>
+          <tr className="border-b border-divider text-left text-content-secondary">
+            <th scope="col" className="py-1.5 pr-4 font-medium">Month</th>
+            <th scope="col" className="py-1.5 pr-4 text-right font-medium">Money in</th>
+            <th scope="col" className="py-1.5 text-right font-medium">Money out</th>
           </tr>
         </thead>
         <tbody>
           {data.map((d) => (
-            <tr key={d.month}>
-              <th scope="row">{monthLabel(d.month)}</th>
-              <td>{usd(d.inflow)}</td>
-              <td>{usd(d.outflow)}</td>
+            <tr key={d.month} className="border-b border-divider/60">
+              <th scope="row" className="py-1.5 pr-4 text-left font-medium">{monthLabel(d.month)}</th>
+              <td className="py-1.5 pr-4 text-right tabular-nums">{usd(d.inflow)}</td>
+              <td className="py-1.5 text-right tabular-nums">{usd(d.outflow)}</td>
             </tr>
           ))}
         </tbody>

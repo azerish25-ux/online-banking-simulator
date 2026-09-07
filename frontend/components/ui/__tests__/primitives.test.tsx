@@ -241,13 +241,13 @@ describe("Table", () => {
 describe("TxStatusBadge", () => {
   it("labels an unknown server value explicitly instead of assuming POSTED (F11)", () => {
     render(<TxStatusBadge />);
-    expect(screen.getByText("UNKNOWN")).toBeInTheDocument();
+    expect(screen.getByText("Unknown")).toBeInTheDocument();
     expect(screen.queryByText("POSTED")).toBeNull();
   });
 
   it("surfaces an unrecognized server value rather than hiding it", () => {
     render(<TxStatusBadge status="MYSTERY" />);
-    expect(screen.getByText("UNKNOWN · MYSTERY")).toBeInTheDocument();
+    expect(screen.getByText("Unknown · MYSTERY")).toBeInTheDocument();
   });
 });
 
@@ -271,7 +271,7 @@ describe("SpendingChart", () => {
     const { container } = render(<SpendingChart data={data} />);
     const svg = container.querySelector("svg");
     expect(svg).not.toBeNull();
-    expect(screen.getByRole("img", { name: "Monthly money in and out" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Monthly money in and out, in USD" })).toBeInTheDocument();
     // Two bars per month + two legend swatches.
     expect(container.querySelectorAll("rect")).toHaveLength(data.length * 2 + 2);
     // Month labels appear once in the chart AND once in its sr-only data table

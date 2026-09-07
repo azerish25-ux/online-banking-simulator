@@ -72,7 +72,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
 
   return (
     <AppShell>
-      <p className="text-sm"><Link href={Routes.dashboard} className="text-brass-300 hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Overview</Link></p>
+      <p className="text-sm"><Link href={Routes.dashboard} className="text-action hover:underline"><ArrowLeft size={14} aria-hidden="true" /> Overview</Link></p>
       {accountNotFound ? (
         <div className="mt-3">
           <EmptyState
@@ -101,7 +101,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
             // A drawn loan is debt - same "amount you owe" treatment as the cards.
             <>
               <p className="label muted mt-1 text-xs">Outstanding loan (amount you owe)</p>
-              <p className="mt-1 text-4xl font-bold tabular-nums text-rose">{usdFromCents(-decimalToCents(account.data.balance))}</p>
+              <p className="mt-1 text-4xl font-bold tabular-nums text-danger">{usdFromCents(-decimalToCents(account.data.balance))}</p>
               <p className="muted text-sm">Repay by sending money to this account from another of yours. Interest accrues monthly on what you owe.</p>
             </>
           ) : (
@@ -124,7 +124,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
               </div>
               {issued && (
                 <div className="mb-3 rounded-md border border-success-border bg-success-surface p-4" role="status">
-                  <p className="text-sm font-medium text-mint">Copy now. This number is shown only once.</p>
+                  <p className="text-sm font-medium text-success">Copy now. This number is shown only once.</p>
                   <p className="mono mt-2 text-xl tracking-widest">{issued.pan}</p>
                   <p className="mono muted text-sm">CVV {issued.cvv} · Exp {issued.expMonth}/{issued.expYear}</p>
                 </div>
@@ -134,7 +134,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
               ) : (
                 <ul className="space-y-2">
                   {(cards.data ?? []).map((c) => (
-                    <li key={c.id} className="flex items-center justify-between rounded-md border border-line p-3">
+                    <li key={c.id} className="flex items-center justify-between rounded-md border border-divider p-3">
                       <div>
                         <p className="mono">•••• •••• •••• {c.last4}</p>
                         <p className="muted text-xs">Exp {c.expMonth}/{c.expYear} · <Badge tone={c.status === "ACTIVE" ? "success" : "danger"}>{c.status}</Badge></p>

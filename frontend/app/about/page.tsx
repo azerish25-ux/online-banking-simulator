@@ -12,14 +12,14 @@ import { Badge } from "../../components/ui/badge";
  */
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-ink-900">
+    <div className="min-h-screen bg-workspace">
       <div className="mx-auto max-w-4xl px-5 py-12">
         <p className="text-sm">
-          <Link href={Routes.home} className="text-brass-300 hover:underline">
+          <Link href={Routes.home} className="text-action hover:underline">
             <ArrowLeft size={14} aria-hidden="true" className="inline" /> {BrandName}
           </Link>
         </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight">{AboutThisDemo}</h1>
+        <h1 className="mt-2 text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">{AboutThisDemo}</h1>
         <p className="muted mt-1 max-w-2xl text-sm">
           What you can do here, what is simulated, and the machinery underneath,
           in plain words.
@@ -96,8 +96,8 @@ export default function AboutPage() {
           </Card>
         </div>
 
-        <div className="mt-6 rounded-md border border-line p-5">
-          <p className="caps text-content-muted">Residual risks</p>
+        <div className="mt-6 rounded-md border border-divider p-5">
+          <p className="text-sm font-medium text-content-secondary">Residual risks</p>
           <ul className="muted mt-3 list-disc space-y-2 pl-5 text-sm">
             <li>
               The browser holds a short-lived access token that the app&rsquo;s routing
@@ -132,7 +132,7 @@ export default function AboutPage() {
         </div>
 
         <p className="mt-6 text-sm">
-          <Link href={Routes.design} className="text-brass-300 hover:underline">
+          <Link href={Routes.design} className="text-action hover:underline">
             Browse the design system →
           </Link>
         </p>

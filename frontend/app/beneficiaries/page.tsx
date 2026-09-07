@@ -65,7 +65,7 @@ export default function BeneficiariesPage() {
 
   return (
     <AppShell>
-      <h1 className="text-2xl font-bold tracking-tight">Beneficiaries</h1>
+      <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Beneficiaries</h1>
       <p className="muted mt-1 text-sm">Your transfer address book.</p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">

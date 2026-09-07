@@ -103,7 +103,7 @@ export function UnresolvedOperations() {
           return (
             <li
               key={id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-ink-800/40 p-3"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-divider bg-surface-subtle p-3"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium">
@@ -117,7 +117,7 @@ export function UnresolvedOperations() {
                   Sent {fmtDate(new Date(op.createdAt).toISOString())} · the answer never arrived
                 </p>
                 {note ? (
-                  <p role="status" className={"mt-1 text-xs " + (note.tone === "error" ? "text-rose" : "text-sky")}>
+                  <p role="status" className={"mt-1 text-xs " + (note.tone === "error" ? "text-danger" : "text-info")}>
                     {note.message}
                   </p>
                 ) : null}

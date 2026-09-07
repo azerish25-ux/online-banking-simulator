@@ -14,9 +14,9 @@ export default function GlobalError({
   return (
     <html lang="en">
       <body>
-        <div className="flex min-h-screen items-center justify-center bg-ink-900 p-4">
+        <div className="flex min-h-screen items-center justify-center bg-workspace p-4">
           <Card className="w-full max-w-md">
-            <CardTitle className="display">Something went wrong</CardTitle>
+            <CardTitle>Something went wrong</CardTitle>
             <CardDescription>
               The request could not be completed. Try again, and if it keeps
               failing, log in once more.

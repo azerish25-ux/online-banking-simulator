@@ -52,7 +52,7 @@ export function ActivitySection() {
               ? "Reverses " + shortId(t.reversesTransactionId) + ": “" + (t.reversalReason ?? "") + "”"
               : null;
             return (
-              <li key={t.id} className="rounded-md border border-line p-3">
+              <li key={t.id} className="rounded-md border border-divider p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 text-sm">
                     <span className="flex flex-wrap items-center gap-2">
@@ -70,7 +70,7 @@ export function ActivitySection() {
                   <p className="muted mt-1 text-sm">{reversalLine}</p>
                 ) : t.memo ? (
                   <p className="muted mt-1 text-sm">
-                    <span className="label text-content-muted">Memo:</span> {t.memo}
+                    <span className="label">Memo:</span> {t.memo}
                   </p>
                 ) : null}
               </li>
