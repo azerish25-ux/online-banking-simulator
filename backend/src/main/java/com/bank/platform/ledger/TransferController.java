@@ -37,13 +37,15 @@ public class TransferController {
   private final MoneyService money;
   private final TransactionRepository transactions;
   private final StatementService statements;
+  private final TransactionHistoryDao historyDao;
 
   public TransferController(AccountService accounts, MoneyService money, TransactionRepository transactions,
-      StatementService statements) {
+      StatementService statements, TransactionHistoryDao historyDao) {
     this.accounts = accounts;
     this.money = money;
     this.transactions = transactions;
     this.statements = statements;
+    this.historyDao = historyDao;
   }
 
   @PostMapping("/transfers")
@@ -76,7 +78,12 @@ public class TransferController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
       @RequestParam(defaultValue = "20") int size,
-      @RequestParam(required = false) String cursor) {
+      @RequestParam(required = false) String cursor,
+      @RequestParam(required = false) String minAmount,
+      @RequestParam(required = false) String maxAmount,
+      @RequestParam(required = false) List<String> kind,
+      @RequestParam(required = false) List<String> status,
+      @RequestParam(required = false) String q) {
     // Ownership check first: throws 404 for foreign or missing accounts.
     accounts.accountDetail(authentication.getName(), accountId);
     int safeSize = Math.min(Math.max(size, 1), 100);
@@ -89,11 +96,43 @@ public class TransferController {
     // paging has no "absurd depth" to clamp because it never re-scans an
     // offset.
     Period window = new Period(from, to);
+    // section 14 server-backed filters: amount range, kind(s), state(s) and a
+    // reference/counterparty search are VALIDATED here (400 before any query)
+    // and then become SQL predicates over the whole account history - never a
+    // client-side filter of the loaded page. "Searching" a 10-row page is
+    // deliberately impossible: the DAO's predicates run on the database.
+    BigDecimal min = decimalFilter(minAmount, "minAmount");
+    BigDecimal max = decimalFilter(maxAmount, "maxAmount");
+    if (min != null && max != null && min.compareTo(max) > 0) {
+      throw new IllegalArgumentException(
+          "Amount range is inverted: minAmount (" + min.toPlainString()
+              + ") is above maxAmount (" + max.toPlainString() + ")");
+    }
+    List<String> kinds = enumFilter(kind, TxKind.class, "kind");
+    List<String> statuses = enumFilter(status, TxStatus.class, "status");
+    String term = q == null || q.isBlank() ? null : q.trim();
+    if (term != null && term.length() < 2) {
+      // A one-character LIKE over every memo and counter-party IBAN is not a
+      // search - it is a scan. Bound expensive searches (section 14).
+      throw new IllegalArgumentException(
+          "Search term must be at least 2 characters");
+    }
     Long cursorSeq = cursor == null || cursor.isBlank() ? null : HistoryCursor.decode(cursor);
-    // Fetch one extra row to learn whether another page exists.
-    List<Transaction> rows =
-        transactions.historyPage(accountId, window, cursorSeq, safeSize + 1);
-    long total = transactions.historyCount(accountId, window);
+    boolean filtered = min != null || max != null || !kinds.isEmpty() || !statuses.isEmpty()
+        || term != null;
+    List<Transaction> rows;
+    long total;
+    if (filtered) {
+      TransactionHistoryDao.HistoryFilter filter = new TransactionHistoryDao.HistoryFilter(
+          accountId, window.start(), window.endExclusive(), min, max, kinds, statuses, term);
+      rows = historyDao.page(filter, cursorSeq, safeSize + 1);
+      total = historyDao.count(filter);
+    } else {
+      // No extra filters: the exact original keyset query keeps its proven
+      // path (identical semantics and indexes).
+      rows = transactions.historyPage(accountId, window, cursorSeq, safeSize + 1);
+      total = transactions.historyCount(accountId, window);
+    }
     boolean hasMore = rows.size() > safeSize;
     List<Transaction> page = hasMore ? rows.subList(0, safeSize) : rows;
     Map<UUID, String> ibans = statements.ibanMap(page);
@@ -111,6 +150,44 @@ public class TransferController {
       nextCursor = HistoryCursor.encode(seq);
     }
     return new TransactionHistoryPage(mapped, total, nextCursor);
+  }
+
+  /** Parses an exact ledger amount filter (at most 4 fraction digits). */
+  private static BigDecimal decimalFilter(String raw, String name) {
+    if (raw == null || raw.isBlank()) {
+      return null;
+    }
+    String value = raw.trim();
+    if (!value.matches("-?\\d+(\\.\\d{1,4})?")) {
+      throw new IllegalArgumentException(
+          name + " must be a ledger decimal with at most 4 fraction digits");
+    }
+    return new BigDecimal(value);
+  }
+
+  /** Validates enum filters by their STRING names (a bad name is a 400). */
+  private static <E extends Enum<E>> List<String> enumFilter(
+      List<String> raw, Class<E> type, String name) {
+    if (raw == null) {
+      return List.of();
+    }
+    List<String> names = new java.util.ArrayList<>();
+    for (String value : raw) {
+      if (value == null || value.isBlank()) {
+        continue;
+      }
+      String candidate = value.trim().toUpperCase();
+      try {
+        Enum.valueOf(type, candidate);
+      } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException(
+            "Unknown " + name + " filter: " + value + " (supported: "
+                + java.util.Arrays.stream(type.getEnumConstants()).map(Enum::name)
+                    .collect(java.util.stream.Collectors.joining(", ")) + ")");
+      }
+      names.add(candidate);
+    }
+    return names;
   }
 
   /**

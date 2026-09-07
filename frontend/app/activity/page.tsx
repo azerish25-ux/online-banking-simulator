@@ -10,13 +10,13 @@ import { EmptyState } from "../../components/ui/empty-state";
 import { LoadFailed } from "../../components/ui/load-failed";
 import { Field, Input } from "../../components/ui/input";
 import { Select } from "../../components/ui/select";
-import { ArrowLeft, ArrowRight } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { TxWhen } from "../../components/ui/tx-when";
 import { useToast } from "../../components/feedback/toast";
-import { useAccounts, useTransactions } from "../../lib/queries";
+import { useAccounts, useTransactions, type HistoryFilters } from "../../lib/queries";
 import { statementUrl } from "../../lib/statements";
 import { downloadAuthed } from "../../lib/download";
 import { accountLabel, maskIban, signedUsd } from "../../lib/format";
@@ -24,13 +24,66 @@ import { Routes } from "../../lib/routes";
 
 const SIZE = 10;
 
-type InitialParams = { account?: string; from?: string; to?: string };
+type InitialParams = {
+  account?: string;
+  from?: string;
+  to?: string;
+  min?: string;
+  max?: string;
+  kind?: string;
+  status?: string;
+  q?: string;
+};
 
 /** A URL date filter is only trusted when it is a real ISO calendar date;
  *  anything else is dropped (validated recoverable state, section 14). */
 function validDate(value: string | undefined): string {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
+
+/** An amount filter is only trusted when it is a non-negative decimal with at
+ *  most four fraction digits - exactly what the ledger stores. */
+function validAmount(value: string | undefined): string {
+  const v = (value ?? "").trim();
+  return v && /^\d+(\.\d{1,4})?$/.test(v) ? v : "";
+}
+
+const KINDS = ["TRANSFER", "DEPOSIT", "INTEREST", "REVERSAL"] as const;
+const STATUSES = ["POSTED", "HELD", "CANCELLED"] as const;
+
+function validKind(value: string | undefined): string {
+  return value && (KINDS as readonly string[]).includes(value) ? value : "";
+}
+
+function validStatus(value: string | undefined): string {
+  return value && (STATUSES as readonly string[]).includes(value) ? value : "";
+}
+
+/** The APPLIED predicate set: everything the server was asked for. Empty
+ *  members are open filters, and the whole set travels in the URL. */
+type Applied = {
+  from: string;
+  to: string;
+  min: string;
+  max: string;
+  kind: string;
+  status: string;
+  q: string;
+};
+
+function appliedFromInitial(initial: InitialParams): Applied {
+  return {
+    from: validDate(initial.from),
+    to: validDate(initial.to),
+    min: validAmount(initial.min),
+    max: validAmount(initial.max),
+    kind: validKind(initial.kind),
+    status: validStatus(initial.status),
+    q: (initial.q ?? "").trim().slice(0, 200)
+  };
+}
+
+const EMPTY_APPLIED: Applied = { from: "", to: "", min: "", max: "", kind: "", status: "", q: "" };
 
 function ActivityContent({ initial }: { initial: InitialParams }) {
   const router = useRouter();
@@ -42,27 +95,43 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
   const list = accounts.data ?? [];
   const paramValid = list.some((a) => a.id === paramId);
   const accountId = paramValid ? paramId : list[0]?.id ?? "";
-  const [from, setFrom] = React.useState(validDate(initial.from));
-  const [to, setTo] = React.useState(validDate(initial.to));
-  // The APPLIED range (what the server was asked for) is what travels in the
-  // URL - edits in the fields are a draft until "Apply" commits them.
-  const [applied, setApplied] = React.useState({ from: validDate(initial.from), to: validDate(initial.to) });
+  // Drafts vs the APPLIED set: edits are drafts until "Apply" commits them to
+  // the URL and the server request (validated recoverable state, section 14).
+  const [draft, setDraft] = React.useState<Applied>(appliedFromInitial(initial));
+  const [applied, setApplied] = React.useState<Applied>(appliedFromInitial(initial));
   // Keyset paging (F26): page i is fetched with the opaque cursor that page
   // i-1 returned (blank = the newest page). The cursor is a position, so
   // previously loaded pages never duplicate or skip even when new rows land
-  // mid-browse; a window/account change starts a fresh browse at the newest
+  // mid-browse; a filter/account change starts a fresh browse at the newest
   // page.
   const [index, setIndex] = React.useState(0);
   const [cursors, setCursors] = React.useState<Record<number, string>>({ 0: "" });
   const cursor = cursors[index] ?? "";
-  const page = useTransactions(accountId, cursor, SIZE, applied.from, applied.to);
+  // Server-backed filters ( section 14): every predicate is a SQL
+  // clause over the whole account history - the page never filters what a
+  // loaded page already returned. An empty applied set is a normal browse.
+  const filters: HistoryFilters | undefined = applied.min || applied.max || applied.kind || applied.status || applied.q
+    ? {
+        minAmount: applied.min || undefined,
+        maxAmount: applied.max || undefined,
+        kinds: applied.kind ? [applied.kind] : undefined,
+        statuses: applied.status ? [applied.status] : undefined,
+        q: applied.q || undefined
+      }
+    : undefined;
+  const page = useTransactions(accountId, cursor, SIZE, applied.from, applied.to, filters);
 
-  /** The URL is the recoverable home of account + applied date range. */
-  function syncUrl(next: { account: string; from: string; to: string }) {
+  /** The URL is the recoverable home of account + applied predicates. */
+  function syncUrl(next: { account: string } & Applied) {
     const params = new URLSearchParams();
     if (next.account) params.set("account", next.account);
     if (next.from) params.set("from", next.from);
     if (next.to) params.set("to", next.to);
+    if (next.min) params.set("min", next.min);
+    if (next.max) params.set("max", next.max);
+    if (next.kind) params.set("kind", next.kind);
+    if (next.status) params.set("status", next.status);
+    if (next.q) params.set("q", next.q);
     const qs = params.toString();
     router.replace(qs ? Routes.activity + "?" + qs : Routes.activity, { scroll: false });
   }
@@ -71,7 +140,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
     setParamId(id);
     setCursors({ 0: "" });
     setIndex(0);
-    syncUrl({ account: id, from: applied.from, to: applied.to });
+    syncUrl({ account: id, ...applied });
   }
 
   function resetBrowse() {
@@ -95,30 +164,37 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
   async function download(kind: "csv" | "pdf") {
     if (!accountId) return;
     try {
-      await downloadAuthed(statementUrl(accountId, kind, applied), "statement." + kind);
+      await downloadAuthed(
+        statementUrl(accountId, kind, { from: applied.from, to: applied.to }),
+        "statement." + kind
+      );
       push("Statement downloaded.", "success");
     } catch (e) {
       push(e instanceof Error ? e.message : "Export failed", "error");
     }
   }
 
-  function applyRange(e: React.FormEvent) {
+  /** Applies drafts as one validated predicate set (dates + filters). */
+  function applyFilters(e: React.FormEvent) {
     e.preventDefault();
-    if (from && to && from > to) {
+    if (draft.from && draft.to && draft.from > draft.to) {
       push("Start date must be before end date.", "error");
       return;
     }
+    if (draft.min && draft.max && Number(draft.min) > Number(draft.max)) {
+      push("Minimum amount must not exceed the maximum.", "error");
+      return;
+    }
     resetBrowse();
-    setApplied({ from, to });
-    syncUrl({ account: accountId, from, to });
+    setApplied(draft);
+    syncUrl({ account: accountId, ...draft });
   }
 
-  function clearRange() {
-    setFrom("");
-    setTo("");
+  function clearFilters() {
+    setDraft(EMPTY_APPLIED);
     resetBrowse();
-    setApplied({ from: "", to: "" });
-    syncUrl({ account: accountId, from: "", to: "" });
+    setApplied(EMPTY_APPLIED);
+    syncUrl({ account: accountId, ...EMPTY_APPLIED });
   }
 
   const rows = page.data?.items ?? [];
@@ -130,6 +206,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
   // Ledger direction needs the viewed account's IBAN: inbound rows are
   // credits, outbound rows are debits, regardless of who else is in the row.
   const viewedAccount = list.find((a) => a.id === accountId);
+  const anyFilter = applied.from || applied.to || applied.min || applied.max || applied.kind || applied.status || applied.q;
 
   const pageHeading = (
     <>
@@ -203,16 +280,39 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
       <UnresolvedOperations />
 
       <Card className="mb-4">
-        <form onSubmit={applyRange} className="flex flex-wrap items-end gap-3">
-          <Field label="From"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field>
-          <Field label="To"><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field>
+        <form onSubmit={applyFilters} className="flex flex-wrap items-end gap-3">
+          <Field label="From"><Input type="date" value={draft.from} onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))} /></Field>
+          <Field label="To"><Input type="date" value={draft.to} onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))} /></Field>
+          <Field label="Min amount"><Input inputMode="decimal" placeholder="0.00" value={draft.min} onChange={(e) => setDraft((d) => ({ ...d, min: e.target.value }))} /></Field>
+          <Field label="Max amount"><Input inputMode="decimal" placeholder="0.00" value={draft.max} onChange={(e) => setDraft((d) => ({ ...d, max: e.target.value }))} /></Field>
+          <Field label="Type">
+            <Select value={draft.kind} onChange={(e) => setDraft((d) => ({ ...d, kind: e.target.value }))} className="w-40">
+              <option value="">All</option>
+              {KINDS.map((k) => <option key={k} value={k}>{k[0] + k.slice(1).toLowerCase()}</option>)}
+            </Select>
+          </Field>
+          <Field label="State">
+            <Select value={draft.status} onChange={(e) => setDraft((d) => ({ ...d, status: e.target.value }))} className="w-36">
+              <option value="">All</option>
+              {STATUSES.map((s) => <option key={s} value={s}>{s[0] + s.slice(1).toLowerCase()}</option>)}
+            </Select>
+          </Field>
+          <Field label="Search">
+            <div className="relative">
+              <Search size={14} aria-hidden="true" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-content-tertiary" />
+              <Input className="pl-8 w-48" placeholder="Memo or IBAN" value={draft.q} onChange={(e) => setDraft((d) => ({ ...d, q: e.target.value }))} />
+            </div>
+          </Field>
           <Button type="submit" variant="secondary">Apply</Button>
-          {(applied.from || applied.to) && (
-            <Button type="button" variant="ghost" onClick={clearRange}>
+          {anyFilter && (
+            <Button type="button" variant="ghost" onClick={clearFilters}>
               Clear
             </Button>
           )}
         </form>
+        <p className="muted mt-2 text-xs">
+          Filters run against the whole account history on the server - never just the rows already on screen.
+        </p>
       </Card>
 
       <Card>
@@ -230,7 +330,10 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
             description="Open an account on the overview and activity will appear here."
           />
         ) : rows.length === 0 ? (
-          <EmptyState title="No transactions" description="Transfers and deposits will appear here." />
+          <EmptyState
+            title={anyFilter ? "No matching transactions" : "No transactions"}
+            description={anyFilter ? "No rows match these filters. Widen or clear them and try again." : "Transfers and deposits will appear here."}
+          />
         ) : (
           <>
             {page.isError && page.data != null ? (
@@ -281,7 +384,16 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
 export default function ActivityPage({
   searchParams
 }: {
-  searchParams?: Promise<{ account?: string | string[]; from?: string | string[]; to?: string | string[] }>;
+  searchParams?: Promise<{
+    account?: string | string[];
+    from?: string | string[];
+    to?: string | string[];
+    min?: string | string[];
+    max?: string | string[];
+    kind?: string | string[];
+    status?: string | string[];
+    q?: string | string[];
+  }>;
 }) {
   // Next 15+ delivers searchParams as a Promise - unwrap it, mirroring the
   // account-detail/dashboard page pattern (kept optional for tests).
@@ -289,7 +401,16 @@ export default function ActivityPage({
   const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");
   return (
     <ActivityContent
-      initial={{ account: one(params?.account), from: validDate(one(params?.from)), to: validDate(one(params?.to)) }}
+      initial={{
+        account: one(params?.account),
+        from: validDate(one(params?.from)),
+        to: validDate(one(params?.to)),
+        min: validAmount(one(params?.min)),
+        max: validAmount(one(params?.max)),
+        kind: validKind(one(params?.kind)),
+        status: validStatus(one(params?.status)),
+        q: one(params?.q).trim().slice(0, 200)
+      }}
     />
   );
 }

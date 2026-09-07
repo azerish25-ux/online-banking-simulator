@@ -2394,6 +2394,11 @@ export interface operations {
                 to?: string;
                 size?: number;
                 cursor?: string;
+                minAmount?: string;
+                maxAmount?: string;
+                kind?: string[];
+                status?: string[];
+                q?: string;
             };
             header?: never;
             path?: never;

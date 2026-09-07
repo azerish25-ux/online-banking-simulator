@@ -63,9 +63,19 @@ export const queryKeys = {
   recentOperations: ["operations", "recent"] as const,
   // The cursor (blank = newest page) is part of the key: two different
   // positions in the same feed are two different result sets and must not
-  // collide in the cache.
-  transactions: (accountId: string, cursor: string, size: number, from?: string, to?: string) =>
-    ["transactions", accountId, cursor, size, from ?? "", to ?? ""] as const,
+  // collide in the cache. The optional filter tuple member makes each
+  // server-filtered view its own cache entry too ( section 14).
+  transactions: (
+    accountId: string,
+    cursor: string,
+    size: number,
+    from?: string,
+    to?: string,
+    filters?: HistoryFilters
+  ) =>
+    filters
+      ? (["transactions", accountId, cursor, size, from ?? "", to ?? "", filters] as const)
+      : (["transactions", accountId, cursor, size, from ?? "", to ?? ""] as const),
   summary: (accountId: string, months: number) => ["summary", accountId, months] as const,
   transferReceipt: (id: string) => ["transfer-receipt", id] as const,
   beneficiaries: ["beneficiaries"] as const,
@@ -104,6 +114,21 @@ export function useAccount(id: string): UseQueryResult<Account, ApiError> {
 }
 
 /**
+ * Server-side history predicates ( section 14): the customer feed's
+ * amount range, kind(s), state(s) and reference/counterparty search are SQL
+ * predicates over the WHOLE account history. Empty members mean "open" - an
+ * empty applied filter is a normal unfiltered browse, not a query for empty
+ * values.
+ */
+export type HistoryFilters = {
+  minAmount?: string;
+  maxAmount?: string;
+  kinds?: string[];
+  statuses?: string[];
+  q?: string;
+};
+
+/**
  * One of the caller's own operations by id (F11 durable receipt). The route
  * is bookmarkable and the lookup is originator-scoped server-side; a foreign
  * or unknown id answers 404 either way. Re-fetching after a HELD→POSTED
@@ -123,15 +148,23 @@ export function useTransactions(
   cursor = "",
   size = 10,
   from?: string,
-  to?: string
+  to?: string,
+  filters?: HistoryFilters
 ): UseQueryResult<HistoryPage<Tx>, ApiError> {
   return useQuery({
-    queryKey: queryKeys.transactions(accountId, cursor, size, from, to),
+    queryKey: queryKeys.transactions(accountId, cursor, size, from, to, filters),
     queryFn: async () => {
-      let url = "/v1/transactions?accountId=" + accountId + "&size=" + size;
+      let url = "/v1/transactions?accountId=" + encodeURIComponent(accountId) + "&size=" + size;
       if (cursor) url += "&cursor=" + encodeURIComponent(cursor);
       if (from) url += "&from=" + from;
       if (to) url += "&to=" + to;
+      if (filters) {
+        if (filters.minAmount) url += "&minAmount=" + encodeURIComponent(filters.minAmount);
+        if (filters.maxAmount) url += "&maxAmount=" + encodeURIComponent(filters.maxAmount);
+        for (const kind of filters.kinds ?? []) url += "&kind=" + encodeURIComponent(kind);
+        for (const status of filters.statuses ?? []) url += "&status=" + encodeURIComponent(status);
+        if (filters.q) url += "&q=" + encodeURIComponent(filters.q);
+      }
       return requireShape(historyPageSchema, await api<unknown>(url), "history") as HistoryPage<Tx>;
     },
     enabled: accountId.length > 0
