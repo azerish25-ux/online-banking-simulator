@@ -33,7 +33,7 @@ export default function MfaChallengePage() {
         body: JSON.stringify({ mfaToken: token, code: code.trim() })
       });
       clearMfaToken();
-      setToken(data.accessToken);
+      setToken(data.accessToken, data.expiresInSeconds);
       push("Welcome back.", "success");
       router.push(Routes.dashboard);
     } catch (err) {

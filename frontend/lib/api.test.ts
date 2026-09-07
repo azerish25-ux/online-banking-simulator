@@ -59,13 +59,79 @@ describe("token cookie", () => {
 
   it("dies with the access token instead of lingering for a week", () => {
     const cookie = tokenCookie("abc.123");
-    // Max-Age mirrors the 15-minute access-token TTL, not the old 7-day value.
+    // Fallback Max-Age mirrors the 15-minute access-token TTL, not the old
+    // 7-day value (the AUTHORITATIVE lifetime comes from the auth response's
+    // expiresInSeconds - see the cookie-lifetime tests below).
     expect(cookie).toContain("max-age=" + ACCESS_TOKEN_COOKIE_MAX_AGE);
     expect(cookie.includes("max-age=604800")).toBe(false);
     expect(cookie).toContain("samesite=lax");
     expect(cookie.includes("; Secure")).toBe(false); // dev http stays Secure-less
     // Over HTTPS the cookie must be marked Secure.
-    expect(tokenCookie("abc.123", true)).toContain("; Secure");
+    expect(tokenCookie("abc.123", undefined, true)).toContain("; Secure");
+  });
+
+  it("mirrors the VALIDATED access-token lifetime when one is provided", () => {
+    // section 9: the cookie dies exactly when the JWT does - the auth response's
+    // expiresInSeconds, not a client-side guess.
+    expect(tokenCookie("abc.123", 900)).toContain("max-age=900");
+    expect(tokenCookie("abc.123", 30)).toContain("max-age=30");
+    // A nonsensical value falls back instead of writing a broken cookie.
+    expect(tokenCookie("abc.123", Number.NaN)).toContain("max-age=" + ACCESS_TOKEN_COOKIE_MAX_AGE);
+    expect(tokenCookie("abc.123", -5)).toContain("max-age=" + ACCESS_TOKEN_COOKIE_MAX_AGE);
+  });
+});
+
+describe("credential adoption ( section 9)", () => {
+  it("installs the token from a VALIDATED auth response with its lifetime", async () => {
+    setToken("old");
+    // jsdom's document.cookie drops attributes, so capture every raw
+    // Set-Cookie string the client writes (cookie is an accessor on the
+    // Document prototype: shadow it on the instance, then delete the shadow
+    // so later tests read through the prototype accessor again).
+    const assigned: string[] = [];
+    Object.defineProperty(document, "cookie", {
+      get: () => assigned.join("; "),
+      set: (value: string) => {
+        assigned.push(value);
+      },
+      configurable: true
+    });
+    try {
+      mockFetchOnce({
+        accessToken: "session-token",
+        tokenType: "Bearer",
+        expiresInSeconds: 42,
+        user: { id: "1", email: "a@b.c", fullName: "A", role: "CUSTOMER" }
+      });
+      await api("/v1/auth/login", { method: "POST", body: "{}" });
+      expect(getToken()).toBe("session-token");
+      // The cookie Max-Age mirrors the VALIDATED lifetime (42s), not the
+      // client's 15-minute constant.
+      expect(assigned.join(" ")).toContain("max-age=42");
+    } finally {
+      // Restores the prototype accessor (the beforeEach reset then applies
+      // to the real cookie jar again).
+      delete (document as { cookie?: unknown }).cookie;
+    }
+  });
+
+  it("never adopts an accessToken from a resource response", async () => {
+    setToken("old");
+    // A (misbehaving or malicious) account endpoint echoes an accessToken -
+    // the client must not install it: only validated auth responses may
+    // plant credentials.
+    mockFetchOnce({ id: "acc-1", balance: "10.00", accessToken: "injected" });
+    await api("/v1/accounts");
+    expect(getToken()).toBe("old");
+    expect(document.cookie).not.toContain("injected");
+  });
+
+  it("ignores a malformed auth response body (no validated lifetime)", async () => {
+    setToken("old");
+    mockFetchOnce({ accessToken: "half" }); // no expiresInSeconds
+    await api("/v1/auth/login", { method: "POST", body: "{}" });
+    expect(getToken()).toBe("old");
+    expect(document.cookie).not.toContain("half");
   });
 });
 
@@ -126,7 +192,11 @@ describe("silent refresh", () => {
     (global.fetch as ReturnType<typeof vi.fn>) = vi.fn()
       .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "expired" }), { status: 401 }))
       .mockResolvedValueOnce(new Response(JSON.stringify({ detail: "expired" }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: "fresh" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        accessToken: "fresh",
+        tokenType: "Bearer",
+        expiresInSeconds: 900
+      }), { status: 200 }))
       .mockResolvedValueOnce(new Response("{}", { status: 200 }))
       .mockResolvedValueOnce(new Response("{}", { status: 200 }));
     await Promise.all([api("/v1/a"), api("/v1/b")]);
@@ -155,6 +225,22 @@ describe("silent refresh", () => {
       .mockResolvedValueOnce(new Response(JSON.stringify({ title: "Bad", detail: "nope" }), { status: 401 }));
     await expect(api("/v1/auth/login", { method: "POST", body: "{}" })).rejects.toThrow("nope");
     expect((global.fetch as ReturnType<typeof vi.fn>).mock.calls).toHaveLength(1);
+  });
+
+  it("adopts the rotated token with its validated lifetime when refresh is malformed it expires", async () => {
+    // A refresh body without a VALIDATED AuthResponse (no expiresInSeconds) is
+    // a failed rotation - credentials must never be installed from a partial
+    // body, so the session expires instead of limping along.
+    setToken("expired-token");
+    (global.fetch as ReturnType<typeof vi.fn>) = vi.fn()
+      .mockResolvedValueOnce(new Response("{}", { status: 401 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: "orphan" }), { status: 200 }));
+    const listener = vi.fn();
+    window.addEventListener(SESSION_EXPIRED_EVENT, listener);
+    await expect(api("/v1/auth/me")).rejects.toThrow("Session expired");
+    expect(getToken()).toBeNull();
+    expect(listener).toHaveBeenCalledTimes(1);
+    window.removeEventListener(SESSION_EXPIRED_EVENT, listener);
   });
 });
 
@@ -206,7 +292,11 @@ describe("TOTP credential rejections keep the session (F02)", () => {
       // rejects for another reason is indistinguishable from expiry at the
       // client, so the silent refresh runs once...
       .mockResolvedValueOnce(new Response(JSON.stringify({ title: "Unauthorized", detail: "Invalid code" }), { status: 401 }))
-      .mockResolvedValueOnce(new Response(JSON.stringify({ accessToken: "fresh" }), { status: 200 }))
+      .mockResolvedValueOnce(new Response(JSON.stringify({
+        accessToken: "fresh",
+        tokenType: "Bearer",
+        expiresInSeconds: 900
+      }), { status: 200 }))
       // ...and the retried submission is refused for the SAME business reason.
       // That is a definitive rejection of a HEALTHY session: the user must
       // see "Invalid code", not be logged out.

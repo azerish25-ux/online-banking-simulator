@@ -34,7 +34,7 @@ export default function LoginPage() {
       }
       const session = authSessionSchema.safeParse(data);
       if (session.success) {
-        setToken(session.data.accessToken);
+        setToken(session.data.accessToken, session.data.expiresInSeconds);
         push("Welcome back.", "success");
         router.push(Routes.dashboard);
         return;

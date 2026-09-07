@@ -23,20 +23,40 @@ export function getToken(): string | null {
 
 /**
  * The bank_token cookie is JS-readable (the Edge middleware needs it for UX
- * routing) and carries the access token, whose default lifetime is 15 minutes
- * (backend app.jwt.access-minutes). Its Max-Age mirrors that TTL so a stolen
- * cookie dies with the JWT it holds; the silent-refresh path rewrites the
- * cookie on every rotation, so active sessions never notice. Trade-off: after
- * 15 idle minutes a fresh navigation may land on login even though the
- * HttpOnly refresh cookie could still repair the session - routing here is
- * UX-only, the API is the authority.
+ * routing) and carries the access token. Its Max-Age mirrors the ACCESS
+ * TOKEN's validated lifetime so a stolen cookie dies with the JWT it holds;
+ * the silent-refresh path rewrites the cookie on every rotation, so active
+ * sessions never notice. Trade-off: after that lifetime a fresh navigation
+ * may land on login even though the HttpOnly refresh cookie could still
+ * repair the session - routing here is UX-only, the API is the authority.
+ */
+
+/**
+ * Fallback cookie lifetime (seconds) when no VALIDATED session configuration
+ * has been seen yet. The authoritative value always comes from an
+ * authentication response's expiresInSeconds ( section 9: "derive
+ * access-cookie lifetime from validated session configuration rather than
+ * the hard-coded lifetime") - this constant only sizes a cookie set by test
+ * helpers or defensive paths that lack a validated number.
  */
 export const ACCESS_TOKEN_COOKIE_MAX_AGE = 15 * 60;
 
-/** The full Set-Cookie value; split out so tests can pin the exact attributes. */
-export function tokenCookie(token: string, secure: boolean = isSecureContext()): string {
+/**
+ * The full Set-Cookie value; split out so tests can pin the exact attributes.
+ * {@code maxAgeSeconds} is the ACCESS TOKEN's validated lifetime - callers
+ * that hold an AuthResponse pass expiresInSeconds; everyone else falls back
+ * to the constant.
+ */
+export function tokenCookie(
+  token: string,
+  maxAgeSeconds: number = ACCESS_TOKEN_COOKIE_MAX_AGE,
+  secure: boolean = isSecureContext()
+): string {
+  const maxAge = Number.isFinite(maxAgeSeconds) && maxAgeSeconds > 0
+      ? Math.floor(maxAgeSeconds)
+      : ACCESS_TOKEN_COOKIE_MAX_AGE;
   return "bank_token=" + encodeURIComponent(token)
-      + "; path=/; max-age=" + ACCESS_TOKEN_COOKIE_MAX_AGE
+      + "; path=/; max-age=" + maxAge
       + "; samesite=lax"
       + (secure ? "; Secure" : "");
 }
@@ -45,8 +65,10 @@ function isSecureContext(): boolean {
   return typeof window !== "undefined" && window.location.protocol === "https:";
 }
 
-export function setToken(token: string) {
-  document.cookie = tokenCookie(token);
+/** Installs an access token; pass the AUTH RESPONSE's expiresInSeconds when
+ *  one is available so the cookie dies exactly when the JWT does (F22). */
+export function setToken(token: string, maxAgeSeconds?: number) {
+  document.cookie = tokenCookie(token, maxAgeSeconds);
 }
 
 export function clearToken() {
@@ -57,7 +79,9 @@ export function clearToken() {
   clearAllPendingOperations();
 }
 
-function safeJson(text: string): { detail?: string; title?: string; accessToken?: string } | null {
+function safeJson(
+  text: string
+): { detail?: string; title?: string; accessToken?: string; expiresInSeconds?: number } | null {
   if (!text) return null;
   try {
     return JSON.parse(text);
@@ -168,6 +192,21 @@ async function withRefreshLock(task: () => Promise<void>): Promise<void> {
 }
 
 /**
+ * The endpoints whose 2xx body IS an AuthResponse (access token + validated
+ * expiresInSeconds): login/register, MFA verification, and the factor
+ * changes that reissue credentials under a new security version. ONLY these
+ * may install credentials - a resource endpoint must never be able to plant
+ * an arbitrary accessToken into the cookie jar ( section 9).
+ */
+const AUTH_SESSION_PATHS = new Set([
+  "/v1/auth/login",
+  "/v1/auth/register",
+  "/v1/auth/mfa/verify",
+  "/v1/auth/totp/enable",
+  "/v1/auth/totp/disable"
+]);
+
+/**
  * Rotate the refresh cookie once and persist the new access token.
  * Returns true when THIS caller performed a rotation; false when another tab
  * already did (nothing left to do - the retried request will carry the fresh
@@ -187,10 +226,13 @@ async function rotateSession(): Promise<void> {
       const res = await fetch("/backend/v1/auth/refresh", { method: "POST" });
       if (!res.ok) throw new Error("refresh failed: " + res.status);
       const data = safeJson(await res.text());
-      if (!data || typeof data.accessToken !== "string" || data.accessToken.length === 0) {
-        throw new Error("refresh returned no access token");
+      // A refresh body is an AuthResponse: only a validated access token AND
+      // its positive lifetime may be installed - a malformed body is a failed
+      // rotation (expire the session), never a partial cookie.
+      if (!isValidAuthBody(data)) {
+        throw new Error("refresh returned no validated access token");
       }
-      setToken(data.accessToken);
+      setToken(data.accessToken, data.expiresInSeconds);
       broadcastAuth({ type: "refreshed" });
     })
       .finally(() => {
@@ -198,6 +240,20 @@ async function rotateSession(): Promise<void> {
       });
   }
   return refreshing;
+}
+
+/** The validated AuthResponse fields every credential-installing path needs. */
+function isValidAuthBody(
+  body: { accessToken?: string; expiresInSeconds?: number } | null
+): body is { accessToken: string; expiresInSeconds: number } {
+  return Boolean(
+    body
+    && typeof body.accessToken === "string"
+    && body.accessToken.length > 0
+    && typeof body.expiresInSeconds === "number"
+    && Number.isFinite(body.expiresInSeconds)
+    && body.expiresInSeconds > 0
+  );
 }
 
 /**
@@ -258,13 +314,15 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
       parts.detail || "Request failed: " + res.status
     );
   }
-  // Session-rotating endpoints (login, refresh, and factor changes like
-  // totp/enable - which bumps the security version and would kill the current
-  // access token) reissue credentials in the response. Adopt the fresh access
-  // token whenever a successful body carries one, so the session survives the
-  // rotation no matter which endpoint performed it.
-  if (data && typeof data.accessToken === "string" && data.accessToken.length > 0) {
-    setToken(data.accessToken);
+  // Session-issuing endpoints (login, register, MFA verification, and the
+  // factor changes like totp/enable that bump the security version and would
+  // otherwise kill the current access token) reissue credentials in their
+  // AuthResponse. Adopt the fresh token ONLY from those validated endpoints,
+  // and only when the body actually is an AuthResponse ( section 9): a
+  // resource endpoint can never plant an arbitrary accessToken into the
+  // cookie jar, and the cookie's Max-Age mirrors the validated lifetime.
+  if (AUTH_SESSION_PATHS.has(path) && isValidAuthBody(data)) {
+    setToken(data.accessToken, data.expiresInSeconds);
   }
   return data as T;
 }

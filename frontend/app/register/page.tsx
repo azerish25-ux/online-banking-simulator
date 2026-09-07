@@ -22,7 +22,7 @@ export default function RegisterPage() {
   async function onSubmit(values: Form) {
     try {
       const data = await api<AuthResponse>("/v1/auth/register", { method: "POST", body: JSON.stringify(values) });
-      setToken(data.accessToken);
+      setToken(data.accessToken, data.expiresInSeconds);
       push("Account created. A checking account is ready.", "success");
       router.push(Routes.dashboard);
     } catch (err) {
