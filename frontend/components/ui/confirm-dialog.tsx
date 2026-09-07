@@ -17,6 +17,7 @@ export function ConfirmDialog({
   body,
   confirmLabel = "Confirm",
   busy = false,
+  confirmDisabled = false,
   error = null,
   onConfirm,
   onClose
@@ -26,6 +27,8 @@ export function ConfirmDialog({
   body: React.ReactNode;
   confirmLabel?: string;
   busy?: boolean;
+  /** Grey the confirm button until a prerequisite (e.g. a mandatory reason) is met. */
+  confirmDisabled?: boolean;
   /** A server rejection to show inside the dialog (null clears it). */
   error?: string | null;
   onConfirm: () => void;
@@ -43,7 +46,7 @@ export function ConfirmDialog({
         <Button variant="secondary" disabled={busy} onClick={onClose}>
           Cancel
         </Button>
-        <Button variant="danger" disabled={busy} onClick={onConfirm}>
+        <Button variant="danger" disabled={busy || confirmDisabled} onClick={onConfirm}>
           {busy ? "Working..." : confirmLabel}
         </Button>
       </div>

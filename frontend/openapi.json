@@ -1016,6 +1016,20 @@
             "description" : "null while HELD or when CANCELLED - money has not moved",
             "type" : [ "string", "null" ]
           },
+          "reversalId" : {
+            "description" : "Operator surfaces only: id of the REVERSAL row when this posted transaction has been reversed. Always null on customer-facing feeds.",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
+          "reversalReason" : {
+            "description" : "Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds - it is the operator's internal note.",
+            "type" : [ "string", "null" ]
+          },
+          "reversesTransactionId" : {
+            "description" : "On a REVERSAL row: the posted transaction it reverses (V29)",
+            "format" : "uuid",
+            "type" : [ "string", "null" ]
+          },
           "reviewed" : {
             "type" : "boolean"
           },
@@ -1028,7 +1042,7 @@
             "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "kind", "memo", "postedAt", "reviewed", "status", "toIban" ],
+        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "kind", "memo", "postedAt", "reversalId", "reversalReason", "reversesTransactionId", "reviewed", "status", "toIban" ],
         "type" : "object"
       },
       "TransferRequest" : {

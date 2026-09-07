@@ -56,7 +56,10 @@ public final class TransferDtos {
       @Schema(nullable = true) String memo,
       TxKind kind, TxStatus status, String createdAt,
       @Schema(nullable = true, description = "null while HELD or when CANCELLED - money has not moved") String postedAt,
-      boolean flagged, boolean reviewed) {}
+      boolean flagged, boolean reviewed,
+      @Schema(nullable = true, description = "On a REVERSAL row: the posted transaction it reverses (V29)") UUID reversesTransactionId,
+      @Schema(nullable = true, description = "Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds - it is the operator's internal note.") String reversalReason,
+      @Schema(nullable = true, description = "Operator surfaces only: id of the REVERSAL row when this posted transaction has been reversed. Always null on customer-facing feeds.") UUID reversalId) {}
 
   /**
    * History feed envelope (F26). {@code items} are newest-first and

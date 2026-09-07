@@ -2,7 +2,10 @@ package com.bank.platform.ledger;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Collection;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.domain.Page;
@@ -243,6 +246,28 @@ public interface TransactionRepository
 
   /** Duplicate-reversal protection: at most one reversal per original instruction. */
   boolean existsByReversesTransactionId(UUID reversesTransactionId);
+
+  /** Reversal rows whose original is one of {@code originalIds}. */
+  List<Transaction> findByReversesTransactionIdIn(Collection<UUID> originalIds);
+
+  /**
+   * original-id → its reversal row id, for the given rows (empty when none
+   * have been reversed). The operator surface uses this so a console never
+   * offers a second reversal of a row that already has one - the original row
+   * itself is untouched (history stays as it was), so only the reversal index
+   * can say "this has been reversed".
+   */
+  default Map<UUID, UUID> reversalIndexBy(Collection<Transaction> rows) {
+    List<UUID> ids = rows.stream().map(Transaction::getId).toList();
+    if (ids.isEmpty()) {
+      return Map.of();
+    }
+    Map<UUID, UUID> index = new HashMap<>();
+    for (Transaction reversal : findByReversesTransactionIdIn(ids)) {
+      index.put(reversal.getReversesTransactionId(), reversal.getId());
+    }
+    return index;
+  }
 
   @Query("select coalesce(sum(t.amount), 0) from Transaction t where t.kind = :kind and t.status = :status")
   Optional<BigDecimal> sumAmountByKindAndStatus(@Param("kind") TxKind kind, @Param("status") TxStatus status);

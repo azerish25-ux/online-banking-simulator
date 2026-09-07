@@ -4,12 +4,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.bank.platform.accounts.Account;
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.support.ApiTestClient;
+import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
 import java.time.Clock;
@@ -218,6 +220,64 @@ class ReversalWorkflowTest {
         .andExpect(status().isBadRequest());
     assertEquals(0L, transactions.findAll().stream()
         .filter(tx -> tx.getReversesTransactionId() != null).count());
+  }
+
+  @Test
+  void operatorAndCustomerWireShapesCarryTheRightReversalState() throws Exception {
+    String alice = client.register("rev-k@example.com", "Rev K");
+    String bob = client.register("rev-l@example.com", "Rev L");
+    UUID aliceId = UUID.fromString(client.accountId(alice));
+    String bobIban = client.accountIban(bob);
+    client.deposit(alice, aliceId.toString(), "1000.00");
+    String transferId = client.transfer(alice, bobIban, "90.00");
+
+    // The reverse response is the NEW reversal row, reason and linkage on it.
+    MvcResult res = mvc.perform(post("/api/v1/admin/transactions/" + transferId + "/reverse")
+            .header("Authorization", "Bearer " + client.adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"reason\":\"Wrong amount entered\"}"))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode body = objectMapper.readTree(res.getResponse().getContentAsString());
+    String reversalId = body.get("id").asText();
+    assertEquals("REVERSAL", body.get("kind").asText());
+    assertEquals("Wrong amount entered", body.get("reversalReason").asText());
+    assertEquals(transferId, body.get("reversesTransactionId").asText());
+
+    // The operator list marks the ORIGINAL as reversed - its row is untouched,
+    // so only the reversal index can say so - and shows the reason on the row.
+    MvcResult list = mvc.perform(get("/api/v1/admin/transactions?size=50")
+            .header("Authorization", "Bearer " + client.adminToken()))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode content = objectMapper.readTree(list.getResponse().getContentAsString())
+        .get("content");
+    assertEquals(reversalId, findById(content, transferId).get("reversalId").asText(),
+        "the operator list tells the console the original already has a reversal");
+    assertEquals("Wrong amount entered",
+        findById(content, reversalId).get("reversalReason").asText());
+
+    // The customer feed keeps the operator's note off the wire entirely.
+    MvcResult feed = mvc.perform(get("/api/v1/transactions?accountId=" + aliceId + "&size=50")
+            .header("Authorization", "Bearer " + alice))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode items = objectMapper.readTree(feed.getResponse().getContentAsString()).get("items");
+    JsonNode feedReversal = findById(items, reversalId);
+    assertEquals(transferId, feedReversal.get("reversesTransactionId").asText(),
+        "the customer still sees the reversal is of their transfer");
+    assertTrue(feedReversal.has("reversalReason")
+        && feedReversal.get("reversalReason").isNull(),
+        "the operator's reason is never exposed on a customer-facing feed");
+  }
+
+  private JsonNode findById(JsonNode array, String id) {
+    for (JsonNode row : array) {
+      if (row.get("id").asText().equals(id)) {
+        return row;
+      }
+    }
+    throw new AssertionError("no row with id " + id + " in " + array);
   }
 
   private String reverse(String admin, UUID transactionId, String reason) throws Exception {

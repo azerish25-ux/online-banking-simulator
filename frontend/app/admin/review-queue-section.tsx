@@ -9,6 +9,7 @@ import { LoadFailed } from "../../components/ui/load-failed";
 import { Skeleton } from "../../components/ui/skeleton";
 import { ConfirmDialog } from "../../components/ui/confirm-dialog";
 import { useResultToast } from "../../components/feedback/use-result-toast";
+import { ReversalAction } from "../../components/admin/reverse-transaction";
 import { useAdminReviewQueue, useDeclineTransaction, useReviewTransaction } from "../../lib/queries";
 import { fmtDate, maskIban, usd } from "../../lib/format";
 import type { Tx } from "../../lib/api-types";
@@ -127,14 +128,17 @@ export function ReviewQueueSection() {
                       </Button>
                     </div>
                   ) : (
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      disabled={busy(t.id)}
-                      onClick={() => review.mutate(t.id)}
-                    >
-                      Acknowledge
-                    </Button>
+                    <div className="flex shrink-0 gap-2">
+                      <Button
+                        size="sm"
+                        variant="secondary"
+                        disabled={busy(t.id)}
+                        onClick={() => review.mutate(t.id)}
+                      >
+                        Acknowledge
+                      </Button>
+                      <ReversalAction tx={t} />
+                    </div>
                   )}
                 </div>
                 {t.memo ? (

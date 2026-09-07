@@ -188,7 +188,11 @@ public class AdminController {
         TransactionSpecs.filters(accountId, flagged, reviewed, fromInstant, toInstant),
         withInsertionTiebreak(capped(pageable)));
     Map<UUID, String> ibans = statementService.ibanMap(page.getContent());
-    return page.map(tx -> TransactionMapper.toResponse(tx, ibans));
+    // The operator surface shows the full reversal picture (reason on a
+    // REVERSAL row, and which POSTED rows already have one) so the console
+    // never offers a second reversal of the same instruction.
+    Map<UUID, UUID> reversalIndex = transactions.reversalIndexBy(page.getContent());
+    return page.map(tx -> TransactionMapper.toAdminResponse(tx, ibans, reversalIndex));
   }
 
   @GetMapping("/audit-logs")
@@ -232,15 +236,13 @@ public class AdminController {
   @PostMapping("/transactions/{id}/review")
   public TransactionResponse review(Authentication authentication, @PathVariable UUID id) {
     Transaction tx = adminService.reviewTransaction(authentication.getName(), id);
-    Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
-    return TransactionMapper.toResponse(tx, ibans);
+    return operatorResponse(tx);
   }
 
   @PostMapping("/transactions/{id}/decline")
   public TransactionResponse decline(Authentication authentication, @PathVariable UUID id) {
     Transaction tx = adminService.declineTransaction(authentication.getName(), id);
-    Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
-    return TransactionMapper.toResponse(tx, ibans);
+    return operatorResponse(tx);
   }
 
   /**
@@ -254,12 +256,18 @@ public class AdminController {
       @RequestBody(required = false) ReversalRequest request) {
     Transaction tx = reversalService.reverse(authentication.getName(), id,
         request == null ? null : request.reason());
-    Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
-    return TransactionMapper.toResponse(tx, ibans);
+    return operatorResponse(tx);
   }
 
   /** The operator's mandatory reversal reason (validated in ReversalService). */
   public record ReversalRequest(String reason) {}
+
+  /** One settled row for the operator surface, with its live reversal state. */
+  private TransactionResponse operatorResponse(Transaction tx) {
+    Map<UUID, String> ibans = statementService.ibanMap(List.of(tx));
+    Map<UUID, UUID> reversalIndex = transactions.reversalIndexBy(List.of(tx));
+    return TransactionMapper.toAdminResponse(tx, ibans, reversalIndex);
+  }
 
   @GetMapping("/reports/daily-totals")
   public List<ReportService.DayTotal> dailyTotals(@RequestParam(defaultValue = "30") int days) {

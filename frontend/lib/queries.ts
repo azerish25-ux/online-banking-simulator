@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-query";
 import * as React from "react";
 import { ApiError, api } from "./api";
-import { classifyMoneyFailure } from "./money-failure";
+import { classifyMoneyFailure, isDefinitiveRejection } from "./money-failure";
 import {
   PENDING_OPS_EVENT,
   listPendingOperations,
@@ -374,17 +374,13 @@ export async function resolveUnresolvedOperation(
   }
 }
 
-/**
- * Definitive client rejections (validation, insufficient funds) mean the
- * server recorded nothing, so the key was NOT consumed and the next attempt
- * may mint a fresh one. 409 (key already names a different operation) and
- * 429 (throttled) are NOT proof of rejection - the key is kept so a retry
- * deduplicates against whatever the server actually did (F06).
- */
-function isDefinitiveRejection(err: unknown): boolean {
-  return err instanceof ApiError && err.status >= 400 && err.status < 500
-      && err.status !== 409 && err.status !== 429;
-}
+// Definitive client rejections (validation, insufficient funds) mean the
+// server recorded nothing, so the key was NOT consumed and the next attempt
+// may mint a fresh one. 409 (key already names a different operation) and
+// 429 (throttled) are NOT proof of rejection - the key is kept so a retry
+// deduplicates against whatever the server actually did (F06). The predicate
+// itself is owned by money-failure.ts - the single authority on the
+// definitive-vs-ambiguous boundary.
 
 /** The signed-in user id from the me query, when it has loaded. */
 function currentUserId(qc: ReturnType<typeof useQueryClient>): string | undefined {
@@ -829,6 +825,34 @@ export function useDeclineTransaction(): UseMutationResult<Tx, ApiError, string>
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: ["admin", "review-queue"] });
       void qc.invalidateQueries({ queryKey: ["transactions"] });
+    }
+  });
+}
+
+/**
+ * Reverses a POSTED transaction (V29) with the operator's mandatory reason.
+ * The server authors a NEW reversal row that moves the money back - one per
+ * original - so the success response is that row, never the edited original.
+ * Reversal moves money, so every operator readout that reflects balances or
+ * flow is refreshed from the same graph the console lists use.
+ */
+export function useReverseTransaction(): UseMutationResult<
+  Tx,
+  ApiError,
+  { id: string; reason: string }
+> {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, reason }) =>
+      api<Tx>("/v1/admin/transactions/" + id + "/reverse", {
+        method: "POST",
+        body: JSON.stringify({ reason })
+      }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["admin", "review-queue"] });
+      void qc.invalidateQueries({ queryKey: ["admin", "transactions"] });
+      void qc.invalidateQueries({ queryKey: queryKeys.admin.dailyTotals });
+      void qc.invalidateQueries({ queryKey: queryKeys.accounts });
     }
   });
 }

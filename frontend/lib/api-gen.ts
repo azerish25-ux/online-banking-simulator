@@ -1147,6 +1147,18 @@ export interface components {
             memo: string | null;
             /** @description null while HELD or when CANCELLED - money has not moved */
             postedAt: string | null;
+            /**
+             * Format: uuid
+             * @description Operator surfaces only: id of the REVERSAL row when this posted transaction has been reversed. Always null on customer-facing feeds.
+             */
+            reversalId: string | null;
+            /** @description Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds - it is the operator's internal note. */
+            reversalReason: string | null;
+            /**
+             * Format: uuid
+             * @description On a REVERSAL row: the posted transaction it reverses (V29)
+             */
+            reversesTransactionId: string | null;
             reviewed: boolean;
             /** @enum {string} */
             status: "POSTED" | "HELD" | "CANCELLED";
