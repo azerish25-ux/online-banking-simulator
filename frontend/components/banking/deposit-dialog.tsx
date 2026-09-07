@@ -8,6 +8,7 @@ import { Modal } from "../ui/modal";
 import { Select } from "../ui/select";
 import { useDeposit } from "../../lib/queries";
 import { accountLabel, maskIban, usd } from "../../lib/format";
+import { classifyMoneyFailure } from "../../lib/money-failure";
 import { depositSchema } from "../../lib/validation";
 import type { Account } from "../../lib/api-types";
 
@@ -80,7 +81,14 @@ export function DepositDialog({
   }, [amount, target, resetIdempotencyKey]);
   useResultToast(deposit, {
     error: false,
-    onFailure: (message) => setError(message),
+    // Truthful copy for the inline slot: a definitive rejection keeps the
+    // server's words; an interrupted/ambiguous one (network, 5xx, 429, 409)
+    // says the deposit is saved and a retry checks the server instead of
+    // double-posting.
+    onFailure: (message, error) => {
+      const classified = classifyMoneyFailure("deposit", error).message;
+      setError(classified || message);
+    },
     success: {
       // The deposit answer nests the account under the recoverable operation
       // identity (F06 lifecycle), so the toast unwraps it.

@@ -119,7 +119,9 @@ it("hears each failure through onFailure without corner-toasting (error: false)"
   rerender({ result: fail("Deposit exceeds the per-transaction limit") });
   expect(pushMock).not.toHaveBeenCalled(); // no corner toast - rendered inline instead
   expect(hear).toHaveBeenCalledTimes(1);
-  expect(hear).toHaveBeenCalledWith("Deposit exceeds the per-transaction limit");
+  // The settled error rides along so the inline surface can re-classify the
+  // failure (e.g. interrupted money operation) instead of trusting raw copy.
+  expect(hear).toHaveBeenCalledWith("Deposit exceeds the per-transaction limit", expect.any(Error));
 
   // A re-render while still failed must not repeat it; a second failed
   // attempt gets its own hearing.
@@ -149,7 +151,24 @@ it("does not fire onFailure on success, and shares the spec message when one is 
   rerender({ result: { status: "pending", error: null, data: undefined } });
   rerender({ result: fail("raw boom") });
   expect(pushMock).toHaveBeenCalledWith("Couldn't do that.", "error");
-  expect(hear).toHaveBeenCalledWith("Couldn't do that."); // same words as the toast
+  expect(hear).toHaveBeenCalledWith("Couldn't do that.", expect.any(Error)); // same words as the toast
+});
+
+it("hands the settled error to inline surfaces for truthful re-classification", () => {
+  const hear = vi.fn();
+  const boom = new TypeError("Failed to fetch");
+  const { rerender } = renderHook(
+    ({ result }: Props) => useResultToast(result, { error: false, onFailure: hear }),
+    { initialProps: { result: idle } }
+  );
+
+  rerender({ result: { status: "pending", error: null, data: undefined } });
+  rerender({ result: { status: "error", error: boom, data: undefined } });
+  expect(pushMock).not.toHaveBeenCalled();
+  // The dialog hears the exact error object, not just copy, so it can say
+  // "the outcome is unknown and a retry cannot double-post" instead of
+  // printing the raw network message.
+  expect(hear).toHaveBeenCalledWith("Failed to fetch", boom);
 });
 
 it("runs the latest side-effect exactly once per success, with the result", () => {

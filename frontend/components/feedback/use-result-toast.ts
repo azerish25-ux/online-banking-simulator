@@ -37,9 +37,12 @@ export type ResultToastFeedback<TData, TError extends Error> = {
    * Hears every failed attempt's message, exactly once. Dialog surfaces pair
    * this with `error: false` and render the message inline next to the field
    * that failed (a bank keeps the rejection beside the input, not in a corner
-   * toast behind a scrim).
+   * toast behind a scrim). The settled error rides along as the second
+   * argument so an inline surface can re-classify the failure (e.g. truthfully
+   * say an interrupted money operation is saved for a safe retry) without
+   * re-deriving it from raw copy.
    */
-  onFailure?: (message: string) => void;
+  onFailure?: (message: string, error: TError) => void;
   /** Fired exactly once per success: the toast first, then `run`. */
   success?: {
     toast?: ResultToastSpec | ((data: TData) => ResultToastSpec);
@@ -89,7 +92,9 @@ export function useResultToast<TData, TError extends Error = Error>(
         message = spec.message;
         toast(spec.message, spec.tone ?? "error");
       }
-      if (message && fb?.onFailure) fb.onFailure(message);
+      if (message && fb?.onFailure && settled.error) {
+        fb.onFailure(message, settled.error);
+      }
     } else if (settled.status === "success" && fb?.success) {
       const { toast: toastSpec, run } = fb.success;
       if (toastSpec) {

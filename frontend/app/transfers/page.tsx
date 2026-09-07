@@ -15,6 +15,7 @@ import { useResultToast } from "../../components/feedback/use-result-toast";
 import { TxStatusBadge } from "../../components/ui/tx-status-badge";
 import { useAccounts, useBeneficiaries, useTransfer, type TransferInput } from "../../lib/queries";
 import { accountLabel, usdReview } from "../../lib/format";
+import { classifyMoneyFailure } from "../../lib/money-failure";
 import { Routes } from "../../lib/routes";
 
 type ReviewSnapshot = {
@@ -88,6 +89,13 @@ export default function TransfersPage() {
     error: { message: "Couldn't load your beneficiaries - type the IBAN manually." }
   });
   useResultToast(transfer, {
+    // Truthful failure copy (interrupted-response UX): a definitive rejection
+    // says what the server said; an ambiguous one (network/5xx/429/409) says
+    // the outcome is unknown and the saved attempt can be retried safely.
+    error: (err) => {
+      const failure = classifyMoneyFailure("transfer", err);
+      return { message: failure.message, tone: failure.ambiguous ? "info" : "error" };
+    },
     success: {
       toast: (d) =>
         d.status === "HELD"
