@@ -61,7 +61,7 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           const outH = scale(parseFloat(d.outflow));
           return (
             <g key={d.month}>
-              <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-brass-400">
+              <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-brass-500">
                 <title>{"In " + d.month + ": " + usd(d.inflow)}</title>
               </rect>
               <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(0, outH)} rx={1.5} className="fill-outflow">
@@ -75,7 +75,7 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           );
         })}
         <g fontSize={11} className="fill-content-muted">
-          <rect x={pad} y={4} width={10} height={10} rx={1.5} className="fill-brass-400" />
+          <rect x={pad} y={4} width={10} height={10} rx={1.5} className="fill-brass-500" />
           <text x={pad + 14} y={13}>In</text>
           <rect x={pad + 52} y={4} width={10} height={10} rx={1.5} className="fill-outflow" />
           <text x={pad + 66} y={13}>Out</text>

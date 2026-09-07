@@ -3,15 +3,15 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
-  --bg: #0c101d;
-  --panel: #151e33;
-  --line: #26324e;
-  --text: #e9edf5;
-  --muted: #97a3bd;
-  --brand: #c9a35c;
-  --mint: #9fdcb4;
-  --rose: #f2a9a9;
+  color-scheme: light;
+  --bg: #f1efe8;
+  --panel: #fdfcf7;
+  --line: #cfc8b4;
+  --text: #1a2130;
+  --muted: #4c5a70;
+  --brand: #6e521c;
+  --mint: #2e6b3f;
+  --rose: #9e2f22;
 }
 
 html, body {
@@ -24,9 +24,9 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-::selection { background: rgba(201, 163, 92, 0.30); }
+::selection { background: rgba(178, 138, 66, 0.24); }
 
-/* Refined focus: brass ring, visible on every interactive element. */
+/* Refined focus: dark bronze ring, visible on the light surfaces. */
 :focus-visible {
   outline: 2px solid var(--brand);
   outline-offset: 2px;

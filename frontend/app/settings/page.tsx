@@ -227,7 +227,7 @@ export default function SettingsPage() {
                 />
                 <div className="min-w-0">
                   <p className="label mb-1 text-content-muted">Secret key</p>
-                  <p className="mono break-all rounded-md border border-line bg-ink-950/60 px-3 py-2">{pendingSetup.secret}</p>
+                  <p className="mono break-all rounded-md border border-line bg-ink-800/60 px-3 py-2">{pendingSetup.secret}</p>
                   <Button size="sm" variant="secondary" className="mt-2" onClick={copySecret}>
                     Copy secret
                   </Button>
