@@ -158,6 +158,60 @@ class ChallengePersistenceTest {
   }
 
   @Test
+  void concurrentGuessesCanNeverExceedTheFiveAttemptBudget() throws Exception {
+    // section 9: the attempt is RESERVED atomically before verification,
+    // so a concurrent burst of wrong codes against one challenge can never
+    // overshoot the five-verification budget (a read-then-increment counter
+    // lets parallel callers all pass the check before any of them records).
+    // Eight threads keep this H2 run inside the shared Hikari pool (10); the
+    // real-PostgreSQL leg (ChallengePersistenceTest on the disposable
+    // database) runs the same test with higher pool capacity for the 24-way
+    // synchronization under load.
+    UUID challengeId = challengeIdOf(challengeToken);
+    int n = 8;
+    ExecutorService pool = Executors.newFixedThreadPool(n);
+    CountDownLatch ready = new CountDownLatch(n);
+    CountDownLatch start = new CountDownLatch(1);
+    AtomicInteger verified = new AtomicInteger();   // wrong-code BadCredentials (a real verification ran)
+    AtomicInteger refused = new AtomicInteger();    // TooMany - refused BEFORE any code check
+    AtomicInteger unexpected = new AtomicInteger();
+    java.util.concurrent.ConcurrentLinkedQueue<String> unexpectedDetail = new java.util.concurrent.ConcurrentLinkedQueue<>();
+    for (int i = 0; i < n; i++) {
+      pool.submit(() -> {
+        ready.countDown();
+        try {
+          if (!start.await(10, TimeUnit.SECONDS)) {
+            return;
+          }
+          authService.verifyMfaChallenge(challengeId, "000000");
+          unexpected.incrementAndGet(); // a wrong code must never succeed
+        } catch (BadCredentialsException expected) {
+          verified.incrementAndGet();
+        } catch (TooManyTotpAttemptsException expected) {
+          refused.incrementAndGet();
+        } catch (Exception e) {
+          unexpected.incrementAndGet();
+          unexpectedDetail.add(e.getClass().getSimpleName() + ": " + e.getMessage());
+        }
+      });
+    }
+    assertTrue(ready.await(10, TimeUnit.SECONDS), "all threads must start");
+    start.countDown();
+    pool.shutdown();
+    assertTrue(pool.awaitTermination(60, TimeUnit.SECONDS), "verifications must resolve");
+
+    assertEquals(0, unexpected.get(), "no request may succeed or fail unexpectedly: "
+        + String.join(" | ", unexpectedDetail));
+    assertEquals(n, verified.get() + refused.get(), "every request resolved to a defined outcome");
+    // The core guarantee: however the 24 requests interleave, at most five may
+    // actually verify a code - everyone else is refused before verification.
+    LoginChallenge row = challenges.findById(challengeId).orElseThrow();
+    assertEquals(5, row.getFailedAttempts(), "the five-attempt budget is never overshot");
+    assertEquals(5, verified.get(), "no more than the budgeted verifications may run");
+    assertTrue(refused.get() >= 3, "every guess beyond the budget is refused, none verified");
+  }
+
+  @Test
   void expiredChallengeIsRejected() throws Exception {
     UUID challengeId = UUID.randomUUID();
     challenges.save(new LoginChallenge(userId, Instant.now().minus(1, ChronoUnit.MINUTES)));

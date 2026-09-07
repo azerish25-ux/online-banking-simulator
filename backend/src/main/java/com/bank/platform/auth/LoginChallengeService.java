@@ -4,6 +4,7 @@ import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.UUID;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
@@ -47,6 +48,38 @@ public class LoginChallengeService {
   @Transactional(propagation = Propagation.REQUIRES_NEW)
   public void recordFailure(UUID challengeId) {
     challenges.recordFailure(challengeId);
+  }
+
+  /**
+   * Reserves ONE verification attempt BEFORE any code is checked (section 9): a single conditional UPDATE books the attempt only while the
+   * challenge is unused, unexpired, and under its five-attempt budget, and it
+   * commits in its own REQUIRES_NEW transaction so the rejection rollback
+   * that follows a wrong code can never erase the booking. Concurrent
+   * submissions serialize on the row update, so the budget can never be
+   * overshot by parallel guesses - and the caller never holds a lock on the
+   * challenge row while this waits for it (no outer read lock exists).
+   *
+   * <p>Throws {@link TooManyTotpAttemptsException} when the challenge is
+   * still live but its budget is spent (the verification must not run), and
+   * {@link BadCredentialsException} when the challenge is gone, consumed, or
+   * expired.
+   */
+  @Transactional(propagation = Propagation.REQUIRES_NEW)
+  public void reserveAttempt(UUID challengeId) {
+    int reserved = challenges.reserveAttempt(challengeId, clock.instant(), MAX_ATTEMPTS);
+    if (reserved > 0) {
+      return;
+    }
+    // The update refused us - read the row to distinguish "budget spent on a
+    // live challenge" (429, never verify again) from "gone/consumed/expired"
+    // (a plain rejection).
+    LoginChallenge current = challenges.findById(challengeId).orElse(null);
+    if (current != null && !current.isConsumed()
+        && current.getExpiresAt().isAfter(clock.instant())
+        && current.getFailedAttempts() >= MAX_ATTEMPTS) {
+      throw new TooManyTotpAttemptsException();
+    }
+    throw new BadCredentialsException("Invalid MFA token");
   }
 
   @Transactional

@@ -13,14 +13,17 @@ import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
+import java.util.UUID;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
-import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
-@Transactional
+// NOT @Transactional: challenge verification reserves attempts in their own
+// REQUIRES_NEW transaction, which cannot see rows created inside an outer
+// test transaction. Like ChallengePersistenceTest, this class keeps its
+// writes committed and isolates itself with unique per-run emails.
 class TotpFlowTest {
 
   @Autowired MockMvc mvc;
@@ -29,7 +32,8 @@ class TotpFlowTest {
 
   @Test
   void setupEnableChallengeDisable() throws Exception {
-    String token = register("totp@example.com", "Totp User");
+    String email = "totpflow-" + UUID.randomUUID().toString().substring(0, 8) + "@example.com";
+    String token = register(email, "Totp User");
 
     MvcResult setup = mvc.perform(post("/api/v1/auth/totp/setup")
             .header("Authorization", "Bearer " + token))
@@ -58,7 +62,7 @@ class TotpFlowTest {
     MvcResult challenge = mvc.perform(post("/api/v1/auth/login")
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                {"email":"totp@example.com","password":"secret123"}"""))
+                {"email":"%s","password":"secret123"}""".formatted(email)))
         .andExpect(status().isAccepted())
         .andExpect(jsonPath("$.mfaToken").isNotEmpty())
         .andReturn();
@@ -93,7 +97,7 @@ class TotpFlowTest {
     mvc.perform(post("/api/v1/auth/login")
             .contentType(MediaType.APPLICATION_JSON)
             .content("""
-                {"email":"totp@example.com","password":"secret123"}"""))
+                {"email":"%s","password":"secret123"}""".formatted(email)))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.accessToken").isNotEmpty());
   }

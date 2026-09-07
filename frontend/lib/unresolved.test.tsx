@@ -168,6 +168,24 @@ describe("unresolved-operation resolution", () => {
     expect(listPendingOperations("u1")).toHaveLength(1);
   });
 
+  it("a 401 during recovery is AMBIGUOUS: the original dispatch may have committed", async () => {
+    // The first attempt could have posted with a token that expired after
+    // commit; this replay is refused by the auth filter before the server can
+    // say what happened. The record must survive so the user can check again
+    // after re-authentication (section 6/section 15) - never silently erase it as a
+    // definitive rejection.
+    setToken("tok");
+    upsertPendingOperation({
+      userId: "u1", kind: "transfer", key: "kt401", accountId: "a1",
+      amount: "5.00", toIban: "DE999", createdAt: Date.now() - 1000
+    });
+    vi.mocked(api).mockRejectedValue(new ApiError(401, "Unauthorized", "Session expired"));
+    const outcome = await resolveUnresolvedOperation(client(), listPendingOperations("u1")[0]);
+    expect(outcome.kind).toBe("unknown");
+    expect((outcome as { message: string }).message).toContain("session expired");
+    expect(listPendingOperations("u1")).toHaveLength(1);
+  });
+
   it("a 409 resolves through the recorded truth lookup instead of guessing", async () => {
     setToken("tok");
     upsertPendingOperation({

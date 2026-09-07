@@ -106,25 +106,29 @@ public class AuthService {
 
   /**
    * F30 verification of a persisted login challenge (see {@link #verifyMfaChallenge}).
+   *
+   * The attempt is RESERVED atomically before any code is checked (section 9): one conditional UPDATE books it only while the challenge is
+   * unused, unexpired and under its budget, committing in a short REQUIRES_NEW
+   * boundary so a concurrent burst can never overshoot the five-attempt limit
+   * and a rejected code can never erase its own booking. The final consume is
+   * a second atomic UPDATE on the same conditions, so exactly one correct
+   * submission wins the race.
    */
   @Transactional
   public User verifyMfaChallenge(UUID challengeId, String code) {
+    // Reserve the attempt FIRST (may throw TooMany when the budget is spent,
+    // or BadCredentials when the challenge is gone/consumed/expired). No row
+    // lock is held across this call - the reservation commits on its own.
+    challengeService.reserveAttempt(challengeId);
     LoginChallenge challenge = challenges.findById(challengeId)
         .orElseThrow(() -> new BadCredentialsException("Invalid MFA token"));
-    if (challenge.isConsumed()) {
-      throw new BadCredentialsException("Invalid MFA token");
-    }
-    if (!challenge.getExpiresAt().isAfter(clock.instant())) {
-      throw new BadCredentialsException("Invalid MFA token");
-    }
-    if (challenge.getFailedAttempts() >= LoginChallengeService.MAX_ATTEMPTS) {
-      throw new TooManyTotpAttemptsException();
-    }
     User user = users.findById(challenge.getUserId())
         .orElseThrow(() -> new BadCredentialsException("Invalid MFA token"));
     totpThrottle.verifyAvailable(user.getEmail());
     if (!user.isTotpEnabled() || !totp.verify(secretOf(user), code)) {
-      challengeService.recordFailure(challengeId);
+      // The attempt was already booked by the reservation; the account-level
+      // throttle records the failure so repeated guessing also locks the
+      // account across freshly issued challenges.
       totpThrottle.recordFailure(user.getEmail());
       throw new BadCredentialsException("Invalid code");
     }

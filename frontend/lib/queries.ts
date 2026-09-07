@@ -371,6 +371,16 @@ export async function resolveUnresolvedOperation(
     const data = await replay();
     return finish(data.status, data);
   } catch (err) {
+    // A 401 during RECOVERY is ambiguous, never definitive: the ORIGINAL
+    // dispatch may have committed with a token that expired afterwards, so
+    // this replay is refused by the filter without telling us what happened.
+    // The record is kept; the user re-authenticates and checks again (section 6/section 15).
+    if (err instanceof ApiError && err.status === 401) {
+      return {
+        kind: "unknown",
+        message: "Your session expired before this attempt was confirmed. Sign in again, then retry the status check."
+      };
+    }
     const failure = classifyMoneyFailure(kind, err);
     if (!failure.ambiguous) {
       // Definitive rejection: the server recorded nothing - resolve + clear.

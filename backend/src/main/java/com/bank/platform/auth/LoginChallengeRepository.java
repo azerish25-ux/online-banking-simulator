@@ -31,6 +31,21 @@ public interface LoginChallengeRepository extends JpaRepository<LoginChallenge, 
       + "where c.id = :id and c.consumed = false")
   int recordFailure(@Param("id") UUID id);
 
+  /**
+   * ATOMIC attempt reservation ( section 9): increments the attempt
+   * count in ONE conditional UPDATE that succeeds only while the challenge is
+   * still unused, unexpired, and has budget left. Returns 1 when this caller
+   * reserved an attempt (and may now verify a code), 0 when the challenge is
+   * gone/consumed/expired or the budget is already spent. Because the check
+   * and the increment are the same statement, N concurrent submissions can
+   * never jointly overshoot the five-attempt budget.
+   */
+  @Modifying
+  @Query("update LoginChallenge c set c.failedAttempts = c.failedAttempts + 1 "
+      + "where c.id = :id and c.consumed = false and c.expiresAt > :now "
+      + "and c.failedAttempts < :max")
+  int reserveAttempt(@Param("id") UUID id, @Param("now") Instant now, @Param("max") int max);
+
   /** Bounded retention: expired rows (consumed or abandoned) leave the table. */
   @Modifying
   @Query("delete from LoginChallenge c where c.expiresAt < :now")
