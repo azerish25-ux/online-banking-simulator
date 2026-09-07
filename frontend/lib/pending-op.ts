@@ -39,6 +39,12 @@ export interface PendingOperation {
   /** Reviewed-intent context so a reloaded page can describe the operation. */
   amount?: string;
   toIban?: string;
+  /**
+   * The transfer memo, part of the reviewed intent. A replay must re-send the
+   * BYTE-IDENTICAL request (the server's dedupe compares a request hash that
+   * includes the normalized memo), so the memo is stored with the key.
+   */
+  memo?: string;
   /** When the operation was dispatched (UTC epoch millis). */
   createdAt: number;
 }
@@ -101,6 +107,24 @@ function opId(op: Pick<PendingOperation, "userId" | "kind" | "key">): string {
   return op.userId + ":" + op.kind + ":" + op.key;
 }
 
+/**
+ * Same-document change notice. The recovery surface reads the store to list
+ * unresolved operations; a deposit/transfer that ends ambiguously WHILE that
+ * surface is mounted (e.g. the dashboard dialog behind it) would otherwise
+ * stay invisible until a reload. Every store write fires this event and the
+ * surface re-reads - no polling, no shared state object.
+ */
+export const PENDING_OPS_EVENT = "bank:pending-ops-changed";
+
+function notifyPendingOpsChanged(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.dispatchEvent(new Event(PENDING_OPS_EVENT));
+  } catch {
+    // A broken dispatch must never fail a persistence write.
+  }
+}
+
 /** Writes one operation record (new or refreshed). */
 export function upsertPendingOperation(op: PendingOperation): void {
   const store = readAll();
@@ -109,6 +133,7 @@ export function upsertPendingOperation(op: PendingOperation): void {
   bucket[id] = op;
   store[op.userId] = bucket;
   writeAll(store);
+  notifyPendingOpsChanged();
 }
 
 /** All unresolved records of one user (the recovery list for that session). */
@@ -148,6 +173,7 @@ export function removePendingOperation(
     store[userId] = bucket;
   }
   writeAll(store);
+  notifyPendingOpsChanged();
 }
 
 /**
@@ -165,4 +191,5 @@ export function clearAllPendingOperations(): void {
   } catch {
     // Ignore storage failures at logout - the cookie is already gone.
   }
+  notifyPendingOpsChanged();
 }

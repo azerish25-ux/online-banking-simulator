@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
+import { UnresolvedOperations } from "../../components/banking/unresolved-operations";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
@@ -157,6 +158,11 @@ export default function ActivityPage() {
           <Button variant="secondary" onClick={() => download("pdf")} disabled={!accountId}>PDF</Button>
         </div>
       </div>
+
+      {/* The recovery surface renders only while a saved operation's answer is
+          genuinely unknown (money may have moved and the user must be able to
+          resolve it, never left guessing). */}
+      <UnresolvedOperations />
 
       <Card className="mb-4">
         <form onSubmit={applyRange} className="flex flex-wrap items-end gap-3">

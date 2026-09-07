@@ -4,6 +4,7 @@ import { ArrowRight } from "lucide-react";
 import * as React from "react";
 import Link from "next/link";
 import { AppShell } from "../../components/layout/app-shell";
+import { UnresolvedOperations } from "../../components/banking/unresolved-operations";
 import { DepositDialog } from "../../components/banking/deposit-dialog";
 import { OpenAccountDialog } from "../../components/banking/open-account-dialog";
 import { Badge } from "../../components/ui/badge";
@@ -131,6 +132,11 @@ export default function DashboardPage() {
           })}
         </div>
       )}
+
+      {/* The recovery surface renders only while a saved operation's answer
+          is genuinely unknown (money may have moved and the user must be able
+          to resolve it, never left guessing). */}
+      <UnresolvedOperations />
 
       <Card className="mt-4">
         <div className="mb-3 flex items-center justify-between">

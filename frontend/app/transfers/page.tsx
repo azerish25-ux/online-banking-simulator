@@ -57,15 +57,19 @@ export default function TransfersPage() {
 
   // Editing the transfer is a new intent: the outstanding idempotency key
   // (which exists to make retries of THIS transfer safe) no longer applies.
-  const lastIntent = React.useRef({ from: "", to: "", amount: "" });
+  // The memo is part of the intent too - the server's dedupe hashes it, so
+  // sending an edited memo under an old key would answer 409 (never a replay).
+  const lastIntent = React.useRef({ from: "", to: "", amount: "", memo: "" });
+  const watchMemo = watch("memo");
   React.useEffect(() => {
-    const next = { from: watchFrom, to: watchTo, amount: watchAmount };
+    const next = { from: watchFrom, to: watchTo, amount: watchAmount, memo: watchMemo ?? "" };
     const prev = lastIntent.current;
-    if (prev.from !== next.from || prev.to !== next.to || prev.amount !== next.amount) {
+    if (prev.from !== next.from || prev.to !== next.to || prev.amount !== next.amount
+        || prev.memo !== next.memo) {
       lastIntent.current = next;
       resetIdempotencyKey();
     }
-  }, [watchFrom, watchTo, watchAmount, resetIdempotencyKey]);
+  }, [watchFrom, watchTo, watchAmount, watchMemo, resetIdempotencyKey]);
 
   // Default the source account once, when accounts first arrive. Deliberately
   // not on every refetch: invalidation-driven refetches (e.g. after a transfer

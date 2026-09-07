@@ -4,15 +4,19 @@ import {
   useMutation,
   useQuery,
   useQueryClient,
+  type QueryClient,
   type UseMutationResult,
   type UseQueryResult
 } from "@tanstack/react-query";
 import * as React from "react";
 import { ApiError, api } from "./api";
+import { classifyMoneyFailure } from "./money-failure";
 import {
+  PENDING_OPS_EVENT,
   listPendingOperations,
   removePendingOperation,
-  upsertPendingOperation
+  upsertPendingOperation,
+  type PendingOperation
 } from "./pending-op";
 import type {
   Account,
@@ -179,11 +183,195 @@ export function usePublicStats(): UseQueryResult<PublicStats, ApiError> {
  */
 export type DepositResult = Deposit;
 
-export function useRecentOperations(limit = 25): UseQueryResult<OperationList, ApiError> {
+export function useRecentOperations(limit = 25, enabled = true): UseQueryResult<OperationList, ApiError> {
+  const qc = useQueryClient();
+  const userId = currentUserId(qc);
   return useQuery({
     queryKey: queryKeys.recentOperations,
-    queryFn: () => api<OperationList>("/v1/operations/recent?limit=" + limit)
+    queryFn: () => api<OperationList>("/v1/operations/recent?limit=" + limit),
+    // The recovery list is owner-scoped: without a signed-in identity there is
+    // nothing to list (and no authorized request to make).
+    enabled: enabled && !!userId
   });
+}
+
+/**
+ * The money invalidation graph - the exact set of queries a posted deposit or
+ * transfer makes stale. The live forms AND the recovery replay both resolve
+ * money here, so the graph cannot drift between them.
+ */
+function invalidateMoneyMovement(
+  qc: QueryClient,
+  opts: { accountIds: string[]; toIban?: string }
+): void {
+  void qc.invalidateQueries({ queryKey: queryKeys.accounts });
+  for (const id of opts.accountIds) {
+    void qc.invalidateQueries({ queryKey: ["account", id] });
+  }
+  // An own-account transfer moves money on BOTH legs.
+  if (opts.toIban) {
+    const own = (qc.getQueryData<Account[]>(queryKeys.accounts) ?? [])
+        .find((a) => a.iban === opts.toIban);
+    if (own) void qc.invalidateQueries({ queryKey: ["account", own.id] });
+  }
+  void qc.invalidateQueries({ queryKey: ["transactions"] });
+  void qc.invalidateQueries({ queryKey: ["summary"] });
+  void qc.invalidateQueries({ queryKey: ["public-stats"] });
+  void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
+  void qc.invalidateQueries({ queryKey: queryKeys.recentOperations });
+}
+
+/** One operation this session dispatched without a confirmed answer. */
+export type UnresolvedOperation = PendingOperation;
+
+/**
+ * The recovery surface's list. Unresolved operations = the records this
+ * session's store holds (an operation is only "unresolved" because a response
+ * never arrived); the SERVER list is the authority that ENDS that state:
+ *
+ *  - an operation the server recorded is resolved in fact - its outcome is no
+ *    longer unknown and the money already shows in accounts/activity, so the
+ *    record is cleared here and never offered as "unknown";
+ *  - an operation the server has never seen stays listed for a safe keyed
+ *    retry, and one cannot vanish just because the list is still loading or
+ *    its fetch failed (absence proves nothing).
+ *
+ * The server records no read-state, so only operations THIS session still
+ * holds a record for are surfaced - the store marks an op as unacknowledged,
+ * the server is what ends that state. The store emits PENDING_OPS_EVENT on
+ * every write, so an operation that ends ambiguously while this surface is
+ * mounted (e.g. a deposit dialog behind it) appears without a reload.
+ */
+export function useUnresolvedOperations(): {
+  items: UnresolvedOperation[];
+  loading: boolean;
+} {
+  const qc = useQueryClient();
+  const userId = currentUserId(qc);
+  const recent = useRecentOperations(100);
+  const [items, setItems] = React.useState<UnresolvedOperation[]>([]);
+
+  // Latest server truth, readable from the store-change listener below (a
+  // listener closure must never read a stale list).
+  const recentRef = React.useRef(recent);
+  React.useEffect(() => {
+    recentRef.current = recent;
+  });
+
+  React.useEffect(() => {
+    function reconcile() {
+      if (!userId) {
+        setItems([]);
+        return;
+      }
+      const stored = listPendingOperations(userId);
+      if (stored.length === 0) {
+        setItems([]);
+        return;
+      }
+      const list = recentRef.current;
+      if (list.status === "success" && list.data) {
+        const recorded = new Set((list.data.items ?? []).map((op) => op.idempotencyKey));
+        const kept: UnresolvedOperation[] = [];
+        for (const op of stored) {
+          if (recorded.has(op.key)) {
+            removePendingOperation(userId, op.kind, op.key);
+          } else {
+            kept.push(op);
+          }
+        }
+        setItems(kept);
+      } else {
+        setItems(stored);
+      }
+    }
+    reconcile();
+    if (userId) {
+      window.addEventListener(PENDING_OPS_EVENT, reconcile);
+      return () => window.removeEventListener(PENDING_OPS_EVENT, reconcile);
+    }
+    return undefined;
+  }, [userId, recent.status, recent.data]);
+
+  return { items, loading: recent.status === "pending" && items.length === 0 };
+}
+
+/**
+ * The outcome of resolving ONE saved operation (the record is cleared for
+ * {@code resolved}/{@code rejected}, kept for {@code unknown}).
+ */
+export type UnresolvedOutcome =
+  | { kind: "resolved"; status: Tx["status"]; data: Tx | Deposit }
+  | { kind: "rejected"; message: string }
+  | { kind: "unknown"; message: string };
+
+/**
+ * Resolves ONE saved operation by re-sending the IDENTICAL keyed request the
+ * original dispatch carried. The server deduplicates on the key, so the
+ * replay either returns the ORIGINAL result (the operation already posted or
+ * sits held - never a second credit) or completes a request that never
+ * arrived. Outcomes:
+ *
+ *  - 2xx            → resolved: authoritative status; the record is cleared.
+ *  - definitive 4xx → rejected: the server recorded nothing; cleared.
+ *  - 409            → the key names a recorded operation under a DIFFERENT
+ *    intent; its recorded truth is fetched by key instead of guessed.
+ *  - network/5xx/429 → unknown: money may have moved; the record is KEPT so
+ *    the user can check again, never silently erased.
+ */
+export async function resolveUnresolvedOperation(
+  qc: QueryClient,
+  record: UnresolvedOperation
+): Promise<UnresolvedOutcome> {
+  const { userId, key, kind } = record;
+  const accountIds = [record.accountId ?? ""].filter(Boolean);
+  const replay = (): Promise<Tx | Deposit> =>
+    kind === "deposit"
+      ? api<Deposit>("/v1/accounts/" + record.accountId + "/deposit", {
+          method: "POST",
+          headers: { "Idempotency-Key": key },
+          body: JSON.stringify({ amount: record.amount })
+        })
+      : api<Tx>("/v1/transfers", {
+          method: "POST",
+          headers: { "Idempotency-Key": key },
+          body: JSON.stringify({
+            fromAccountId: record.accountId,
+            toIban: record.toIban,
+            amount: record.amount,
+            memo: record.memo || undefined
+          })
+        });
+  const finish = (status: Tx["status"], data: Tx | Deposit): UnresolvedOutcome => {
+    removePendingOperation(userId, kind, key);
+    invalidateMoneyMovement(qc, {
+      accountIds,
+      toIban: kind === "transfer" ? record.toIban : undefined
+    });
+    return { kind: "resolved", status, data };
+  };
+  try {
+    const data = await replay();
+    return finish(data.status, data);
+  } catch (err) {
+    const failure = classifyMoneyFailure(kind, err);
+    if (!failure.ambiguous) {
+      // Definitive rejection: the server recorded nothing - resolve + clear.
+      removePendingOperation(userId, kind, key);
+      return { kind: "rejected", message: failure.message };
+    }
+    if (err instanceof ApiError && err.status === 409) {
+      try {
+        // Same key, different intent: fetch the recorded operation by key -
+        // the server's answer is the truth, not our guess.
+        const truth = await api<Tx>("/v1/operations?key=" + encodeURIComponent(key));
+        return finish(truth.status, truth);
+      } catch {
+        // Even the truth lookup failed - still unknown; keep the record.
+      }
+    }
+    return { kind: "unknown", message: failure.message };
+  }
 }
 
 /**
@@ -224,7 +412,7 @@ function nextOperationKey(
   qc: ReturnType<typeof useQueryClient>,
   kind: "transfer" | "deposit",
   keyRef: React.MutableRefObject<string | null>,
-  intent: { accountId: string; amount: string; toIban?: string }
+  intent: { accountId: string; amount: string; toIban?: string; memo?: string }
 ): { key: string; userId?: string } {
   const userId = currentUserId(qc);
   if (keyRef.current) {
@@ -238,6 +426,12 @@ function nextOperationKey(
       // A transfer's destination is part of the reviewed intent; a deposit
       // has none, so only compare when both sides carry one.
       if (kind === "transfer" && op.toIban && intent.toIban && op.toIban !== intent.toIban) {
+        return false;
+      }
+      // The memo is part of the server's request hash: replaying a stored key
+      // with a DIFFERENT memo would answer 409, so a changed memo is a new
+      // intent that must mint a fresh key (the old record stays recoverable).
+      if (kind === "transfer" && (op.memo ?? "") !== (intent.memo ?? "")) {
         return false;
       }
       return true;
@@ -257,7 +451,7 @@ function persistBeforeDispatch(
   qc: ReturnType<typeof useQueryClient>,
   kind: "transfer" | "deposit",
   key: string,
-  intent: { accountId: string; amount: string; toIban?: string }
+  intent: { accountId: string; amount: string; toIban?: string; memo?: string }
 ): void {
   const userId = currentUserId(qc);
   if (!userId) return;
@@ -268,6 +462,7 @@ function persistBeforeDispatch(
     accountId: intent.accountId,
     amount: intent.amount,
     toIban: kind === "transfer" ? intent.toIban : undefined,
+    memo: kind === "transfer" ? intent.memo : undefined,
     createdAt: Date.now()
   });
 }
@@ -322,16 +517,7 @@ export function useDeposit(): DepositMutation {
       const key = keyRef.current;
       finishPendingOperation(qc, "deposit", key);
       keyRef.current = null;
-      // Invalidate the funded account's detail as well as the lists that read
-      // from it (a deposit changes the detail of the account it funded).
-      void qc.invalidateQueries({ queryKey: queryKeys.accounts });
-      void qc.invalidateQueries({ queryKey: ["account", variables.accountId] });
-      void qc.invalidateQueries({ queryKey: ["transactions"] });
-      void qc.invalidateQueries({ queryKey: ["summary"] });
-      void qc.invalidateQueries({ queryKey: ["public-stats"] });
-      // A deposit posts a DEPOSIT_POSTED notification for this user.
-      void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
-      void qc.invalidateQueries({ queryKey: queryKeys.recentOperations });
+      invalidateMoneyMovement(qc, { accountIds: [variables.accountId] });
     },
     onError: (err) => {
       const key = keyRef.current;
@@ -386,7 +572,8 @@ export function useTransfer(): TransferMutation {
       const intent = {
         accountId: input.fromAccountId,
         amount: input.amount,
-        toIban: input.toIban
+        toIban: input.toIban,
+        memo: input.memo
       };
       const { key, userId } = nextOperationKey(qc, "transfer", keyRef, intent);
       // Persist the identity BEFORE the request: a killed tab must not lose
@@ -403,21 +590,10 @@ export function useTransfer(): TransferMutation {
       const key = keyRef.current;
       finishPendingOperation(qc, "transfer", key);
       keyRef.current = null;
-      // Invalidate both legs' account details when the destination is one of
-      // the caller's own accounts (self/own-account transfers move money on
-      // both sides).
-      const ownAccounts = qc.getQueryData<Account[]>(queryKeys.accounts) ?? [];
-      const toOwned = ownAccounts.find((a) => a.iban === variables.toIban);
-      void qc.invalidateQueries({ queryKey: queryKeys.accounts });
-      void qc.invalidateQueries({ queryKey: ["account", variables.fromAccountId] });
-      if (toOwned) {
-        void qc.invalidateQueries({ queryKey: ["account", toOwned.id] });
-      }
-      void qc.invalidateQueries({ queryKey: ["transactions"] });
-      void qc.invalidateQueries({ queryKey: ["summary"] });
-      void qc.invalidateQueries({ queryKey: queryKeys.unreadCount });
-      void qc.invalidateQueries({ queryKey: ["public-stats"] });
-      void qc.invalidateQueries({ queryKey: queryKeys.recentOperations });
+      invalidateMoneyMovement(qc, {
+        accountIds: [variables.fromAccountId],
+        toIban: variables.toIban
+      });
     },
     onError: (err) => {
       if (isDefinitiveRejection(err)) {
