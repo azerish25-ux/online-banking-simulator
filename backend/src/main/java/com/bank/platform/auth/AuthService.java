@@ -74,7 +74,10 @@ public class AuthService {
       throw new EmailTakenException(normalized);
     }
     User user =    users.save(new User(normalized, passwords.encode(rawPassword), fullName.trim()));
-    accounts.save(new Account(user.getId(), Iban.uniqueOrThrow(accounts::existsByIban, 5), AccountType.CHECKING));
+    Account checking = new Account(user.getId(),
+        Iban.uniqueOrThrow(accounts::existsByIban, 5), AccountType.CHECKING);
+    checking.setCreatedAt(clock.instant());
+    accounts.save(checking);
     audits.save(AuditLog.of(user.getId(), "USER_REGISTERED", "User", user.getId().toString(),
         "email", user.getEmail()));
     invalidation.clearSynchronized("public-stats");

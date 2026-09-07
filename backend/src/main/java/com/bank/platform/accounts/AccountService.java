@@ -6,6 +6,7 @@ import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.common.LedgerCacheInvalidation;
 import com.bank.platform.notifications.NotificationService;
+import java.time.Clock;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -26,18 +27,21 @@ public class AccountService {
   private final AuditLogRepository audits;
   private final NotificationService notifications;
   private final LedgerCacheInvalidation invalidation;
+  private final Clock clock;
 
   public AccountService(
       UserRepository users,
       AccountRepository accounts,
       AuditLogRepository audits,
       NotificationService notifications,
-      LedgerCacheInvalidation invalidation) {
+      LedgerCacheInvalidation invalidation,
+      Clock clock) {
     this.users = users;
     this.accounts = accounts;
     this.invalidation = invalidation;
     this.audits = audits;
     this.notifications = notifications;
+    this.clock = clock;
   }
 
   @Transactional(readOnly = true)
@@ -79,6 +83,10 @@ public class AccountService {
     if (accountType == AccountType.LOAN) {
       account.setCreditLimit(new java.math.BigDecimal("1000.00"));
     }
+    // Stamp creation with the business clock (not the entity fallback's wall
+    // clock), so the interest accrual's first-supported-month boundary and
+    // any other clock-based accounting agree with the simulator's clock.
+    account.setCreatedAt(clock.instant());
     accounts.save(account);
     audits.save(AuditLog.of(user.getId(), "ACCOUNT_OPENED", "Account", account.getId().toString(),
         "iban", account.getIban(), "type", account.getType().name()));

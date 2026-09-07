@@ -7,6 +7,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.bank.platform.support.ApiTestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
@@ -15,6 +16,8 @@ import java.time.Clock;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
+import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -50,10 +53,39 @@ class InterestCardsNotifyTest {
   @Autowired MockMvc mvc;
   @Autowired ObjectMapper objectMapper;
   @Autowired InterestService interestService;
+  @Autowired InterestAccrualRepository accruals;
+
+  ApiTestClient client;
 
   @BeforeEach
   void freezeMidJune() {
     CLOCK.set(Instant.parse("2026-06-15T10:00:00Z"));
+    client = new ApiTestClient(mvc, objectMapper);
+  }
+
+  /** One calendar-day range (inclusive) over which principal was constant. */
+  private record PrincipalSegment(int fromDay, int toDay, BigDecimal principal) {}
+
+  private static PrincipalSegment seg(int fromDay, int toDay, String principal) {
+    return new PrincipalSegment(fromDay, toDay, new BigDecimal(principal));
+  }
+
+  /** Independent daily-principal loan charge: Σ closing × 12%/365, one round at the end. */
+  private static BigDecimal loanCharge(List<PrincipalSegment> segments) {
+    BigDecimal dailyRate = new BigDecimal("0.12")
+        .divide(BigDecimal.valueOf(365), 12, RoundingMode.HALF_EVEN);
+    BigDecimal total = BigDecimal.ZERO;
+    for (PrincipalSegment segment : segments) {
+      int days = segment.toDay - segment.fromDay + 1;
+      total = total.add(segment.principal.multiply(dailyRate).multiply(BigDecimal.valueOf(days)));
+    }
+    return total.setScale(4, RoundingMode.HALF_EVEN);
+  }
+
+  /** A loan's expected balance: -(principal + independently computed charge). */
+  private static String expectedLoanBalance(String principal, BigDecimal charge) {
+    return new BigDecimal(principal).add(charge).negate().setScale(4, RoundingMode.HALF_EVEN)
+        .toPlainString();
   }
 
   @Test
@@ -88,11 +120,14 @@ class InterestCardsNotifyTest {
     CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
     assertEquals(2, interestService.accrueMonthly().get("accrued"));
     // Savings: 1400 held from June 15-30 (16 closing days) at 4% actual/365.
-    // Loan: simple 1% monthly on the $200 principal - $2.00.
+    // Loan: 200 drawn June 15 → 16 closing days at 200 × 12% actual/365.
     expectBalance(token, savingsId, dailyInterest("1400.00", 16));
-    expectBalance(token, loanId, "-202.0000");
+    expectBalance(token, loanId, expectedLoanBalance("200.00",
+        loanCharge(List.of(seg(15, 30, "200.00")))));
     assertEquals(0, interestService.accrueMonthly().get("accrued"));
     expectBalance(token, savingsId, dailyInterest("1400.00", 16));
+    expectBalance(token, loanId, expectedLoanBalance("200.00",
+        loanCharge(List.of(seg(15, 30, "200.00")))));
   }
 
   @Test
@@ -114,15 +149,80 @@ class InterestCardsNotifyTest {
         .andExpect(status().isCreated());
 
     CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
-    // The 1% monthly charge ($9.99 on the $999 principal) is NOT forgiven at
-    // the full limit: the debt deepens past -credit_limit - the point of F16.
+    // The daily-principal charge on the $999 principal (16 closing days) is NOT
+    // forgiven at the full limit: the debt deepens past -credit_limit - F16.
     assertEquals(2, interestService.accrueMonthly().get("accrued"));
-    expectBalance(token, loanId, "-1008.9900");
+    expectBalance(token, loanId, expectedLoanBalance("999.00",
+        loanCharge(List.of(seg(15, 30, "999.00")))));
     expectBalance(token, savingsId, dailyInterest("2199.00", 16));
 
     // A second run is a no-op (nothing accrued twice), including the maxed loan.
     assertEquals(0, interestService.accrueMonthly().get("accrued"));
-    expectBalance(token, loanId, "-1008.9900");
+    expectBalance(token, loanId, expectedLoanBalance("999.00",
+        loanCharge(List.of(seg(15, 30, "999.00")))));
+  }
+
+  /**
+   * Frozen accounts do not accrue and are not retroactively charged after
+   * re-activation. A loan drawn in June and frozen on July 10 is charged for
+   * June and for July 1..9 only - never July 10..31. When it is unfrozen in
+   * August, the next run prices August 5..31 and skips the frozen days, using
+   * the recorded status history rather than today's principal or status.
+   */
+  @Test
+  void frozenLoanIsChargedOnlyForItsActiveDays() throws Exception {
+    String token = register("p8f@example.com", "P Eight F");
+    String admin = client.adminToken();
+    String savingsId = openAccount(token, "SAVINGS");
+    String loanId = openAccount(token, "LOAN");
+
+    deposit(token, savingsId, "1200.00");
+    String savingsIban = accountIban(token, savingsId);
+    // Draw $500 of principal on June 15 into savings.
+    mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "tx-" + System.nanoTime())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("""
+                {"toIban":"%s","amount":"500.00","fromAccountId":"%s"}"""
+                .formatted(savingsIban, loanId)))
+        .andExpect(status().isCreated());
+
+    // July 1 run prices June for both accounts.
+    CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
+    assertEquals(2, interestService.accrueMonthly().get("accrued"));
+    BigDecimal juneCharge = loanCharge(List.of(seg(15, 30, "500.00")));
+    expectBalance(token, loanId, expectedLoanBalance("500.00", juneCharge));
+
+    // Freeze the loan on July 10. The August 1 run (which prices July) sees a
+    // frozen account and skips it entirely - nothing accrues, nothing zeroes.
+    CLOCK.set(Instant.parse("2026-07-10T10:00:00Z"));
+    mvc.perform(post("/api/v1/admin/accounts/" + loanId + "/freeze")
+            .header("Authorization", "Bearer " + admin))
+        .andExpect(status().isOk());
+    CLOCK.set(Instant.parse("2026-08-01T03:00:00Z"));
+    assertEquals(1, interestService.accrueMonthly().get("accrued"));
+    assertTrue(accruals.findByAccountIdAndPeriod(UUID.fromString(loanId), "2026-07").isEmpty(),
+        "no July accrual while the loan was frozen at run time");
+
+    // Unfreeze on August 5. The September 1 run must recover July and August
+    // from the status history: July 1..9 (9 days) and August 5..31 (27 days).
+    CLOCK.set(Instant.parse("2026-08-05T09:00:00Z"));
+    mvc.perform(post("/api/v1/admin/accounts/" + loanId + "/unfreeze")
+            .header("Authorization", "Bearer " + admin))
+        .andExpect(status().isOk());
+    CLOCK.set(Instant.parse("2026-09-01T03:00:00Z"));
+    interestService.accrueMonthly();
+
+    BigDecimal julyCharge = loanCharge(List.of(seg(1, 9, "500.00")));
+    BigDecimal augustCharge = loanCharge(List.of(seg(5, 31, "500.00")));
+    expectBalance(token, loanId, expectedLoanBalance("500.00",
+        juneCharge.add(julyCharge).add(augustCharge)));
+    assertEquals(9, accruals.findByAccountIdAndPeriod(UUID.fromString(loanId), "2026-07")
+        .orElseThrow().getDayCount(), "July priced its 9 active days only");
+    assertEquals(27, accruals.findByAccountIdAndPeriod(UUID.fromString(loanId), "2026-08")
+        .orElseThrow().getDayCount(), "August priced its 27 active days only");
+    assertEquals(0, interestService.accrueMonthly().get("accrued"));
   }
 
   /** The policy formula stated independently: closing × 4%/365 per eligible day. */

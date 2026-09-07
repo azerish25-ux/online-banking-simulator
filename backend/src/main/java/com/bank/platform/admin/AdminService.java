@@ -4,6 +4,8 @@ import com.bank.platform.accounts.Account;
 import com.bank.platform.accounts.AccountNotFoundException;
 import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.accounts.AccountStatus;
+import com.bank.platform.accounts.AccountStatusChange;
+import com.bank.platform.accounts.AccountStatusChangeRepository;
 import com.bank.platform.audit.AuditLog;
 import com.bank.platform.audit.AuditLogRepository;
 import com.bank.platform.ledger.HeldTransferService;
@@ -16,6 +18,7 @@ import com.bank.platform.auth.Role;
 import com.bank.platform.auth.User;
 import com.bank.platform.auth.UserRepository;
 import com.bank.platform.notifications.NotificationService;
+import java.time.Clock;
 import java.util.UUID;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -31,15 +34,20 @@ public class AdminService {
   private final NotificationService notifications;
   private final TransactionRepository transactions;
   private final HeldTransferService heldTransfers;
+  private final AccountStatusChangeRepository statusHistory;
+  private final Clock clock;
 
   public AdminService(UserRepository users, AccountRepository accounts, AuditLogRepository audits,
-      NotificationService notifications, TransactionRepository transactions, HeldTransferService heldTransfers) {
+      NotificationService notifications, TransactionRepository transactions, HeldTransferService heldTransfers,
+      AccountStatusChangeRepository statusHistory, Clock clock) {
     this.users = users;
     this.accounts = accounts;
     this.audits = audits;
     this.notifications = notifications;
     this.transactions = transactions;
     this.heldTransfers = heldTransfers;
+    this.statusHistory = statusHistory;
+    this.clock = clock;
   }
 
   /**
@@ -91,6 +99,10 @@ public class AdminService {
         .orElseThrow(() -> new AccountNotFoundException(accountId));
     account.setStatus(status);
     accounts.save(account);
+    // Immutable transition record (V27) in the SAME transaction: the interest
+    // job prices only days the account was ACTIVE, so a frozen period is never
+    // charged - now or retroactively after re-activation.
+    statusHistory.save(new AccountStatusChange(account.getId(), status, clock.instant()));
     String action = status == AccountStatus.FROZEN ? "ACCOUNT_FROZEN" : "ACCOUNT_UNFROZEN";
     audits.save(AuditLog.of(admin.getId(), action, "Account", account.getId().toString(),
         "iban", account.getIban(), "status", status.name()));

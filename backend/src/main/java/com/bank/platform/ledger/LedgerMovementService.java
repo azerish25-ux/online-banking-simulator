@@ -6,6 +6,8 @@ import com.bank.platform.accounts.AccountRepository;
 import com.bank.platform.accounts.AccountStatus;
 import com.bank.platform.accounts.AccountType;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.stereotype.Service;
 
@@ -27,7 +29,15 @@ public class LedgerMovementService {
   }
 
   /** The two locked rows after a move, so callers can record the row and emit events. */
-  public record Moved(Account from, Account to) {}
+  public record Moved(Account from, Account to, List<PrincipalEvent> principalEvents) {}
+
+  /**
+   * One principal-component change a move applied (V26): a draw raises
+   * principal, a repayment's principal component lowers it. The movement is
+   * recorded in the caller's transaction against the caller's transaction id,
+   * so principal history stays keyed to the exact money movement.
+   */
+  public record PrincipalEvent(UUID accountId, PrincipalKind kind, BigDecimal signedAmount) {}
 
   /**
    * Locks both account rows in stable ID order (deadlock-safe so concurrent
@@ -63,19 +73,26 @@ public class LedgerMovementService {
       assertLoanRepayment(to, amount);
     }
 
+    List<PrincipalEvent> principalEvents = new ArrayList<>();
     from.setBalance(from.getBalance().subtract(amount));
     if (toLoan) {
-      applyLoanCredit(to, amount);
+      BigDecimal principalComponent = applyLoanCredit(to, amount);
+      if (principalComponent.signum() > 0) {
+        principalEvents.add(new PrincipalEvent(to.getId(),
+            PrincipalKind.PRINCIPAL_REPAYMENT, principalComponent.negate()));
+      }
     } else {
       to.setBalance(to.getBalance().add(amount));
     }
     // A draw from a LOAN is new principal - capped by assertAffordable above.
     if (from.getType() == AccountType.LOAN) {
       from.setPrincipal(from.getPrincipal().add(amount));
+      principalEvents.add(new PrincipalEvent(from.getId(),
+          PrincipalKind.DRAW, amount));
     }
     accounts.save(from);
     accounts.save(to);
-    return new Moved(from, to);
+    return new Moved(from, to, principalEvents);
   }
 
   public void requireActive(Account account) {
@@ -126,9 +143,11 @@ public class LedgerMovementService {
    * Credits the loan's balance and allocates the payment interest-first:
    * the unpaid interest (owed minus drawn principal) is extinguished first,
    * then the remainder reduces principal. The caller has already validated
-   * the cap.
+   * the cap. Returns the PRINCIPAL component of the payment (the amount that
+   * actually reduced principal) so the caller can record it as a principal
+   * movement (V26); the interest portion is never a principal movement.
    */
-  public void applyLoanCredit(Account loan, BigDecimal amount) {
+  public BigDecimal applyLoanCredit(Account loan, BigDecimal amount) {
     BigDecimal debtBefore = loan.getBalance().negate();
     BigDecimal interestBefore = debtBefore.subtract(loan.getPrincipal());
     if (interestBefore.signum() < 0) {
@@ -136,17 +155,21 @@ public class LedgerMovementService {
     }
     BigDecimal interestPaid = amount.min(interestBefore);
     loan.setBalance(loan.getBalance().add(amount));
-    loan.setPrincipal(loan.getPrincipal().subtract(amount.subtract(interestPaid)));
+    BigDecimal principalComponent = amount.subtract(interestPaid);
+    loan.setPrincipal(loan.getPrincipal().subtract(principalComponent));
+    return principalComponent;
   }
 
   /**
    * Simulated-rail credit into a LOAN (deposit): same repayment policy as a
-   * transfer credit - capped at the amount owed, interest first.
+   * transfer credit - capped at the amount owed, interest first. Returns the
+   * principal component for the caller's principal-movement record.
    */
-  public void creditLoan(Account loan, BigDecimal amount) {
+  public BigDecimal creditLoan(Account loan, BigDecimal amount) {
     assertLoanRepayment(loan, amount);
-    applyLoanCredit(loan, amount);
+    BigDecimal component = applyLoanCredit(loan, amount);
     accounts.save(loan);
+    return component;
   }
 
 }

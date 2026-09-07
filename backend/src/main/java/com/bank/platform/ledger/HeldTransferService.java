@@ -28,17 +28,20 @@ public class HeldTransferService {
   private final LedgerMovementService movement;
   private final LedgerEventsService events;
   private final JournalService journal;
+  private final PrincipalMovementRepository principalMovements;
   private final Clock clock;
   private final LedgerCacheInvalidation invalidation;
 
   public HeldTransferService(UserRepository users, TransactionRepository transactions,
       LedgerMovementService movement, LedgerEventsService events, JournalService journal,
-      Clock clock, LedgerCacheInvalidation invalidation) {
+      PrincipalMovementRepository principalMovements, Clock clock,
+      LedgerCacheInvalidation invalidation) {
     this.users = users;
     this.transactions = transactions;
     this.movement = movement;
     this.events = events;
     this.journal = journal;
+    this.principalMovements = principalMovements;
     this.clock = clock;
     this.invalidation = invalidation;
   }
@@ -117,7 +120,13 @@ public class HeldTransferService {
     // Approval is when money actually moves, so THIS is where the journal is
     // written - a HELD intent created no entry, and the losing operator in an
     // approval race rolls back before ever reaching here (F15). The posting
-    // time stamped on the row and the journal's are one instant.
+    // time stamped on the row and the journal's are one instant. A draw or a
+    // principal repayment in a settled transfer also leaves its immutable
+    // principal-movement row (V26), keyed to this transaction.
+    for (LedgerMovementService.PrincipalEvent event : moved.principalEvents()) {
+      principalMovements.save(new PrincipalMovement(event.accountId(), event.kind(),
+          event.signedAmount(), tx.getId(), postedAt));
+    }
     journal.post(JournalKind.TRANSFER, tx.getId().toString(), postedAt,
         "Held transfer " + tx.getAmount().toPlainString() + " approved",
         JournalService.Posting.account(tx.getFromAccountId(), tx.getAmount().negate()),

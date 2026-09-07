@@ -49,7 +49,7 @@ public class InterestAccrual {
   @Column(nullable = false, updatable = false, precision = 19, scale = 4)
   private BigDecimal basis;
 
-  /** Days that contributed to the basis (loans accrue a whole month: 0). */
+  /** Eligible days that contributed to the basis (savings and loans alike). */
   @Column(name = "day_count", nullable = false, updatable = false)
   private int dayCount;
 

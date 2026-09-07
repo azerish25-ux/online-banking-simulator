@@ -58,6 +58,7 @@ public class MoneyService {
   private final LedgerMovementService movement;
   private final LedgerEventsService events;
   private final JournalService journal;
+  private final PrincipalMovementRepository principalMovements;
   private final Clock clock;
   private final LedgerCacheInvalidation invalidation;
   private final BigDecimal reviewThreshold;
@@ -73,6 +74,7 @@ public class MoneyService {
       LedgerMovementService movement,
       LedgerEventsService events,
       JournalService journal,
+      PrincipalMovementRepository principalMovements,
       Clock clock,
       LedgerCacheInvalidation invalidation,
       @Value("${app.review.large-transfer-threshold:10000}") BigDecimal reviewThreshold,
@@ -86,6 +88,7 @@ public class MoneyService {
     this.movement = movement;
     this.events = events;
     this.journal = journal;
+    this.principalMovements = principalMovements;
     this.clock = clock;
     this.invalidation = invalidation;
     this.reviewThreshold = reviewThreshold;
@@ -146,11 +149,12 @@ public class MoneyService {
       throw new TransferValidationException("Deposit exceeds the per-transaction limit");
     }
     Instant now = clock.instant();
+    BigDecimal loanPrincipalComponent = BigDecimal.ZERO;
     if (account.getType() == AccountType.LOAN) {
       // A deposit into a LOAN is a repayment under the same policy as a
       // transfer credit: capped at the amount owed, interest extinguished
       // before principal (F16). The balance never goes positive.
-      movement.creditLoan(account, scaled);
+      loanPrincipalComponent = movement.creditLoan(account, scaled);
     } else {
       account.setBalance(account.getBalance().add(scaled));
       accounts.save(account);
@@ -177,6 +181,14 @@ public class MoneyService {
       // identical request: the replay check then returns the winner's result.
       throw new IdempotencyConflictException(
           "This deposit is already being processed; retry the identical request to fetch it");
+    }
+
+    // A deposit repaying principal must leave an immutable principal-movement
+    // record (V26) keyed to this deposit row, in the same transaction.
+    if (loanPrincipalComponent.signum() > 0) {
+      principalMovements.save(new PrincipalMovement(account.getId(),
+          PrincipalKind.PRINCIPAL_REPAYMENT, loanPrincipalComponent.negate(),
+          tx.getId(), now));
     }
 
     // A posted deposit always moves real money: the customer balance rises and
@@ -330,6 +342,14 @@ public class MoneyService {
       // returns the winner's original row.
       throw new IdempotencyConflictException(
           "This transfer is already being processed; retry the identical request to fetch it");
+    }
+
+    // Principal movements (draws / principal repayments) are immutable rows
+    // keyed to this transaction (V26) - written in the same transaction, so
+    // rolled-back money never leaves a phantom principal history.
+    for (LedgerMovementService.PrincipalEvent event : moved.principalEvents()) {
+      principalMovements.save(new PrincipalMovement(event.accountId(), event.kind(),
+          event.signedAmount(), tx.getId(), now));
     }
 
     // The movement and its journal posting share one transaction: the two

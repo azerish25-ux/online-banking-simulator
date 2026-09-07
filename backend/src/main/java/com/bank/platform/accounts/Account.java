@@ -88,9 +88,12 @@ public class Account {
     if (createdAt == null) createdAt = Instant.now();
   }
 
+  public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+
   public UUID getId() { return id; }
   public UUID getUserId() { return userId; }
   public String getIban() { return iban; }
+  public Instant getCreatedAt() { return createdAt; }
   public AccountType getType() { return type; }
   public BigDecimal getBalance() { return balance; }
   public AccountStatus getStatus() { return status; }
