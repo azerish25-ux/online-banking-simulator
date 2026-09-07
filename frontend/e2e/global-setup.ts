@@ -52,11 +52,13 @@ export default async function globalSetup(): Promise<void> {
 
   const base = process.env.E2E_BASE_URL;
   // The identity endpoint is always reached through the SAME path the
-  // browser's API calls use: the frontend rewrite when one is under test,
-  // otherwise the backend origin the local proxy targets.
+  // browser's API calls use: the frontend rewrite when one is under test
+  // (`/backend/*` → backend `/api/*`), otherwise the backend origin the
+  // local proxy targets. The controller lives at `/api/e2e/identity`, so the
+  // direct (no-frontend) probe carries the `/api` prefix.
   const identityUrl = base
     ? base + "/backend/e2e/identity"
-    : (process.env.BACKEND_URL ?? "http://localhost:8080") + "/e2e/identity";
+    : (process.env.BACKEND_URL ?? "http://localhost:8080") + "/api/e2e/identity";
 
   const context = await request.newContext();
   try {
