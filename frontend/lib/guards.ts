@@ -52,3 +52,140 @@ export const mfaChallengeSchema = z.object({
  * which path the session takes.
  */
 export const loginOutcomeSchema = z.union([authSessionSchema, mfaChallengeSchema]);
+
+// ---------------------------------------------------------------------------
+// Financial read-model guards ( section 11): money, statuses, and
+// timestamps are validated at runtime before the UI displays or branches on
+// them. A malformed decimal must never be coerced into a zero balance; an
+// unsupported state must never silently render as POSTED. Schemas stay
+// additive-tolerant (`.passthrough()`, optional nullables) so a server that
+// adds a field does not break older clients, while required money/identity
+// fields and supported enum states remain enforced.
+// ---------------------------------------------------------------------------
+
+/** A ledger amount travels as a decimal string with at most 4 fraction
+ *  digits (optional sign) - never a JSON number, never more precision than
+ *  the ledger keeps. */
+const amountPattern = /^-?\d+(\.\d{1,4})?$/;
+
+export const amountString = z
+  .string()
+  .regex(amountPattern, "not a ledger decimal string");
+
+/** Optional-but-present nullable money fields must still be exact decimals. */
+const nullableAmount = amountString.nullable().optional();
+
+/** Timestamps travel as ISO-8601 strings; an unparseable date must not be
+ *  rendered as if it were a real posting/request instant. */
+const isoInstant = z
+  .string()
+  .refine((s) => s.includes("T") && !Number.isNaN(Date.parse(s)), "not an ISO instant");
+
+const nullableIso = isoInstant.nullable().optional();
+
+export const accountStatusSchema = z.enum(["ACTIVE", "FROZEN"]);
+export const accountTypeSchema = z.enum(["CHECKING", "SAVINGS", "LOAN"]);
+
+export const accountSchema = z
+  .object({
+    id: z.string().min(1),
+    iban: z.string().min(1),
+    type: accountTypeSchema,
+    balance: amountString,
+    status: accountStatusSchema,
+    // Loan-only authoritative fields (section 7): null on non-loans; tolerated when
+    // absent (an older response) but validated when present.
+    principalOwed: nullableAmount,
+    interestOwed: nullableAmount,
+    totalOwed: nullableAmount,
+    availableCredit: nullableAmount
+  })
+  .passthrough();
+
+export const accountListSchema = z.array(accountSchema);
+
+/** Supported transaction lifecycle states. Anything else is unrecognized and
+ *  fails closed - the UI must never guess what an unknown state means. */
+export const txStatusSchema = z.enum(["POSTED", "HELD", "CANCELLED"]);
+
+export const transactionSchema = z
+  .object({
+    id: z.string().min(1),
+    status: txStatusSchema,
+    amount: amountString,
+    currency: z.string().regex(/^[A-Z]{3}$/, "not an ISO currency code"),
+    createdAt: isoInstant,
+    // Nullable relationships are either absent or genuinely null/typed;
+    // non-null values are still validated.
+    postedAt: nullableIso,
+    memo: z.string().nullable().optional(),
+    fromIban: z.string().nullable().optional(),
+    toIban: z.string().nullable().optional(),
+    kind: z.string().optional(),
+    flagged: z.boolean().optional(),
+    reviewed: z.boolean().optional(),
+    reversalId: z.string().nullable().optional(),
+    reversalReason: z.string().nullable().optional(),
+    reversesTransactionId: z.string().nullable().optional()
+  })
+  .passthrough();
+
+export const transactionListSchema = z.array(transactionSchema);
+
+/** The cursor-paged history envelope (F26). */
+export const historyPageSchema = z.object({
+  items: transactionListSchema,
+  total: z.number().int().nonnegative(),
+  nextCursor: z.string().nullable()
+});
+
+/** One monthly point of the spending summary. */
+export const monthPointSchema = z
+  .object({
+    month: z.string().min(1),
+    inflow: amountString,
+    outflow: amountString
+  })
+  .passthrough();
+
+export const monthPointListSchema = z.array(monthPointSchema);
+
+/** One recoverable operation on the authorized recent list. */
+export const operationItemSchema = z
+  .object({
+    id: z.string().min(1),
+    idempotencyKey: z.string().min(1),
+    kind: z.string().min(1),
+    amount: amountString,
+    currency: z.string().regex(/^[A-Z]{3}$/, "not an ISO currency code"),
+    createdAt: isoInstant,
+    postedAt: nullableIso,
+    memo: z.string().nullable().optional(),
+    fromIban: z.string().nullable().optional(),
+    toIban: z.string().nullable().optional(),
+    status: txStatusSchema
+  })
+  .passthrough();
+
+export const operationListSchema = z
+  .object({
+    items: z.array(operationItemSchema)
+  })
+  .passthrough();
+
+/**
+ * Validates a runtime response against its schema and returns the typed
+ * value, or throws so the caller's query lands in its honest error state
+ * ("unrecognized response", never coerced money or a guessed status).
+ */
+export function requireShape<S extends z.ZodTypeAny>(
+  schema: S,
+  data: unknown,
+  what: string
+): z.output<S> {
+  const parsed = schema.safeParse(data);
+  if (!parsed.success) {
+    throw new Error("Unrecognized " + what + " response from the server.");
+  }
+  return parsed.data;
+}

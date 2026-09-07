@@ -12,6 +12,15 @@ import * as React from "react";
 import { ApiError, api } from "./api";
 import { classifyMoneyFailure, isDefinitiveRejection } from "./money-failure";
 import {
+  accountListSchema,
+  accountSchema,
+  historyPageSchema,
+  monthPointListSchema,
+  operationListSchema,
+  requireShape,
+  transactionSchema
+} from "./guards";
+import {
   PENDING_OPS_EVENT,
   listPendingOperations,
   removePendingOperation,
@@ -78,13 +87,18 @@ export function useMe(): UseQueryResult<User, ApiError> {
 }
 
 export function useAccounts(): UseQueryResult<Account[], ApiError> {
-  return useQuery({ queryKey: queryKeys.accounts, queryFn: () => api<Account[]>("/v1/accounts") });
+  return useQuery({
+    queryKey: queryKeys.accounts,
+    queryFn: async () =>
+      requireShape(accountListSchema, await api<unknown>("/v1/accounts"), "account") as Account[]
+  });
 }
 
 export function useAccount(id: string): UseQueryResult<Account, ApiError> {
   return useQuery({
-    queryKey: ["account", id],
-    queryFn: () => api<Account>("/v1/accounts/" + id),
+    queryKey: queryKeys.accountDetail(id),
+    queryFn: async () =>
+      requireShape(accountSchema, await api<unknown>("/v1/accounts/" + id), "account") as Account,
     enabled: id.length > 0
   });
 }
@@ -98,7 +112,8 @@ export function useAccount(id: string): UseQueryResult<Account, ApiError> {
 export function useTransferReceipt(id: string): UseQueryResult<Tx, ApiError> {
   return useQuery({
     queryKey: queryKeys.transferReceipt(id),
-    queryFn: () => api<Tx>("/v1/transfers/" + id),
+    queryFn: async () =>
+      requireShape(transactionSchema, await api<unknown>("/v1/transfers/" + id), "receipt") as Tx,
     enabled: id.length > 0
   });
 }
@@ -112,12 +127,12 @@ export function useTransactions(
 ): UseQueryResult<HistoryPage<Tx>, ApiError> {
   return useQuery({
     queryKey: queryKeys.transactions(accountId, cursor, size, from, to),
-    queryFn: () => {
+    queryFn: async () => {
       let url = "/v1/transactions?accountId=" + accountId + "&size=" + size;
       if (cursor) url += "&cursor=" + encodeURIComponent(cursor);
       if (from) url += "&from=" + from;
       if (to) url += "&to=" + to;
-      return api<HistoryPage<Tx>>(url);
+      return requireShape(historyPageSchema, await api<unknown>(url), "history") as HistoryPage<Tx>;
     },
     enabled: accountId.length > 0
   });
@@ -126,7 +141,8 @@ export function useTransactions(
 export function useSummary(accountId: string, months = 6): UseQueryResult<MonthPoint[], ApiError> {
   return useQuery({
     queryKey: queryKeys.summary(accountId, months),
-    queryFn: () => api<MonthPoint[]>("/v1/accounts/" + accountId + "/summary?months=" + months),
+    queryFn: async () =>
+      requireShape(monthPointListSchema, await api<unknown>("/v1/accounts/" + accountId + "/summary?months=" + months), "summary") as MonthPoint[],
     enabled: accountId.length > 0
   });
 }
@@ -188,7 +204,8 @@ export function useRecentOperations(limit = 25, enabled = true): UseQueryResult<
   const userId = currentUserId(qc);
   return useQuery({
     queryKey: queryKeys.recentOperations,
-    queryFn: () => api<OperationList>("/v1/operations/recent?limit=" + limit),
+    queryFn: async () =>
+      requireShape(operationListSchema, await api<unknown>("/v1/operations/recent?limit=" + limit), "operation list") as OperationList,
     // The recovery list is owner-scoped: without a signed-in identity there is
     // nothing to list (and no authorized request to make).
     enabled: enabled && !!userId

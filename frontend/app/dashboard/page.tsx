@@ -16,10 +16,11 @@ import { Select } from "../../components/ui/select";
 import { Skeleton } from "../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { TxStatusBadge } from "../../components/ui/tx-status-badge";
+import { TxWhen } from "../../components/ui/tx-when";
 import { SpendingChart } from "../../components/charts/spending-chart";
 import { Routes } from "../../lib/routes";
 import { useAccounts, useMe, useSummary, useTransactions } from "../../lib/queries";
-import { accountLabel, fmtDate, maskIban, signedUsd, toTenThousandths, totalUsd, usd, usdReview } from "../../lib/format";
+import { accountLabel, maskIban, signedUsd, toTenThousandths, totalUsd, usd, usdReview } from "../../lib/format";
 import { cn } from "../../lib/cn";
 import type { Account } from "../../lib/api-types";
 
@@ -332,7 +333,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
                   <tbody>
                     {(recent.data?.items ?? []).map((t) => (
                       <TRow key={t.id}>
-                        <TD className="whitespace-nowrap">{fmtDate(t.postedAt ?? t.createdAt)}</TD>
+                        <TD><TxWhen tx={t} /></TD>
                         <TD className="mono">{maskIban(t.fromIban) ?? "DEPOSIT"}</TD>
                         <TD className="mono">{maskIban(t.toIban) ?? "-"}</TD>
                         <TD className="max-w-40 truncate">{t.memo ?? "-"}</TD>

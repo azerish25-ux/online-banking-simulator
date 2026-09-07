@@ -13,11 +13,12 @@ import { LoadFailed } from "../../../components/ui/load-failed";
 import { Skeleton } from "../../../components/ui/skeleton";
 import { TD, TH, THead, TRow, Table } from "../../../components/ui/table";
 import { TxStatusBadge } from "../../../components/ui/tx-status-badge";
-import type { CardItem, IssuedCard, Tx } from "../../../lib/api-types";
+import { TxWhen } from "../../../components/ui/tx-when";
+import type { CardItem, IssuedCard } from "../../../lib/api-types";
 import { useResultToast } from "../../../components/feedback/use-result-toast";
 import { useToast } from "../../../components/feedback/toast";
 import { useAccount, useCards, useIssueCard, useSetCardStatus, useTransactions } from "../../../lib/queries";
-import { fmtDate, signedUsd, usd, usdReview } from "../../../lib/format";
+import { signedUsd, usd, usdReview } from "../../../lib/format";
 import { Routes } from "../../../lib/routes";
 import { cn } from "../../../lib/cn";
 
@@ -28,30 +29,6 @@ function typeName(type: string): string {
 
 function statusText(status: string): string {
   return status.charAt(0) + status.slice(1).toLowerCase();
-}
-
-/**
- * The financial date of a row is its POSTING time; the request time is shown
- * only when it differs (a HELD/CANCELLED row has no posting time at all and
- * must never read as having settled - section 14).
- */
-function TxWhen({ tx }: { tx: Tx }) {
-  if (tx.status === "POSTED") {
-    const posted = tx.postedAt ?? tx.createdAt;
-    const requested = tx.postedAt && tx.postedAt !== tx.createdAt ? tx.createdAt : null;
-    return (
-      <>
-        <p className="whitespace-nowrap">{fmtDate(posted)}</p>
-        {requested ? <p className="muted mt-0.5 text-xs">Requested {fmtDate(requested)}</p> : null}
-      </>
-    );
-  }
-  return (
-    <>
-      <p className="whitespace-nowrap">{fmtDate(tx.createdAt)}</p>
-      <p className="muted mt-0.5 text-xs">Not posted</p>
-    </>
-  );
 }
 
 /** One labelled loan figure - authoritative, policy-derived (never a
