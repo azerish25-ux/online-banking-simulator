@@ -99,8 +99,8 @@ public final class StatementPdfRenderer {
       for (StatementService.StatementRow tx : posted) {
         boolean in = account.id().equals(tx.toAccountId());
         String desc = tx.memo() != null ? tx.memo()
-            : (in ? "Transfer from " + shortIban(ibans.get(tx.fromAccountId()))
-                  : "Transfer to " + shortIban(ibans.get(tx.toAccountId())));
+            : (in ? "Transfer from " + counterpartLabel(ibans, tx.fromAccountId())
+                  : "Transfer to " + counterpartLabel(ibans, tx.toAccountId()));
         String date = tx.postedAt().atZone(ZoneOffset.UTC).toLocalDate().toString();
         String amount = (in ? "+" : "-") + Money.plain(tx.amount());
         float amountWidth = textWidth(font, amount, size);
@@ -257,8 +257,33 @@ public final class StatementPdfRenderer {
         || (cp >= 0xFE70 && cp <= 0xFEFF);
   }
 
+  /**
+   * The label for a memo-less row whose counterpart is the ledger's EXTERNAL
+   * side - no second account exists to name. Deposits (and their V29
+   * reversals) settle against the simulator-funding rail; interest posts
+   * against the engine's INTEREST counteraccount. The statement row does not
+   * carry the kind, so one engine-side name serves every such leg.
+   */
+  private static final String ENGINE_SIDE_LABEL = "the funding rail";
+
   private static String shortIban(String iban) {
     return iban == null ? "external" : "..." + iban.substring(Math.max(0, iban.length() - 6));
+  }
+
+  /**
+   * The display label for a row's counterpart leg when the row has no memo.
+   * A REAL account leg resolves through the statement's IBAN map to a short
+   * IBAN. A NULL leg - money arriving from, or returning to, the funding rail
+   * (a deposit or its reversal), or an engine interest row settling against
+   * its counteraccount - is NAMED instead of looked up: there is no account
+   * to label, and the immutable IBAN map must never be probed with a null
+   * key (an ImmutableCollections map throws NPE on {@code get(null)} - the
+   * defect that 500'd a statement containing a deposit-reversal row). A real
+   * leg somehow absent from the map (cannot happen for a statement built
+   * from its own rows) still degrades to "external" via {@link #shortIban}.
+   */
+  private static String counterpartLabel(Map<UUID, String> ibans, UUID leg) {
+    return leg == null ? ENGINE_SIDE_LABEL : shortIban(ibans.get(leg));
   }
 
   /** One text line in its own text object at an absolute position. */
