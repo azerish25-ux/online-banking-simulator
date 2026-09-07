@@ -203,7 +203,7 @@ public class TransferController {
       @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
     StatementService.Statement statement = statements.customerStatement(authentication.getName(), id, from, to);
     byte[] pdf = statements.renderPdf(statement);
-    String filename = "statement-" + statement.account().getIban() + ".pdf";
+    String filename = "statement-" + statement.account().iban() + ".pdf";
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION,
             ContentDisposition.attachment().filename(filename).build().toString())

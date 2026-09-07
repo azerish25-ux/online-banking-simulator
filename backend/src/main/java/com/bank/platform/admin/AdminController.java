@@ -310,7 +310,7 @@ public class AdminController {
 
   private ResponseEntity<byte[]> pdf(StatementService.Statement statement) {
     byte[] pdf = statementService.renderPdf(statement);
-    String filename = "statement-" + statement.account().getIban() + ".pdf";
+    String filename = "statement-" + statement.account().iban() + ".pdf";
     return ResponseEntity.ok()
         .header(HttpHeaders.CONTENT_DISPOSITION,
             ContentDisposition.attachment().filename(filename).build().toString())

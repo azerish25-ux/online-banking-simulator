@@ -28,8 +28,12 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Isolation;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.TransactionDefinition;
+import org.springframework.transaction.support.DefaultTransactionDefinition;
+import org.springframework.transaction.support.TransactionTemplate;
 
 @Service
 public class StatementService {
@@ -38,12 +42,14 @@ public class StatementService {
   private final AccountRepository accountRepository;
   private final TransactionRepository transactions;
   private final Clock clock;
+  private final TransactionTemplate snapshotTx;
   private final long maxRows;
 
   public StatementService(
       AccountService accounts,
       AccountRepository accountRepository,
       TransactionRepository transactions,
+      PlatformTransactionManager transactionManager,
       Clock clock,
       @Value("${app.statement.max-rows:5000}") long maxRows) {
     this.accounts = accounts;
@@ -51,6 +57,10 @@ public class StatementService {
     this.transactions = transactions;
     this.clock = clock;
     this.maxRows = maxRows;
+    DefaultTransactionDefinition definition = new DefaultTransactionDefinition();
+    definition.setReadOnly(true);
+    definition.setIsolationLevel(TransactionDefinition.ISOLATION_REPEATABLE_READ);
+    this.snapshotTx = new TransactionTemplate(transactionManager, definition);
   }
 
   /**
@@ -66,12 +76,18 @@ public class StatementService {
    * <p>{@code asOf} names the database snapshot the figures came from and
    * {@code version} the statement schema, so re-issuing the same request
    * later produces a visibly NEW document (a later asOf), never a silent
-   * mutation of an earlier one. Renderers (PDF/CSV) accept this record and
-   * perform no financial queries of their own.
+   * mutation of an earlier one.
+   *
+   * <p>The statement carries ONLY immutable VALUE data (F05): account and
+   * row shapes are plain records copied at snapshot time, never live JPA
+   * entities - a row that posts after the snapshot, or a memo changed later,
+   * can never mutate what a rendered document already holds. Renderers
+   * (PDF/CSV) accept this record and perform no financial queries of their
+   * own, so the bytes can never combine figures from different snapshots.
    */
   public record Statement(
-      Account account,
-      List<Transaction> rows,
+      StatementAccount account,
+      List<StatementRow> rows,
       Period period,
       Map<UUID, String> ibans,
       BigDecimal openingBalance,
@@ -80,7 +96,7 @@ public class StatementService {
       long version) {
 
     /** The statement schema version these documents are rendered from. */
-    public static final long CURRENT_VERSION = 2;
+    public static final long CURRENT_VERSION = 3;
 
     public Statement {
       rows = List.copyOf(rows);
@@ -88,26 +104,63 @@ public class StatementService {
     }
   }
 
+  /** Immutable account facts a statement needs - never the mutable entity. */
+  public record StatementAccount(UUID id, String iban, String type, String status) {
+    static StatementAccount of(Account a) {
+      return new StatementAccount(
+          a.getId(), a.getIban(), a.getType().name(), a.getStatus().name());
+    }
+  }
+
+  /**
+   * Immutable statement row: the settled values of ONE posted instruction at
+   * snapshot time. Legs are raw account ids (the {@code ibans} map resolves
+   * display labels); direction relative to the statement account is derived
+   * by the renderer from the legs, so a row can never claim a direction its
+   * legs do not support.
+   */
+  public record StatementRow(
+      UUID id,
+      Instant postedAt,
+      UUID fromAccountId,
+      UUID toAccountId,
+      BigDecimal amount,
+      String currency,
+      String memo,
+      TxStatus status) {
+    static StatementRow of(Transaction tx) {
+      return new StatementRow(
+          tx.getId(), tx.getPostedAt(), tx.getFromAccountId(), tx.getToAccountId(),
+          tx.getAmount(), tx.getCurrency(), tx.getMemo(), tx.getStatus());
+    }
+  }
+
   /** A ready-to-stream CSV export: the server-chosen filename and its body. */
   public record CsvStatement(String filename, String content) {}
 
-  @Transactional(readOnly = true)
   public CsvStatement customerCsv(String email, UUID accountId, LocalDate from, LocalDate to) {
-    // The CSV and the PDF share ONE snapshot: same row window, same opening
-    // and closing figures, same as-of - they cannot drift (F05).
-    Statement statement = customerStatement(email, accountId, from, to);
+    // The CSV snapshot runs in an EXPLICIT repeatable-read transaction, not
+    // through a self-invoked @Transactional method: Spring's proxy advice does
+    // not apply when a bean calls its own annotated method, so leaning on the
+    // annotation here would silently downgrade the CSV to the caller's
+    // isolation (F05). The template is the boundary; the read inside it is
+    // one coherent snapshot and the renderer streams it without more queries.
+    Statement statement = snapshotTx.execute(status -> {
+      Account account = accounts.accountDetail(email, accountId);
+      return build(account, from, to);
+    });
     StringBuilder csv = new StringBuilder("id,posted_at,from_iban,to_iban,amount,currency,memo,status\n");
-    for (Transaction tx : statement.rows()) {
-      csv.append(tx.getId()).append(',')
-          .append(tx.getPostedAt()).append(',')
-          .append(cell(tx.getFromAccountId() == null ? "" : statement.ibans().getOrDefault(tx.getFromAccountId(), ""))).append(',')
-          .append(cell(tx.getToAccountId() == null ? "" : statement.ibans().getOrDefault(tx.getToAccountId(), ""))).append(',')
-          .append(tx.getAmount().toPlainString()).append(',')
-          .append(tx.getCurrency()).append(',')
-          .append(cell(tx.getMemo() == null ? "" : tx.getMemo())).append(',')
-          .append(tx.getStatus().name()).append('\n');
+    for (StatementRow row : statement.rows()) {
+      csv.append(row.id()).append(',')
+          .append(row.postedAt()).append(',')
+          .append(cell(row.fromAccountId() == null ? "" : statement.ibans().getOrDefault(row.fromAccountId(), ""))).append(',')
+          .append(cell(row.toAccountId() == null ? "" : statement.ibans().getOrDefault(row.toAccountId(), ""))).append(',')
+          .append(row.amount().toPlainString()).append(',')
+          .append(row.currency()).append(',')
+          .append(cell(row.memo() == null ? "" : row.memo())).append(',')
+          .append(row.status().name()).append('\n');
     }
-    String filename = "statement-" + statement.account().getIban() + "-"
+    String filename = "statement-" + statement.account().iban() + "-"
         + statement.asOf().atZone(ZoneOffset.UTC).toLocalDate() + ".csv";
     return new CsvStatement(filename, csv.toString());
   }
@@ -175,18 +228,23 @@ public class StatementService {
   private Statement build(Account account, LocalDate from, LocalDate to) {
     Period period = window(from, to);
     Instant asOf = clock.instant();
-    List<Transaction> rows = rows(account.getId(), period);
-    Map<UUID, String> ibans = ibanMap(rows);
+    // Every value the document will ever show is COPIED here, at snapshot
+    // time: the statement holds no reference to the mutable Account/Transaction
+    // entities, so nothing the database does later can change the document.
+    StatementAccount statementAccount = StatementAccount.of(account);
+    List<Transaction> settled = rows(account.getId(), period);
+    List<StatementRow> rows = settled.stream().map(StatementRow::of).toList();
+    Map<UUID, String> ibans = ibanMap(settled);
     BigDecimal netFromStart = netSettledFrom(account.getId(), period.start());
     BigDecimal opening = account.getBalance().subtract(netFromStart);
     BigDecimal closing = opening;
-    for (Transaction tx : rows) {
+    for (StatementRow row : rows) {
       // Only POSTED rows reach this list (rows() filters), so every row here
       // moved money: credit the account when it received, debit otherwise.
-      boolean credit = account.getId().equals(tx.getToAccountId());
-      closing = credit ? closing.add(tx.getAmount()) : closing.subtract(tx.getAmount());
+      boolean credit = statementAccount.id().equals(row.toAccountId());
+      closing = credit ? closing.add(row.amount()) : closing.subtract(row.amount());
     }
-    return new Statement(account, rows, period, ibans, opening, closing, asOf,
+    return new Statement(statementAccount, rows, period, ibans, opening, closing, asOf,
         Statement.CURRENT_VERSION);
   }
 
@@ -225,15 +283,18 @@ public class StatementService {
    * every page, and each page carries a page number.
    *
    * <p>Honest limits: DejaVu Sans covers Latin/Cyrillic/Greek and the Arabic
-   * block as ISOLATED letterforms; this renderer does not perform Arabic/
-   * Persian shaping or bidirectional reordering (PDFBox provides neither),
-   * so a Persian memo prints its letters in logical order without joining.
-   * Text extraction and the financial figures are exact; full bidi/shaping
-   * would need a shaping engine and is out of scope for this simulator.
+   * block as ISOLATED letterforms; contiguous RTL runs are pre-reversed into
+   * visual order (see {@link #reverseRtlRuns}) so a Persian memo reads
+   * right-to-left with every word letter-perfect and the extracted text layer
+   * stays faithful, but this renderer does not perform Arabic/Persian
+   * contextual joining (shaping) or full bidirectional reordering of
+   * mixed-direction lines (PDFBox provides neither) - a documented limit of
+   * this simulator, matching the F20 acceptance (StatementUnicodePdfTest).
+   * Text extraction and the financial figures are exact.
    */
   public byte[] renderPdf(Statement statement) {
-    Account account = statement.account();
-    List<Transaction> posted = statement.rows();
+    StatementAccount account = statement.account();
+    List<StatementRow> posted = statement.rows();
     Map<UUID, String> ibans = statement.ibans();
     Instant asOf = statement.asOf();
 
@@ -256,59 +317,82 @@ public class StatementService {
       float size = 9;
       float headSize = 10;
       float mastSize = 16;
-      float lineH = 11.5f; // vertical step between wrapped lines of ONE row
-      float rowPad = 3.5f;
+      float lineHeight = 12;
+      float footerY = 40;
+      // Page one carries the masthead block above the column heading; every
+      // later page starts directly at the heading.
+      float firstPageHeaderHeight = 24 + 15f * 4 + 6 + 14;
+      float otherPageHeaderHeight = 14;
 
       String[] header = {
           Brand.PDF_STATEMENT_HEADER,
-          "IBAN " + account.getIban() + "  ·  " + account.getType().name() + "  ·  "
-              + account.getStatus().name(),
+          "IBAN " + account.iban() + "  ·  " + account.type() + "  ·  "
+              + account.status(),
           "Period " + statement.period().from() + " to " + statement.period().to(),
           "Opening " + Money.usd(statement.openingBalance()) + "   ·   Closing "
               + Money.usd(statement.closingBalance()),
           "Statement as of " + asOf + " (UTC) · version " + statement.version()};
 
-      // Pre-lay every row into measured, wrapped lines: date, the description
-      // lines it needs, and the right-aligned amount text.
-      List<String[]> raw = new ArrayList<>();
-      for (Transaction tx : posted) {
-        boolean in = account.getId().equals(tx.getToAccountId());
-        String desc = tx.getMemo() != null ? tx.getMemo()
-            : (in ? "Transfer from " + shortIban(ibans.get(tx.getFromAccountId()))
-                  : "Transfer to " + shortIban(ibans.get(tx.getToAccountId())));
-        // RTL runs (Arabic block) are reversed into visual order: the font
-        // prints isolated letterforms and PDFBox performs no shaping, so the
-        // glyph stream must carry the right-to-left sequence to READ correctly
-        // and extract back to the exact original memo (F20).
-        raw.add(new String[] {
-            tx.getPostedAt().atZone(ZoneOffset.UTC).toLocalDate().toString(),
-            reverseRtlRuns(desc),
-            (in ? "+" : "-") + Money.plain(tx.getAmount())});
-      }
-      List<String[]> rows = new ArrayList<>();
-      for (String[] data : raw) {
-        String date = data[0];
-        String desc = data[1];
-        String amount = data[2];
-        List<String> lines = wrap(font, size, desc, descWidth);
+      // Pre-lay every row into measured, wrapped display lines. A line carries
+      // {date, amount, description, measuredAmountWidth} - date and amount are
+      // printed only on the first line of their row. RTL runs are reversed
+      // into visual order (isolated letterforms; see reverseRtlRuns).
+      List<String[]> display = new ArrayList<>();
+      for (StatementRow tx : posted) {
+        boolean in = account.id().equals(tx.toAccountId());
+        String desc = tx.memo() != null ? tx.memo()
+            : (in ? "Transfer from " + shortIban(ibans.get(tx.fromAccountId()))
+                  : "Transfer to " + shortIban(ibans.get(tx.toAccountId())));
+        String date = tx.postedAt().atZone(ZoneOffset.UTC).toLocalDate().toString();
+        String amount = (in ? "+" : "-") + Money.plain(tx.amount());
+        float amountWidth = textWidth(font, amount, size);
+        List<String> lines = wrap(font, size, reverseRtlRuns(desc), descWidth);
         if (lines.isEmpty()) {
           lines.add("");
         }
         for (int i = 0; i < lines.size(); i++) {
-          rows.add(new String[] {i == 0 ? date : "", i == 0 ? amount : "", lines.get(i),
-              i == 0 ? String.valueOf(textWidth(font, amount, size)) : ""});
+          display.add(new String[] {
+              i == 0 ? date : "",
+              i == 0 ? amount : "",
+              lines.get(i),
+              i == 0 ? String.valueOf(amountWidth) : ""});
         }
       }
 
-      int pageNo = 1;
-      int rowIndex = 0;
-      float footerY = 40;
-      do {
+      // Paginate the display lines first - the SAME arithmetic the draw pass
+      // uses - so every page's "Page X of N" is the true, final total and no
+      // page can silently gain or lose a line between counting and drawing.
+      List<List<String[]>> pages = new ArrayList<>();
+      {
+        int index = 0;
+        int pageNo = 1;
+        while (index < display.size() || pages.isEmpty()) {
+          float bodyTop = height - margin
+              - (pageNo == 1 ? firstPageHeaderHeight : otherPageHeaderHeight);
+          float y = bodyTop;
+          List<String[]> pageLines = new ArrayList<>();
+          while (index < display.size()
+              && y >= footerY + lineHeight + 8
+              && y - lineHeight >= footerY + 10) {
+            pageLines.add(display.get(index));
+            index++;
+            y -= lineHeight;
+          }
+          pages.add(pageLines);
+          pageNo++;
+          if (index >= display.size()) {
+            break;
+          }
+        }
+      }
+
+      int totalPages = Math.max(pages.size(), 1);
+      for (int pageNo = 0; pageNo < pages.size(); pageNo++) {
         PDPage page = new PDPage(PDRectangle.A4);
         doc.addPage(page);
         PDPageContentStream cs = new PDPageContentStream(doc, page);
         float y = height - margin;
-        if (pageNo == 1) {
+        if (pageNo == 0) {
           for (int h = 0; h < header.length; h++) {
             textLine(cs, font, h == 0 ? mastSize : headSize, margin, y, header[h]);
             y -= h == 0 ? 24 : 15;
@@ -320,27 +404,20 @@ public class StatementService {
         textLine(cs, font, headSize, descCol, y, "Description");
         textLine(cs, font, headSize, amountCol - 4, y, "Amount");
         y -= 14;
-        while (rowIndex < rows.size() && y >= footerY + 18) {
-          String[] line = rows.get(rowIndex);
-          float lineHeight = 12;
-          if (y - lineHeight < footerY + 12) {
-            break; // this row line does not fit - spill to the next page
-          }
+        for (String[] line : pages.get(pageNo)) {
           if (!line[0].isEmpty()) {
             textLine(cs, font, size, dateCol, y, line[0]);
             // Right-aligned amount against the measured column edge.
-            float aw = Float.parseFloat(line[3]);
-            textLine(cs, font, size, amountCol - aw, y, line[1]);
+            textLine(cs, font, size, amountCol - Float.parseFloat(line[3]), y, line[1]);
           }
           textLine(cs, font, size, descCol, y, line[2]);
           y -= lineHeight;
-          rowIndex++;
         }
-        textLine(cs, font, 8, margin, footerY, "Page " + pageNo + " of "
-            + (rows.isEmpty() ? "1" : "..."));
+        textLine(cs, font, 8, margin, footerY,
+            "Page " + (pageNo + 1) + " of " + totalPages
+                + (totalPages > 1 ? " · continued" : ""));
         cs.close();
-        pageNo++;
-      } while (rowIndex < rows.size());
+      }
       doc.save(out);
       return out.toByteArray();
     } catch (IOException ex) {

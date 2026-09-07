@@ -99,9 +99,9 @@ class StatementSnapshotTest {
 
     // opening + sum(printed signed rows) = closing, at internal precision.
     BigDecimal net = BigDecimal.ZERO;
-    for (Transaction tx : april.rows()) {
-      boolean credit = april.account().getId().equals(tx.getToAccountId());
-      net = credit ? net.add(tx.getAmount()) : net.subtract(tx.getAmount());
+    for (StatementService.StatementRow tx : april.rows()) {
+      boolean credit = april.account().id().equals(tx.toAccountId());
+      net = credit ? net.add(tx.amount()) : net.subtract(tx.amount());
     }
     assertEquals(april.closingBalance(), april.openingBalance().add(net),
         "opening + printed rows must equal the closing figure");
@@ -155,8 +155,8 @@ class StatementSnapshotTest {
     long dataLines = csv.content().lines().count() - 1;
     assertEquals(statement.rows().size(), dataLines,
         "CSV and PDF must serialize the same row window:\n" + csv.content());
-    for (Transaction tx : statement.rows()) {
-      assertTrue(csv.content().contains(tx.getId().toString()),
+    for (StatementService.StatementRow tx : statement.rows()) {
+      assertTrue(csv.content().contains(tx.id().toString()),
           "every snapshot row must appear in the CSV export");
     }
     // Both directions are present: the deposit credits, the transfer debits.
