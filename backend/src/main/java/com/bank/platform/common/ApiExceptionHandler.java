@@ -98,7 +98,7 @@ public class ApiExceptionHandler {
             HttpStatus.TOO_MANY_REQUESTS, "Too Many Attempts", ex.getMessage()));
   }
 
-  /** An account burned its password-login failure budget (F03). */
+  /** An account burned its password-login failure budget. */
   @ExceptionHandler(AuthThrottledException.class)
   public ResponseEntity<ApiProblem> authThrottled(AuthThrottledException ex) {
     return ResponseEntity.status(HttpStatus.TOO_MANY_REQUESTS)
@@ -138,7 +138,7 @@ public class ApiExceptionHandler {
   }
 
   /**
-   * One key presented with two different intents (F06): the key already names
+   * One key presented with two different intents: the key already names
    * an operation, and the new payload is not the one it names. 409 so the
    * client treats it as "resolve the original operation", not as a retryable
    * or rejected submit.
@@ -161,7 +161,7 @@ public class ApiExceptionHandler {
 
   /**
    * An operator tried to decide a case another operator already decided
-   * ( section 16): 409 so the losing console refreshes and shows the
+   *: 409 so the losing console refreshes and shows the
    * winning decision instead of preserving an optimistic success toast.
    */
   @ExceptionHandler(DecisionConflictException.class)

@@ -29,10 +29,10 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
  * <p>Pure: it reads ONLY the immutable {@link StatementService.Statement} it
  * is handed - no repository, no clock, no transaction - so the rendered
  * document can never combine figures from a different database snapshot than
- * the rows between them (F05). Rendering the same Statement twice produces
+ * the rows between them. Rendering the same Statement twice produces
  * identical bytes, even after money moves in the database.
  *
- * <p>F20: the body is set in an embedded Unicode TrueType font (DejaVu
+* <p>the body is set in an embedded Unicode TrueType font (DejaVu
  * Sans, bundled under src/main/resources/fonts with its license), so
  * accented names and non-Latin memos are never substituted with '?' or
  * dropped. Columns are positioned from MEASURED string widths - no
@@ -40,7 +40,7 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
  * descriptions wrap onto continuation lines, the column heading repeats on
  * every page, and each page carries a page number.
  *
- * <p>RTL text ( section 10) is shaped and ordered with the ICU4J
+ * <p>RTL text is shaped and ordered with the ICU4J
  * ArabicShaping + {@link Bidi} pipeline (UAX #9/#11): Arabic/Persian
  * letters become joined presentation forms in correct visual order, with
  * mixed-direction lines (identifiers, digits, punctuation) resolved by
@@ -280,7 +280,7 @@ public final class StatementPdfRenderer {
   }
 
   /**
-   * section 10: replace the old character-run reversal with a
+   * Replace the old character-run reversal with a
    * supported bidirectional + shaping pipeline. Each logical line is (1)
    * SHAPED with ICU ArabicShaping - Arabic/Persian letters become joined
    * presentation forms, so a Persian memo renders as connected script, not

@@ -141,7 +141,7 @@ public class InterestService {
     } finally {
       // Interest postings are per-account transactions; whichever units
       // committed (or none) have changed summary buckets, so the cache is
-      // cleared after the run - including a run that died part-way (F07).
+      // cleared after the run - including a run that died part-way.
       invalidation.clearNow("summaries");
     }
   }

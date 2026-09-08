@@ -63,7 +63,7 @@ async function seedAccountActivity(token: string): Promise<void> {
     ).json()) as { id: string }[];
   }
 
-  // Deposits require an Idempotency-Key header (F06) - without it the seed
+  // Deposits require an Idempotency-Key header - without it the seed
   // would 400 and the dashboard feed would stay empty for the whole file.
   const deposit = await fetch(BASE + "/v1/accounts/" + accounts[0].id + "/deposit", {
     method: "POST",

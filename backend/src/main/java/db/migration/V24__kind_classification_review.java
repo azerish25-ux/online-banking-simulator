@@ -9,7 +9,7 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 /**
- * F21: forward-only, evidence-backed transaction-kind review.
+ * forward-only, evidence-backed transaction-kind review.
  *
  * <p>V8 (a checksummed, already-applied migration) classified every legacy
  * row by memo SUBSTRINGS - {@code memo LIKE '%interest%'} labelled an

@@ -1,4 +1,4 @@
--- V17: TOTP secret custody (F30) + persisted login challenges (F30).
+-- V17: TOTP secret custody + persisted login challenges.
 --
 -- Secret custody: users.totp_secret may still hold a LEGACY PLAINTEXT secret
 -- (totp_key_version = 0) until it is migrated. New secrets are stored

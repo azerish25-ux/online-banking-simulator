@@ -30,7 +30,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * F30 regression: login challenges are persisted rows with consumption state,
+ * regression: login challenges are persisted rows with consumption state,
  * expiry and an attempt budget that survives the failed-verification rollback.
  * Replays, expired challenges, exhausted budgets and cross-challenge budget
  * resets are all refused; the successful path works exactly once.
@@ -110,7 +110,7 @@ class ChallengePersistenceTest {
 
   @Test
   void twoSimultaneousCorrectSubmissionsMintExactlyOneSession() throws Exception {
-    // F30: two requests present the SAME unused challenge with a correct code
+    // two requests present the SAME unused challenge with a correct code
     // at the same moment (a double-submit race, not a sequential replay). The
     // atomic consume must let exactly ONE win; the twin must be refused and no
     // second session may be minted.
@@ -159,7 +159,7 @@ class ChallengePersistenceTest {
 
   @Test
   void concurrentGuessesCanNeverExceedTheFiveAttemptBudget() throws Exception {
-    // section 9: the attempt is RESERVED atomically before verification,
+    // The attempt is RESERVED atomically before verification,
     // so a concurrent burst of wrong codes against one challenge can never
     // overshoot the five-verification budget (a read-then-increment counter
     // lets parallel callers all pass the check before any of them records).

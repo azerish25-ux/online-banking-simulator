@@ -1,11 +1,10 @@
 # Testing & DevOps
 
-(Originally "Part 7" of the build series; updated through the hardening release
-. Command results recorded here were executed on this
+(Updated through the hardening release
+and the 1.3.x hardening campaign. Command results recorded here were executed on this
 dev machine (Windows 11, Java 17.0.20, Node 24, local PostgreSQL 16) plus the
 GitHub Actions runners in `ci.yml`; the identical commands were NOT assumed to
-prove anything on an environment they did not run on; exact per-phase test
-counts and the tested source state are in the commit history.)
+prove anything on an environment they did not run on.)
 
 ## Local (no Docker, low RAM)
 
@@ -14,7 +13,7 @@ counts and the tested source state are in the commit history.)
 | Backend unit + API tests | `.\mvnw.cmd verify` in `backend/` | 176 tests + JaCoCo gate (≥55% line coverage) |
 | Frontend unit tests | `npm test` (`npx vitest run`) in `frontend/` | 98 Vitest tests (validation, formatting, API client, typed query hooks, RTL component suite) |
 | Frontend build + lint | `npm run build`, `npm run lint` in `frontend/` | Production bundle + ESLint |
-| Browser e2e | `npx playwright test` in `frontend/` | The run boots its OWN fresh production build on `:3000` and **fails loudly if the port is busy** (`reuseExistingServer: false` - it never silently tests a stale/foreign app). A `global-setup` probes an `E2E_BASE_URL` app (health through the rewrite + nonce CSP) before asserting. Suite = smoke + a11y + the full money loop (incl. the ≥$10k review-threshold hold) + real-browser F22/F23 witnesses; the silent-refresh specs need a short-TTL backend (`APP_JWT_ACCESS_SECONDS` + `E2E_ACCESS_TTL_SECONDS`, which CI's `banking-e2e` sets). An ephemeral second stack runs via `E2E_BASE_URL` + `APP_CORS_ORIGINS` (2026-09-06 sweep: 19/19) |
+| Browser e2e | `npx playwright test` in `frontend/` | The run boots its OWN fresh production build on `:3000` and **fails loudly if the port is busy** (`reuseExistingServer: false` - it never silently tests a stale/foreign app). A `global-setup` probes an `E2E_BASE_URL` app (health through the rewrite + nonce CSP) before asserting. Suite = smoke + a11y + the full money loop (incl. the ≥$10k review-threshold hold) + real-browser witnesses (two-tab session + live-page CSP nonce); the silent-refresh specs need a short-TTL backend (`APP_JWT_ACCESS_SECONDS` + `E2E_ACCESS_TTL_SECONDS`, which CI's `banking-e2e` sets). An ephemeral second stack runs via `E2E_BASE_URL` + `APP_CORS_ORIGINS` (2026-09-06 sweep: 19/19) |
 | README screenshots | `npx playwright test --config=playwright.screenshots.config.ts` in `frontend/` | Captures `docs/screenshots/*` from the live seeded product; excluded from the default suite and CI so PNGs only change when regenerated |
 | Live stack | `.\start-all.ps1` then `.\seed-demo.ps1` (repo root) | Real Postgres end-to-end, health-gated |
 

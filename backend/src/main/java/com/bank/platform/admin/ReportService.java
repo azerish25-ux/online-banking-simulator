@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class ReportService {
 
   private final TransactionRepository transactions;
-  // The injected business clock (F04): the report's "today" is deterministic
+  // The injected business clock: the report's "today" is deterministic
   // and testable at day boundaries instead of a wall-clock LocalDate.now().
   private final Clock clock;
 

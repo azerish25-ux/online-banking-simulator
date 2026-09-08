@@ -39,7 +39,7 @@ import org.springframework.transaction.annotation.Transactional;
  * side effect in {@link LedgerEventsService} - so a change to one behavior
  * lands in one place instead of a single ~430-line god service.
  *
- * <p>F06 operation identity: every user-submitted funding or transfer must
+ * <p>Operation identity: every user-submitted funding or transfer must
  * carry an idempotency key scoped to the originator's account. The key names
  * one logical intent, and the row stores a canonical payload hash, so an
  * identical replay returns the original operation and money moves once, while
@@ -107,7 +107,7 @@ public class MoneyService {
   /**
    * Simulated external rail (ATM/teller). Only the owning customer can fund
    * their own account. Caches are invalidated AFTER commit, never before
-   * (F07): registering the clear inside the transaction defers it to the
+   *: registering the clear inside the transaction defers it to the
    * after-commit hook, so a rolled-back deposit evicts nothing.
    */
   @Transactional
@@ -153,7 +153,7 @@ public class MoneyService {
     if (account.getType() == AccountType.LOAN) {
       // A deposit into a LOAN is a repayment under the same policy as a
       // transfer credit: capped at the amount owed, interest extinguished
-      // before principal (F16). The balance never goes positive.
+      // before principal. The balance never goes positive.
       loanPrincipalComponent = movement.creditLoan(account, scaled);
     } else {
       account.setBalance(account.getBalance().add(scaled));
@@ -193,7 +193,7 @@ public class MoneyService {
 
     // A posted deposit always moves real money: the customer balance rises and
     // a balancing entry pays for it out of the simulator-funding counteraccount
-    // (F15). This runs in the same transaction as the balance update, so a
+    //. This runs in the same transaction as the balance update, so a
     // failed journal write rolls the whole deposit back.
     journal.post(JournalKind.DEPOSIT, tx.getId().toString(), now,
         "Deposit " + scaled.toPlainString(),
@@ -256,7 +256,7 @@ public class MoneyService {
     String currencyNorm = Currencies.normalize(currency);
     String memoNorm = memo == null ? "" : memo.trim();
     // The canonical intent hash: same key + same intent is an idempotent
-    // replay; same key + different intent is a conflict (F06).
+    // replay; same key + different intent is a conflict.
     String hash = fingerprint(TxKind.TRANSFER, fromId, toId, scaled, currencyNorm, memoNorm);
 
     // Keys live in the sender's own namespace (DB unique on from + key), so
@@ -354,7 +354,7 @@ public class MoneyService {
 
     // The movement and its journal posting share one transaction: the two
     // account lines mirror exactly what move() did, so money can never move
-    // between accounts without a balancing record of it (F15).
+    // between accounts without a balancing record of it.
     journal.post(JournalKind.TRANSFER, tx.getId().toString(), now,
         "Transfer " + scaled.toPlainString(),
         Posting.account(from.getId(), scaled.negate()),
@@ -366,7 +366,7 @@ public class MoneyService {
   }
 
   /**
-   * Authenticated operation-status lookup (F06): resolves the caller's own
+   * Authenticated operation-status lookup: resolves the caller's own
    * operation by its idempotency key. Ownership is originator-scoped - a
    * deposit's key lives on the funded account, a transfer's on the sender's -
    * so probing a key that belongs to someone else simply finds nothing.
@@ -415,7 +415,7 @@ public class MoneyService {
   }
 
   /**
-   * Authorized recovery list (F06 namespace fix): the caller's own keyed
+   * Authorized recovery list (namespace fix): the caller's own keyed
    * operations over the last week, newest first, bounded. Completed-but-
    * unacknowledged postings are included, so an operation whose response was
    * lost - even one whose browser record was cleared at logout - stays
@@ -438,7 +438,7 @@ public class MoneyService {
 
   /**
    * Reads one of the caller's own transactions by id for a durable receipt
-   * (F11). Scoping mirrors {@link #operationStatus}: a caller may fetch a row
+   *. Scoping mirrors {@link #operationStatus}: a caller may fetch a row
    * only if they own one of its legs (from or to account) - a foreign or
    * unknown id is indistinguishable (empty, surfaced as 404). Engine rows
    * journaled against the caller's account stay visible because their
@@ -473,7 +473,7 @@ public class MoneyService {
     // Authorization runs HERE, before the cache is consulted - the cached
     // computation below never sees a caller identity, so a cache hit can
     // never leak another user's data. The as-of month anchors the cached
-    // window (F07): advancing the business clock across a month end changes
+    // window: advancing the business clock across a month end changes
     // the key, so no stale "last month" list can be served for this month.
     accountService.accountDetail(email, accountId);
     return summaries.byAccount(accountId, months, YearMonth.now(clock.withZone(ZoneOffset.UTC)));
@@ -493,7 +493,7 @@ public class MoneyService {
   }
 
   /**
-   * User-submitted financial mutations carry an idempotency key (F06);
+   * User-submitted financial mutations carry an idempotency key;
    * scheduled/admin operations get an equivalent deterministic identity from
    * their own caller instead.
    */

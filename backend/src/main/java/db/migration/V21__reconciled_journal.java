@@ -5,7 +5,7 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 /**
- * F15: the reconciled journal. Two append-only tables separate an
+ * the reconciled journal. Two append-only tables separate an
  * operation/instruction's lifecycle (the existing {@code transactions} rows)
  * from the immutable posted accounting entries that actually moved money:
  *

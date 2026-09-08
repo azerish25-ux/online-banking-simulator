@@ -51,7 +51,7 @@ public interface TransactionRepository
   // explicit CAST because PostgreSQL cannot infer a parameter's type from an
   // IS NULL comparison alone (SQLState 42P18) when the bound is a bare null.
   //
-  // F04: a statement is a window of money that MOVED, so the bounds and the
+  // a statement is a window of money that MOVED, so the bounds and the
   // ordering cut on posted_at - never created_at, which is the request time
   // and can precede settlement across a month boundary. Rows that never
   // posted (HELD/CANCELLED) have no posted_at and can never match.
@@ -77,7 +77,7 @@ public interface TransactionRepository
 
   // Rows tied on created_at resolve newest-inserted-first via the DB-assigned
   // seq column (the random UUID id cannot express insertion order - V14).
-  // F26: history pages with a KEYSET cursor over the immutable seq identity,
+  // history pages with a KEYSET cursor over the immutable seq identity,
   // never an OFFSET - an offset re-scans from the newest row every time, so a
   // row committed between two reads shifts everything and the reader
   // duplicates or skips it. A null cursorSeq means the first page (no bound);
@@ -123,7 +123,7 @@ public interface TransactionRepository
   interface PostedRow {
     // The posting instant (JPQL alias postedAt below). Named for what it IS,
     // never after request time: a settled row can post long after it was
-    // created, and this report cuts and buckets on the day money moved (F04).
+    // created, and this report cuts and buckets on the day money moved.
     Instant getPostedAt();
     TxKind getKind();
     BigDecimal getAmount();
@@ -159,7 +159,7 @@ public interface TransactionRepository
   /**
    * Atomically resolves a held transfer: moves it out of HELD into {@code to}
    * (POSTED on approval, CANCELLED on decline), marks it reviewed and stamps
-   * the posting time (F04). Returns 1 for the operator who won the race,
+   * the posting time. Returns 1 for the operator who won the race,
    * 0 when someone already resolved it - so two concurrent approvals can
    * never both settle the same money. {@code postedAt} is set only when
    * {@code to == POSTED} (null for a decline, leaving the column null); the
@@ -181,7 +181,7 @@ public interface TransactionRepository
       String idempotencyKey, UUID toAccountId);
 
   /**
-   * Operation-status lookup scoped to the ORIGINATOR (F06): the user whose
+   * Operation-status lookup scoped to the ORIGINATOR: the user whose
    * account carries the key namespace. A deposit's originator is its funded
    * account (from_account_id IS NULL); a transfer's is its sender. Rows the
    * caller merely received are not their operations.
@@ -192,7 +192,7 @@ public interface TransactionRepository
   List<Transaction> findOperationsByKey(@Param("key") String key, @Param("owned") List<UUID> owned);
 
   /**
-   * Operation lookup scoped to ONE originating account (F06 namespace fix):
+   * Operation lookup scoped to ONE originating account (namespace fix):
    * the database uniqueness lives on (from_account_id, key) for transfers and
    * (to_account_id, key) for deposits, so restricting the lookup to the
    * originating account makes the replay/lookup namespace exactly the
@@ -233,7 +233,7 @@ public interface TransactionRepository
   Optional<Long> rawSeqOf(UUID id);
 
   /**
-   * F28: public transfer numbers classify by KIND and posted status - never
+   * public transfer numbers classify by KIND and posted status - never
    * by "has a from side". The interest engine posts loan charges with a from
    * side and no to side; counting {@code from_account_id IS NOT NULL} rows
    * would present engine interest as user transfers. A public transfer is a

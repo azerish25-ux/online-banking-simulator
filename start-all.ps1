@@ -3,7 +3,7 @@
 # health with deadlines, then exits non-zero with an actionable message and the
 # relevant log tail if either never comes up. Run .\seed-demo.ps1 afterwards.
 #
-# F29 hardening: PostgreSQL is DISCOVERED (PGHOME env, PATH, or well-known
+# Hardening: PostgreSQL is DISCOVERED (PGHOME env, PATH, or well-known
 # install dirs) instead of assuming one fixed path; the user-mode cluster's
 # data directory must exist and match the discovered major version; service
 # logs are captured under the cluster directory so failures are diagnosable;

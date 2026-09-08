@@ -14,8 +14,8 @@ const eslintConfig = defineConfig([
     // React Compiler linter flag patterns this codebase used deliberately
     // under Next 14 (dialog-state sync, mutation-result augmentation). They
     // are advisory rather than classic rule violations, and the UI/state
-    // remediation phases (F09-F11) own those files; disabling here keeps the
-    // lint gate meaningful for every OTHER rule while that work is pending.
+    // modules that own those files rely on the flagged patterns; disabling
+    // here keeps the lint gate meaningful for every OTHER rule.
     rules: {
       "react-hooks/set-state-in-effect": "off",
       "react-hooks/refs": "off",

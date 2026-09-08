@@ -37,7 +37,7 @@ export default function MfaChallengePage() {
       push("Welcome back.", "success");
       router.push(Routes.dashboard);
     } catch (err) {
-      // F30: the server burns attempts on wrong codes and locks the budget
+      // the server burns attempts on wrong codes and locks the budget
       // (429 Retry-After) once exhausted. This challenge can no longer
       // succeed - pretending otherwise with endless retries is dishonest - so
       // send the user back for a fresh challenge after a clear explanation.

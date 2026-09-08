@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { SpendingChart, type MonthPoint } from "../spending-chart";
 
 /**
- * F19/section 14: the chart must expose its EXACT values - tooltip/title-only figures
+ * the chart must expose its EXACT values - tooltip/title-only figures
  * are not enough. The data table is a real <table> that a visible toggle
  * expands; while collapsed it stays sr-only so assistive technology reads the
  * same figures the geometry approximates. Rows = months, cells = exact usd()
@@ -31,7 +31,7 @@ describe("SpendingChart accessible data table", () => {
     expect(table).not.toBeNull();
     // Collapsed: visually hidden but still a real, accessible table.
     expect(table.className).toContain("sr-only");
-    // Expanding makes the same table visible on the page (section 14).
+    // Expanding makes the same table visible on the page.
     fireEvent.click(screen.getByRole("button", { name: "Show exact values" }));
     expect(table.className).not.toContain("sr-only");
     expect(screen.getByRole("button", { name: "Hide exact values" })).toBeInTheDocument();

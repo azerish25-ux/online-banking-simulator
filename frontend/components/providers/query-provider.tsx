@@ -10,7 +10,7 @@ import { Routes } from "../../lib/routes";
  * Shared client: stale-while-revalidate defaults tuned for banking reads.
  * Also the single home for session-end handling: when the api() client
  * broadcasts a hard 401 (refresh failed) OR a sibling tab logs out or hits
- * the same expiry (F22 - the browser cookie jar is shared, so one tab's
+ * the same expiry (the browser cookie jar is shared, so the browser cookie jar is shared, so one tab's
  * session end invalidates every tab's cached data), drop every cached query
  * and send this tab to the login page instead of leaving half-broken or
  * stale screens up behind it.

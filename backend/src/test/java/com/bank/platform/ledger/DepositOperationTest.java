@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * F06 operation identity for funding: deposits require an idempotency key
+ * Operation identity for funding: deposits require an idempotency key
  * scoped to the funded account, identical replays return the original result
  * (money moves exactly once), a changed amount under the same key is a 409
  * conflict, and an authenticated status lookup resolves the caller's own
@@ -137,7 +137,7 @@ class DepositOperationTest {
     String key = "op-lookup-" + UUID.randomUUID();
 
     // Alice deposits under her key; Bob uses the same string for his own
-    // deposit - keys live in each account's namespace (F06), so both post.
+    // deposit - keys live in each account's namespace, so both post.
     depositBalance(alice, aliceId, "200.00", key);
     depositBalance(bob, bobId, "9.00", key);
 

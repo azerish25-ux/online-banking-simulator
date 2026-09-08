@@ -27,7 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * The journal's real-PostgreSQL guarantees (F15), run against a disposable
+ * The journal's real-PostgreSQL guarantees, run against a disposable
  * PostgreSQL database (never bankdb). H2 cannot express these, so they live
  * here:
  *

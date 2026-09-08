@@ -112,7 +112,7 @@ class TransferConcurrencyIT {
       failures.forEach(f -> System.err.println("[cc-failure] " + f));
     }
 
-    // F12: no "at least one success" oracle. Every one of the 24 transfers is
+    // no "at least one success" oracle. Every one of the 24 transfers is
     // valid and fully funded ($10 each, balances $1,000, under the review
     // threshold), so ALL must settle - the ID-ordered locking must serialize
     // opposite directions without deadlock, starvation, or spurious rejection.
@@ -182,7 +182,7 @@ class TransferConcurrencyIT {
   @Test
   void parallelAccrualPostsInterestExactlyOnce() throws Exception {
     // Money moves mid-June; both accrual runs price the completed June month
-    // (F16) so the period they contend over is deterministic.
+    // so the period they contend over is deterministic.
     CLOCK.set(java.time.Instant.parse("2026-06-15T10:00:00Z"));
     String alice = client.register("cc-int@example.com", "CC Interest");
     String savingsId = openAccount(alice, "SAVINGS");

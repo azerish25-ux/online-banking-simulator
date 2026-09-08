@@ -8,7 +8,7 @@ import org.springframework.boot.ApplicationArguments;
 
 /**
  * The production env guard must refuse to boot with any documented dev
- * default credential (including a missing/placeholder TOTP master key, F30),
+ * default credential (including a missing/placeholder TOTP master key),
  * and pass when every credential is overridden.
  */
 class DeploymentEnvGuardTest {
@@ -45,7 +45,7 @@ class DeploymentEnvGuardTest {
 
   @Test
   void productionRefusesMissingOrPlaceholderTotpMasterKey() {
-    // Missing key: F30 fail-closed - seeds must never silently fall back to
+    // Missing key: fail-closed - seeds must never silently fall back to
     // plaintext at rest in a production deployment.
     DeploymentEnvGuard missing = new DeploymentEnvGuard("production", REAL_JWT, "real-admin-pass", "real-db-pass", "");
     assertThrows(IllegalStateException.class, () -> missing.run(noArgs()));

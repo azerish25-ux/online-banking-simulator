@@ -34,8 +34,8 @@ export default defineConfig({
         port: 3000,
         // Deliberately false: the local run must boot the build from THIS
         // checkout and fail loudly if :3000 is already taken (e.g. by an old
-        // start-all.ps1 session serving a pre-remediation build) - never
-        // silently run the suite against a stale application (section 11.3).
+        // start-all.ps1 session serving an outdated build) - never
+        // silently run the suite against a stale application.
         reuseExistingServer: false
       }
 });

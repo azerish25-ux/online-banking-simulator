@@ -32,7 +32,7 @@ public interface LoginChallengeRepository extends JpaRepository<LoginChallenge, 
   int recordFailure(@Param("id") UUID id);
 
   /**
-   * ATOMIC attempt reservation ( section 9): increments the attempt
+   * ATOMIC attempt reservation: increments the attempt
    * count in ONE conditional UPDATE that succeeds only while the challenge is
    * still unused, unexpired, and has budget left. Returns 1 when this caller
    * reserved an attempt (and may now verify a code), 0 when the challenge is

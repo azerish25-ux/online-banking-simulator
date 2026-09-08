@@ -10,7 +10,7 @@ import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
 /**
- * The one place the read-model caches are constructed (F07).
+ * The one place the read-model caches are constructed.
  *
  * <p>Previously the policy lived as an unread string under {@code
  * app.cache.caffeine.spec} - Spring's cache auto-configuration only reads

@@ -6,7 +6,7 @@ import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * Transaction-aware cache invalidation (F07).
+ * Transaction-aware cache invalidation.
  *
  * <p>Each clear is applied twice, deliberately:
  *

@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One account × accrual period row (F16). The database uniqueness on
+ * One account × accrual period row. The database uniqueness on
  * (account_id, period) is what makes interest deterministic and resumable: a
  * scheduler run and an operator trigger can overlap all they like - the
  * second one to post an account's period hits the unique constraint, rolls

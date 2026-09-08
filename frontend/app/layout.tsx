@@ -13,7 +13,7 @@ export const metadata: Metadata = {
     "A full-stack online banking demo: accounts, transfers, interest, cards, 2FA, and an operator console, built with Next.js and Spring Boot."
 };
 
-// F23: the nonce-based CSP (proxy.ts, Next 16's renamed middleware) can only be applied to scripts
+// the nonce-based CSP (proxy.ts, Next 16's renamed middleware) can only be applied to scripts
 // during a real per-request render - statically prerendered pages have no
 // request headers to read the nonce from, so every route renders dynamically.
 // A banking app has no genuinely static content worth caching at the edge;

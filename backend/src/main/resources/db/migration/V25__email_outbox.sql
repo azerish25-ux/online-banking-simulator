@@ -1,4 +1,4 @@
--- F25: commit-safe external delivery. Email was previously sent INSIDE the
+-- commit-safe external delivery. Email was previously sent INSIDE the
 -- money/notification transaction - a slow or failing provider held the
 -- ledger open, and a rollback could still have "sent" mail for an operation
 -- that never happened. Now every event that should produce mail commits an

@@ -5,7 +5,7 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 /**
- * F06: operation identity. Every keyed operation records a canonical payload
+ * operation identity. Every keyed operation records a canonical payload
  * hash ({@code request_hash}) - source, destination, exact normalized amount,
  * currency, and normalized memo - so an idempotent replay can be told apart
  * from a *conflicting* reuse of the same key (same key, different intent is a

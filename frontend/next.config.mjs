@@ -1,7 +1,7 @@
 const backend = process.env.BACKEND_URL || "http://localhost:8080";
 
 /**
- * Baseline security headers for EVERY response (F23). These can be static:
+ * Baseline security headers for EVERY response. These can be static:
  * they carry no per-request state. The nonce-based Content-Security-Policy is
  * deliberately NOT here - a nonce must be unique per request, so the CSP
  * lives in middleware.ts where the HTML document is actually produced.

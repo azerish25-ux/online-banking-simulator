@@ -7,7 +7,7 @@ import { HeroStats } from "./hero-stats";
 
 /**
  * Landing page - one factual statement of what the product is, the simulated
- * money disclosure, and the two real entry points ( section 13). No
+ * money disclosure, and the two real entry points. No
  * engineering feature cards, no slogans: implementation details live in the
  * "About this demo" seam and the repository documentation.
  */

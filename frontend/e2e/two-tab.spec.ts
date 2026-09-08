@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 
 /**
- * F22 real-tab witness. The unit suite fakes the BroadcastChannel bus; this
+ * Real-tab witness. The unit suite fakes the BroadcastChannel bus; this
  * spec proves the Web Lock refresh + `simulator:auth` peer broadcast with
  * TWO real tabs in one browser context (shared origin :3111 behind the
  * ephemeral stack, same partition):
@@ -48,7 +48,7 @@ test("two real tabs share one session: concurrent refresh after expiry, peer log
   await page.waitForTimeout((ttlSeconds + 1.5) * 1000);
 
   // Tab B: a full page load must be repaired by the silent refresh path -
-  // no redirect to login (the exact regression F22 guarded against).
+  // no redirect to login (the exact regression this guarded against).
   await tabB.goto("/transfers");
   await expect(tabB.getByRole("heading", { name: "Send money" })).toBeVisible({ timeout: 15_000 });
   await expect(tabB).not.toHaveURL(/\/login/);

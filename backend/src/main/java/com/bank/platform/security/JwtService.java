@@ -63,7 +63,7 @@ public class JwtService {
         // Role stays a server-side hint for logs/OpenAPI; authorities are
         // always resolved from the database at authentication time.
         .claim("role", role)
-        // The security version under which this session was minted (F02): the
+        // The security version under which this session was minted: the
         // auth filter rejects a token whose version no longer matches the
         // user's row, so a factor change revokes old access tokens immediately.
         .claim("sv", securityVersion)

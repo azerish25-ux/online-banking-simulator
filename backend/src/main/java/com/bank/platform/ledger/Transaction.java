@@ -38,7 +38,7 @@ public class Transaction {
   private String idempotencyKey;
 
   /**
-   * Canonical SHA-256 of the operation intent (F06): source, destination,
+   * Canonical SHA-256 of the operation intent: source, destination,
    * exact normalized amount, currency and normalized memo. An idempotent
    * replay carries the same hash and returns the original row; a reuse of the
    * key for a *different* intent hashes differently and is a conflict, never
@@ -68,7 +68,7 @@ public class Transaction {
   private Instant createdAt;
 
   /**
-   * When money actually moved (F04). Only POSTED rows carry one: HELD and
+   * When money actually moved. Only POSTED rows carry one: HELD and
    * CANCELLED rows are intents and keep it null. Reporting (statements,
    * monthly summaries, daily totals, public stats) cuts and buckets on this,
    * never on {@link #createdAt}, so an approval that lands after a month

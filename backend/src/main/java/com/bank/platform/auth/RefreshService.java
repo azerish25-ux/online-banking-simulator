@@ -24,7 +24,7 @@ public class RefreshService {
   public static final String COOKIE = "refresh_token";
   // Backwards-compatible default only: the LIVE cookie max age always comes
   // from cookieMaxAgeSeconds() so a configured AUTH_REFRESH_DAYS is honored by
-  // both the stored token and the browser cookie (F22).
+  // both the stored token and the browser cookie.
   public static final long COOKIE_MAX_AGE = 7 * 24 * 3600L;
 
   private final RefreshTokenRepository refreshTokens;

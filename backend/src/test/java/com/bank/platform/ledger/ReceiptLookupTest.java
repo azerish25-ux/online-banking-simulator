@@ -20,7 +20,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * F11 durable receipt lookup: GET /api/v1/transfers/{id} returns the caller's
+ * durable receipt lookup: GET /api/v1/transfers/{id} returns the caller's
  * own operation with its authoritative status and times, is bookmarkable, and
  * never discloses a foreign or unknown id (same 404 either way).
  */
@@ -79,7 +79,7 @@ class ReceiptLookupTest {
         .andReturn();
     JsonNode body = json.readValue(result.getResponse().getContentAsString(), JsonNode.class);
     assertEquals("HELD", body.get("status").asText());
-    assertTrue(body.get("postedAt").isNull(), "HELD row has no posting time (F04)");
+    assertTrue(body.get("postedAt").isNull(), "HELD row has no posting time");
     assertTrue(!body.get("createdAt").asText().isEmpty());
   }
 

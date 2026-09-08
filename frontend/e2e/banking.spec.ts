@@ -7,7 +7,7 @@ import { expect, test, type Page } from "@playwright/test";
  *
  * Flow relies on two deterministic facts: accounts list oldest-first
  * (CHECKING before SAVINGS), and the dashboard account list shows MASKED
- * identifiers (section 14) while each account's detail page shows the full
+ * identifiers while each account's detail page shows the full
  * simulator identifier - the transfers form only accepts full identifiers.
  */
 const email = `e2e-${Date.now()}@bank.local`;
@@ -15,7 +15,7 @@ const emailHeld = `e2e-held-${Date.now()}@bank.local`;
 
 /** Open account row `row` (1-based creation order: Checking, then Savings)
  *  and read its full simulator identifier from the detail page - the only
- *  place the dashboard shows it in full (section 14 masks the account list). */
+ *  place the dashboard shows it in full (the account list is masked). */
 async function accountIban(page: Page, row: number): Promise<string> {
   const links = page.locator("main table a[href*='/accounts/']");
   await links.nth(row - 1).click();
@@ -59,7 +59,7 @@ test("review-threshold transfer is held for review, never reported as posted", a
   await page.goto("/transfers");
   await page.getByLabel("Recipient IBAN").fill(savingsIban);
   await page.getByLabel("Amount (USD)").fill("10000.00");
-  // F11: submit opens REVIEW; Confirm & send actually submits.
+  // submit opens REVIEW; Confirm & send actually submits.
   await page.getByRole("button", { name: /Review transfer/ }).click();
   await expect(page.getByRole("region", { name: "Review your transfer" })).toBeVisible();
   await page.getByRole("button", { name: "Confirm & send" }).click();
@@ -109,7 +109,7 @@ test("full money loop in the browser", async ({ page }) => {
   await page.getByLabel("Recipient IBAN").fill(savingsIban.trim());
   await page.getByLabel("Amount (USD)").fill("120.00");
   await page.getByLabel("Memo (optional)").fill("e2e rent");
-  // F11: submit opens REVIEW; Confirm & send actually submits.
+  // submit opens REVIEW; Confirm & send actually submits.
   await page.getByRole("button", { name: /Review transfer/ }).click();
   await expect(page.getByRole("region", { name: "Review your transfer" })).toBeVisible();
   await page.getByRole("button", { name: "Confirm & send" }).click();
@@ -130,7 +130,7 @@ test("full money loop in the browser", async ({ page }) => {
   await page.goto(receiptHref as string);
   await expect(page.getByRole("heading", { name: "Transfer receipt" })).toBeVisible();
   await expect(page.getByText("Settled. The money moved")).toBeVisible();
-  // The sentence-case status badge next to the title (section 12).
+  // The sentence-case status badge next to the title.
   await expect(page.locator("main").getByText("Posted", { exact: true }).first()).toBeVisible();
 });
 

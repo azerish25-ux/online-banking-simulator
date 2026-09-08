@@ -67,7 +67,7 @@ Operators: `admin@bank.local` / `change-me-admin-123` → **Operations** in the 
 | `POST /api/v1/accounts/{id}/deposit` | owner | Simulated deposit rail, capped + flagged at the threshold |
 | `POST /api/v1/transfers` (+`Idempotency-Key`) | owner | Atomic transfer; ≥$10k returns HELD for operator review |
 | `GET /api/v1/transfers/{id}` | owner | Authorized operation detail backing the durable receipt route |
-| `GET /api/v1/operations?key=` | owner | Resolve your own unresolved operation by idempotency key (F06) |
+| `GET /api/v1/operations?key=` | owner | Resolve your own unresolved operation by idempotency key |
 | `GET /api/v1/transactions?accountId=&cursor=` | owner | Keyset-paged history, date filters (no OFFSET) |
 | `GET /api/v1/accounts/{id}/statement.csv` (.pdf) | owner | Dated statements (bounded windows) |
 | `GET /api/v1/accounts/{id}/summary?months=` | owner | Monthly inflow/outflow (cached after authorization) |

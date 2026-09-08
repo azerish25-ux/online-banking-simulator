@@ -6,7 +6,7 @@ import java.time.Duration;
 import org.springframework.stereotype.Component;
 
 /**
- * Per-ACCOUNT authentication throttle (F03). The per-IP filter cannot stop
+ * Per-ACCOUNT authentication throttle. The per-IP filter cannot stop
  * credential stuffing spread across many addresses, so failed logins for one
  * normalized account also share a bounded budget. Keys are normalized emails
  * and NEVER disclose whether the account exists: an unknown email burns the

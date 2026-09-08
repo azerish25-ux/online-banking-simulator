@@ -8,7 +8,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * F30 forward migration for secrets that predate custody. When a master key is
+ * Forward migration for secrets that predate custody. When a master key is
  * configured, every legacy version-0 plaintext row is encrypted in place on
  * startup and marked version 1. Idempotent and reversible with the same key;
  * it never runs when no key is configured (local plaintext demos stay as-is).

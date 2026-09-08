@@ -9,7 +9,7 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 /**
- * F15 reconciled cutover. Accounts that hold a pre-journal balance when this
+ * reconciled cutover. Accounts that hold a pre-journal balance when this
  * migration runs cannot have their history re-derived with certainty (the
  * legacy rows carry no reliable audit trail for every movement), so each gets
  * ONE explicitly labelled OPENING_BALANCE entry that reproduces its current

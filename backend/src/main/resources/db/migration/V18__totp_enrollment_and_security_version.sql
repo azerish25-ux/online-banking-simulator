@@ -1,4 +1,4 @@
--- V18: F02 - safe authenticator enrollment/replacement + session versioning.
+-- V18: safe authenticator enrollment/replacement + session versioning.
 --
 -- users.security_version: bumped on every factor change (enroll, replace,
 -- disable). Access tokens carry the version they were minted under; the auth

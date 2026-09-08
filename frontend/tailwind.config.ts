@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Simulator design tokens - the light financial workspace ( section 12).
+ * Simulator design tokens - the light financial workspace.
  *
  * One source of truth: cool gray workspace and white surfaces, near-navy
  * operational text, a deep-navy primary action, and semantic status pairs.

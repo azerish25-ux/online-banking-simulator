@@ -105,7 +105,7 @@ describe("transfers page HELD outcome", () => {
     await userEvent.type(await screen.findByLabelText("Recipient IBAN"), savings.iban);
     await userEvent.type(screen.getByLabelText("Amount (USD)"), "10000.00");
     await userEvent.type(screen.getByLabelText("Memo (optional)"), "big wire");
-    // F11: the first click opens REVIEW - nothing is sent yet.
+    // the first click opens REVIEW - nothing is sent yet.
     await userEvent.click(screen.getByRole("button", { name: /Review transfer/ }));
 
     // The review shows the exact frozen payload, and the submit button is gone

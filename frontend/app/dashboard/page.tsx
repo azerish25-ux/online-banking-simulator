@@ -36,7 +36,7 @@ function statusText(status: string): string {
 
 /** Exact debt test on the server's policy-derived total: a 0.0001 obligation
  *  is debt even though it rounds to $0.00. Never derive debt from a rounded
- *  balance figure ( section 14). */
+ *  balance figure. */
 function owesAnything(a: Account): boolean {
   const owed = toTenThousandths(a.totalOwed ?? "0.0000");
   return owed !== null && owed > 0n;
@@ -65,7 +65,7 @@ function StripCell({
 }
 
 /** Balance cell content for ONE account - shared by the desktop table row and
- *  the narrow stacked row so the two views can never disagree (F19). */
+ *  the narrow stacked row so the two views can never disagree. */
 function AccountAmount({ account }: { account: Account }) {
   if (account.type === "LOAN") {
     if (owesAnything(account)) {
@@ -109,7 +109,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
   const accounts = useAccounts();
 
   // The feed and chart scope is EXPLICIT - never an invisible first-account
-  // coupling (section 14). The choice lives in the URL so it survives navigation to
+  // coupling. The choice lives in the URL so it survives navigation to
   // account detail or Activity; the fallback is the first account only when
   // the URL names none.
   const [scopeOverride, setScopeOverride] = React.useState("");
@@ -194,7 +194,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
       ) : (
         <>
           {/* Summary strip - usable funds and debt are separate figures; net
-              position is never presented as spendable money (section 14). */}
+              position is never presented as spendable money. */}
           <Card className="mt-4">
             <div className="grid gap-4 md:grid-cols-3">
               <StripCell
@@ -347,7 +347,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
             )}
           </Card>
 
-          {/* The chart stays below the money and the account record (section 14). */}
+          {/* The chart stays below the money and the account record. */}
           <Card className="mt-4">
             <CardTitle>
               Money flow · {scopedAccount ? accountLabel(scopedAccount) : "selected account"} · last 6 months

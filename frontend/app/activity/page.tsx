@@ -36,7 +36,7 @@ type InitialParams = {
 };
 
 /** A URL date filter is only trusted when it is a real ISO calendar date;
- *  anything else is dropped (validated recoverable state, section 14). */
+ *  anything else is dropped (validated recoverable state). */
 function validDate(value: string | undefined): string {
   return value && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
@@ -96,10 +96,10 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
   const paramValid = list.some((a) => a.id === paramId);
   const accountId = paramValid ? paramId : list[0]?.id ?? "";
   // Drafts vs the APPLIED set: edits are drafts until "Apply" commits them to
-  // the URL and the server request (validated recoverable state, section 14).
+  // the URL and the server request (validated recoverable state).
   const [draft, setDraft] = React.useState<Applied>(appliedFromInitial(initial));
   const [applied, setApplied] = React.useState<Applied>(appliedFromInitial(initial));
-  // Keyset paging (F26): page i is fetched with the opaque cursor that page
+  // Keyset paging: page i is fetched with the opaque cursor that page
   // i-1 returned (blank = the newest page). The cursor is a position, so
   // previously loaded pages never duplicate or skip even when new rows land
   // mid-browse; a filter/account change starts a fresh browse at the newest
@@ -107,7 +107,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
   const [index, setIndex] = React.useState(0);
   const [cursors, setCursors] = React.useState<Record<number, string>>({ 0: "" });
   const cursor = cursors[index] ?? "";
-  // Server-backed filters ( section 14): every predicate is a SQL
+  // Server-backed filters: every predicate is a SQL
   // clause over the whole account history - the page never filters what a
   // loaded page already returned. An empty applied set is a normal browse.
   const filters: HistoryFilters | undefined = applied.min || applied.max || applied.kind || applied.status || applied.q
@@ -215,7 +215,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
     </>
   );
 
-  // Truthful account states (F10): a failed account list is an error with a
+  // Truthful account states: a failed account list is an error with a
   // retry (never "no accounts"); loading has skeletons; a genuinely empty
   // account list is the one case that says "open an account first".
   if (accounts.isError && accounts.data == null) {

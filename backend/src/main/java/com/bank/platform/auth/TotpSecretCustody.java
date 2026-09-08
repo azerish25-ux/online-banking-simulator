@@ -12,7 +12,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 /**
- * Custody boundary for TOTP seeds (F30). When {@code app.totp.master-key} is
+ * Custody boundary for TOTP seeds. When {@code app.totp.master-key} is
  * configured, a seed is never written to the database in recoverable form:
  * it is encrypted with AES-256-GCM under a key derived from the deployment
  * key, with a fresh random nonce per encryption and the owning user id bound

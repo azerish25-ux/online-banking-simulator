@@ -15,7 +15,7 @@ import { maskIban, usdReview } from "../../../../lib/format";
 import { Routes } from "../../../../lib/routes";
 
 /**
- * Durable, bookmarkable receipt (F11). The URL carries only the operation id;
+ * Durable, bookmarkable receipt. The URL carries only the operation id;
  * the page fetches the caller's own operation from the authorized lookup
  * (`GET /v1/transfers/{id}`), so a reload - or a HELD→POSTED transition made
  * later - shows the CURRENT authoritative status and posting time, never a
@@ -26,7 +26,7 @@ export default function TransferReceiptPage({ params }: { params: Promise<{ id: 
   const { id } = React.use(params);
   const receipt = useTransferReceipt(id);
   // A 404/410 means the operation does not exist or is not the caller's; any
-  // other failure is a load problem with a retry (F10).
+  // other failure is a load problem with a retry.
   const notFound =
     receipt.isError && (receipt.error?.status === 404 || receipt.error?.status === 410);
 

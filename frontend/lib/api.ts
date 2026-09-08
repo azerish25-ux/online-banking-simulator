@@ -34,7 +34,7 @@ export function getToken(): string | null {
 /**
  * Fallback cookie lifetime (seconds) when no VALIDATED session configuration
  * has been seen yet. The authoritative value always comes from an
- * authentication response's expiresInSeconds ( section 9: "derive
+ * authentication response's expiresInSeconds ("derive
  * access-cookie lifetime from validated session configuration rather than
  * the hard-coded lifetime") - this constant only sizes a cookie set by test
  * helpers or defensive paths that lack a validated number.
@@ -66,7 +66,7 @@ function isSecureContext(): boolean {
 }
 
 /** Installs an access token; pass the AUTH RESPONSE's expiresInSeconds when
- *  one is available so the cookie dies exactly when the JWT does (F22). */
+ *  one is available so the cookie dies exactly when the JWT does. */
 export function setToken(token: string, maxAgeSeconds?: number) {
   document.cookie = tokenCookie(token, maxAgeSeconds);
 }
@@ -74,7 +74,7 @@ export function setToken(token: string, maxAgeSeconds?: number) {
 export function clearToken() {
   document.cookie = "bank_token=; path=/; max-age=0";
   // The logout/expiry boundary must not carry an unresolved operation identity
-  // into another session (F06): the key only means something while the user
+  // into another session: the key only means something while the user
   // who minted it is signed in.
   clearAllPendingOperations();
 }
@@ -97,7 +97,7 @@ function safeJson(
  */
 export const SESSION_EXPIRED_EVENT = "simulator:session-expired";
 
-// Cross-tab session announcements (F22). The browser cookie jar is shared, so
+// Cross-tab session announcements. The browser cookie jar is shared, so
 // a successful refresh in ONE tab already fixes the others - but tabs must
 // not ROTATE THE SAME refresh token simultaneously (double-use burns the
 // whole family server-side), and a logout/expiry in one tab must evict the
@@ -155,7 +155,7 @@ const NO_RETRY = new Set(["/v1/auth/login", "/v1/auth/register", "/v1/auth/refre
 
 /**
  * Endpoints whose controller answers 401 for WRONG CREDENTIALS on a perfectly
- * valid session (F02: TOTP enable/disable reject a bad password or code with
+ * valid session (TOTP enable/disable reject a bad password or code with
  * BadCredentials). After the silent-refresh retry such a 401 is a definitive
  * business rejection - surfacing it must NOT nuke the session the way an
  * unrecoverable "token revoked" 401 does. Endpoints outside this set keep the
@@ -166,7 +166,7 @@ const DEFINITIVE_401 = new Set(["/v1/auth/totp/enable", "/v1/auth/totp/disable"]
 let refreshing: Promise<void> | null = null;
 
 /**
- * Serializes the browser-wide refresh rotation (F22). One Web Lock per
+ * Serializes the browser-wide refresh rotation. One Web Lock per
  * browser, so two tabs that hit expiry together cannot both spend the SAME
  * refresh token: the loser waits, re-checks whether the winner already
  * rotated (the JS-readable bank_token changed), and skips its own rotation.
@@ -196,7 +196,7 @@ async function withRefreshLock(task: () => Promise<void>): Promise<void> {
  * expiresInSeconds): login/register, MFA verification, and the factor
  * changes that reissue credentials under a new security version. ONLY these
  * may install credentials - a resource endpoint must never be able to plant
- * an arbitrary accessToken into the cookie jar ( section 9).
+ * an arbitrary accessToken into the cookie jar.
  */
 const AUTH_SESSION_PATHS = new Set([
   "/v1/auth/login",
@@ -318,7 +318,7 @@ export async function api<T>(path: string, options: RequestInit = {}): Promise<T
   // factor changes like totp/enable that bump the security version and would
   // otherwise kill the current access token) reissue credentials in their
   // AuthResponse. Adopt the fresh token ONLY from those validated endpoints,
-  // and only when the body actually is an AuthResponse ( section 9): a
+  // and only when the body actually is an AuthResponse: a
   // resource endpoint can never plant an arbitrary accessToken into the
   // cookie jar, and the cookie's Max-Age mirrors the validated lifetime.
   if (AUTH_SESSION_PATHS.has(path) && isValidAuthBody(data)) {

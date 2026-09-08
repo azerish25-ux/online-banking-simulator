@@ -91,12 +91,12 @@ public class TransferController {
     // owns; a null side means the side is open (the queries are null-tolerant,
     // so no sentinel bounds exist). An inverted from/to pair is rejected by
     // Period and surfaces as a 400 before any query runs. The cursor is the
-    // opaque position AFTER the previously returned page (F26): an absent or
+    // opaque position AFTER the previously returned page: an absent or
     // null cursor is the newest page, and a malformed one is a 400 - keyset
     // paging has no "absurd depth" to clamp because it never re-scans an
     // offset.
     Period window = new Period(from, to);
-    // section 14 server-backed filters: amount range, kind(s), state(s) and a
+    // server-backed filters: amount range, kind(s), state(s) and a
     // reference/counterparty search are VALIDATED here (400 before any query)
     // and then become SQL predicates over the whole account history - never a
     // client-side filter of the loaded page. "Searching" a 10-row page is
@@ -113,7 +113,7 @@ public class TransferController {
     String term = q == null || q.isBlank() ? null : q.trim();
     if (term != null && term.length() < 2) {
       // A one-character LIKE over every memo and counter-party IBAN is not a
-      // search - it is a scan. Bound expensive searches (section 14).
+      // search - it is a scan. Bound expensive searches.
       throw new IllegalArgumentException(
           "Search term must be at least 2 characters");
     }
@@ -191,7 +191,7 @@ public class TransferController {
   }
 
   /**
-   * Operation-status lookup by idempotency key (F06). Ownership is
+   * Operation-status lookup by idempotency key. Ownership is
    * originator-scoped: only the user whose account carries the key may see
    * the operation - a foreign or unknown key is indistinguishable (404), so
    * probing never discloses another user's row. A client that lost the
@@ -215,7 +215,7 @@ public class TransferController {
   }
 
   /**
-   * Authorized recovery list (F06 namespace fix): the caller's own recent
+   * Authorized recovery list (namespace fix): the caller's own recent
    * keyed transfers and deposits, newest first, bounded - including
    * completed-but-unacknowledged postings. After a lost response, a reload
    * or a re-login the owner can rediscover what a key actually did without
@@ -231,7 +231,7 @@ public class TransferController {
   }
 
   /**
-   * One of the caller's own transactions by id (F11 durable receipt). The
+   * One of the caller's own transactions by id (durable receipt). The
    * receipt URL is bookmarkable: it carries only the operation id, and the
    * lookup is originator-scoped server-side (a foreign or unknown id is the
    * same 404, so nothing is disclosed). Re-fetching after a HELD→POSTED

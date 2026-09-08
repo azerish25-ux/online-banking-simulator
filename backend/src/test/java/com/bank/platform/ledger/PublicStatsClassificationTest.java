@@ -21,10 +21,10 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * F28 - public landing numbers classify transfers by KIND and posted status,
+ * public landing numbers classify transfers by KIND and posted status,
  * never by row shape.
  *
- * <p>The pre-F28 query counted every settled row that had a from side. The
+ * <p>The previous query counted every settled row that had a from side. The
  * interest engine posts LOAN charges with a from side and no to side, so a
  * busy interest run inflated the hero's "transfers" figure with engine
  * bookkeeping. This matrix pins the policy: exactly POSTED rows the rail

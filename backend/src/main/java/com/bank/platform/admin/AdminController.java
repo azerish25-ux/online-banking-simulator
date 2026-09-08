@@ -91,7 +91,7 @@ public class AdminController {
 
   /**
    * Dead-lettered (or any-status) external mail, for the operator's retry
-   * path (F25). Only PENDING rows are in flight; FAILED rows have exhausted
+   * path. Only PENDING rows are in flight; FAILED rows have exhausted
    * their delivery budget and need a decision. Recipient addresses are the
    * operator's business - this is the internal ops tool, not a public feed.
    */
@@ -102,7 +102,7 @@ public class AdminController {
     return emailOutbox.list(status, capped(pageable)).map(EmailOutboxRow::from);
   }
 
-  /** Requeue one dead letter for another bounded delivery attempt (F25). */
+  /** Requeue one dead letter for another bounded delivery attempt. */
   @PostMapping("/email-outbox/{id}/retry")
   @org.springframework.web.bind.annotation.ResponseStatus(
       org.springframework.http.HttpStatus.NO_CONTENT)
@@ -126,7 +126,7 @@ public class AdminController {
   }
 
   /**
-   * Independent reconciliation (F15): derived-from-journal account checks,
+   * Independent reconciliation: derived-from-journal account checks,
    * per-currency balancing, duplicate operation entries and unexplained
    * movements. Operator-visible so a drift between the journal and the
    * balance projections is surfaced instead of silently absorbed.
@@ -212,7 +212,7 @@ public class AdminController {
   }
 
   /**
-   * The F21 kind-review quarantine: every legacy transaction whose kind was
+   * The kind-review quarantine: every legacy transaction whose kind was
    * corrected from structural/audit evidence, or labelled UNCERTAIN because no
    * evidence proved it, is listed here with its original classification and
    * the reason. Operators see exactly what was decided - nothing was silently
@@ -227,14 +227,14 @@ public class AdminController {
         .toList();
   }
 
-  /** One archived classification decision (F21). */
+  /** One archived classification decision. */
   public record KindReviewResponse(
       String transactionId, String priorKind, String reason,
       @io.swagger.v3.oas.annotations.media.Schema(nullable = true) String memoSnippet,
       String reviewedAt) {}
 
   /**
-   * Operator decision bodies ( section 16): a bounded REQUIRED reason
+   * Operator decision bodies: a bounded REQUIRED reason
    * plus the case state the operator saw. A body that omits them is accepted
    * only for programmatic callers (a bounded default reason is recorded); the
    * console always sends the exact state it displayed, so a stale decision

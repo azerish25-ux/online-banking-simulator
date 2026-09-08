@@ -14,7 +14,7 @@ const buttonVariants = cva(
       },
       size: {
         sm: "h-8 px-3",
-        // 44px primary-control height is this project's design target (section 17).
+        // 44px primary-control height is this project's design target.
         md: "h-11 px-5",
         lg: "h-12 px-6 text-base"
       }

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * F23 real-browser witness. The Phase A prod smoke curled headers and grepped
+ * Real-browser witness. An earlier prod smoke curled headers and grepped
  * for nonces; this spec walks the LIVE pages in a real browser against the
  * ephemeral production build (next start, NOT next dev - dev relaxes the CSP
  * with unsafe-eval/unsafe-inline):

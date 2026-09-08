@@ -4,7 +4,7 @@ import java.util.UUID;
 
 /**
  * An operator decision arrived for a case that is no longer in the state the
- * operator acted on ( section 16). Either another operator already
+ * operator acted on. Either another operator already
  * decided it (approval, decline, or acknowledgement) or the row moved on. The
  * caller must NOT keep its optimistic toast: it needs the current state, so
  * this answers 409 with the observed status and the queue refreshes to show

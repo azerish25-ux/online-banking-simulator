@@ -21,7 +21,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Operation recovery semantics (F06 namespace fix): the key namespace is the
+ * Operation recovery semantics (namespace fix): the key namespace is the
  * originating account, so recovery must be unambiguous - an owner with the
  * same key string on two of their own accounts gets a typed 409 from a
  * key-only lookup (never an arbitrary row), the account-scoped lookup

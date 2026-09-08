@@ -14,7 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
 /**
- * F07 - the cache policy that actually runs must be the policy that was
+ * the cache policy that actually runs must be the policy that was
  * configured. The old {@code app.cache.caffeine.spec} string sat in a
  * namespace Spring never read, so the summaries/public-stats caches ran
  * unbounded and immortal while the YAML promised a 5-minute TTL and a

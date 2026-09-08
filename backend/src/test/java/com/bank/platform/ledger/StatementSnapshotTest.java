@@ -26,7 +26,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * F05 - a statement is ONE immutable snapshot, not a pastiche of reads.
+ * a statement is ONE immutable snapshot, not a pastiche of reads.
  *
  * <p>The account moves money in two distinct months under a pinned business
  * clock. A statement over the earlier month must then show exactly that

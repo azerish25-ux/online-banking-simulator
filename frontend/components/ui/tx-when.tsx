@@ -4,8 +4,8 @@ import { fmtDate } from "../../lib/format";
 /**
  * The financial date of a row is its POSTING time; the request time is shown
  * only when it differs. A HELD/CANCELLED row has no posting time at all and
- * must never read as having settled - section 14 (requested time is
- * not a settlement date) and section 15 (HELD/CANCELLED never posted).
+ * must never read as having settled - a requested time is
+ * not a settlement date, and HELD/CANCELLED rows were never posted.
  */
 export function TxWhen({ tx }: { tx: Tx }) {
   if (tx.status === "POSTED") {

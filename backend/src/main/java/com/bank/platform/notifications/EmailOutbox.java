@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One committed external-delivery intent (F25). The row is written in the
+ * One committed external-delivery intent. The row is written in the
  * SAME transaction as the operation that produced it, and only a worker that
  * claims it AFTER that commit may call the provider - so a rolled-back
  * operation never sends mail, and a committed operation's mail cannot be

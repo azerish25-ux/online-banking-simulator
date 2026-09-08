@@ -14,14 +14,14 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilder;
 
 /**
- * F03: forwarding headers are trusted ONLY when the direct socket peer is
+ * forwarding headers are trusted ONLY when the direct socket peer is
  * inside the configured CIDR allowlist. Allowlisted peers get per-real-client
  * buckets (not one shared bucket for the proxy); every other peer is bucketed
  * by its socket address, so spoofed X-Forwarded-For can never mint a fresh
  * budget. The default (no allowlist) stays spoof-proof - see RateLimitTest.
  *
  * <p>Every test uses its own account email: the per-account login throttle
- * (F03) is deliberately NOT reset by a new client IP, so a shared fixture
+ * is deliberately NOT reset by a new client IP, so a shared fixture
  * email would exhaust the account budget across methods and mask what the IP
  * buckets are doing.
  */

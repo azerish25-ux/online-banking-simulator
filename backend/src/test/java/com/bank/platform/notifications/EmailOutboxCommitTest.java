@@ -36,7 +36,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.support.TransactionTemplate;
 
 /**
- * F25 - external delivery is an OUTBOX INTENT committed with the operation,
+ * external delivery is an OUTBOX INTENT committed with the operation,
  * never a provider call inside the transaction.
  *
  * <p>These tests run on their own in-memory database (isolated datasource

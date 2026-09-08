@@ -12,7 +12,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * F15 reconciled cutover against real PostgreSQL (disposable database only).
+ * Reconciled cutover against real PostgreSQL (disposable database only).
  *
  * <p>This test deliberately does NOT boot the Spring context. It migrates a
  * fresh database up to V21 (the journal schema, before the cutover runs),

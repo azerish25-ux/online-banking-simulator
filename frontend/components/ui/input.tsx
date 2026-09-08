@@ -28,7 +28,7 @@ export function Field({
   error?: string;
   hint?: string;
   /**
-   * Explicit control-ID contract (F18): when the caller already owns the
+   * Explicit control-ID contract: when the caller already owns the
    * control's id (e.g. it renders a non-element composition or needs the id
    * elsewhere), pass it here and Field will NOT clone the child - the label,
    * hint and error are all wired to that id.

@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * F02 regression: enrolling is a separate PENDING state. Starting a setup can
+ * regression: enrolling is a separate PENDING state. Starting a setup can
  * never destroy an active factor; replacing or disabling one requires the
  * current password plus proof of the EXISTING authenticator, and promotion
  * revokes old credentials immediately (security-version bump + refresh burn).

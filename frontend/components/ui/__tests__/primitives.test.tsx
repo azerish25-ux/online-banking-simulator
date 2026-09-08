@@ -69,7 +69,7 @@ describe("Field", () => {
     expect(screen.queryByRole("alert")).toBeNull();
   });
 
-  it("associates the control with its hint via aria-describedby (F18)", () => {
+  it("associates the control with its hint via aria-describedby", () => {
     render(
       <Field label="Amount" hint="Simulated rail.">
         <Input />
@@ -82,7 +82,7 @@ describe("Field", () => {
     expect(hint).toHaveTextContent("Simulated rail.");
   });
 
-  it("merges a caller aria-describedby and marks the control invalid on error (F18)", () => {
+  it("merges a caller aria-describedby and marks the control invalid on error", () => {
     render(
       <Field label="IBAN" error="Not a valid IBAN.">
         <Input aria-describedby="helper-1" />
@@ -96,7 +96,7 @@ describe("Field", () => {
     expect(document.getElementById(errorId as string)).toHaveTextContent("Not a valid IBAN.");
   });
 
-  it("honors an explicit controlId without cloning the child (F18)", () => {
+  it("honors an explicit controlId without cloning the child", () => {
     const id = "amount-control";
     render(
       <Field label="Amount" controlId={id}>
@@ -107,7 +107,7 @@ describe("Field", () => {
     expect(screen.getByLabelText("Amount")).toBe(control);
   });
 
-  it("wires the first element child even when siblings make children an array (F18 regression)", () => {
+  it("wires the first element child even when siblings make children an array (regression)", () => {
     // JSX turns `oneControl + siblingParagraph` into an array child; the
     // control must still receive the id the label points at (open-account
     // dialog: a Select next to a conditionally-rendered loan hint).
@@ -138,7 +138,7 @@ describe("Modal", () => {
     expect(screen.getByRole("button", { name: "Close dialog" })).toHaveFocus();
   });
 
-  it("locks background scroll while open and restores it on close (F09)", () => {
+  it("locks background scroll while open and restores it on close", () => {
     const { rerender } = render(
       <Modal open onClose={() => {}} title="Deposit funds"><p>content</p></Modal>
     );
@@ -147,7 +147,7 @@ describe("Modal", () => {
     expect(document.body.style.overflow).toBe("");
   });
 
-  it("never steals focus from a typed control when the onClose identity changes (F09)", async () => {
+  it("never steals focus from a typed control when the onClose identity changes", async () => {
     // The input's value lives in the harness, so every keystroke re-renders
     // it and re-creates the inline onClose. A focus lifecycle keyed on the
     // callback identity would yank focus back to the close button after each
@@ -210,7 +210,7 @@ describe("Modal", () => {
 });
 
 describe("Table", () => {
-  it("merges caller alignment with the base cell padding (F18)", () => {
+  it("merges caller alignment with the base cell padding", () => {
     render(
       <Table>
         <THead className="sr-only">
@@ -239,7 +239,7 @@ describe("Table", () => {
 });
 
 describe("TxStatusBadge", () => {
-  it("labels an unknown server value explicitly instead of assuming POSTED (F11)", () => {
+  it("labels an unknown server value explicitly instead of assuming POSTED", () => {
     render(<TxStatusBadge />);
     expect(screen.getByText("Unknown")).toBeInTheDocument();
     expect(screen.queryByText("POSTED")).toBeNull();
@@ -275,7 +275,7 @@ describe("SpendingChart", () => {
     // Two bars per month + two legend swatches.
     expect(container.querySelectorAll("rect")).toHaveLength(data.length * 2 + 2);
     // Month labels appear once in the chart AND once in its sr-only data table
-    // (F19) - so assert inside the svg for the geometry, then confirm the
+    // - so assert inside the svg for the geometry, then confirm the
     // table exists as the accessible equivalent.
     expect(svg?.textContent).toContain("Apr");
     expect(svg?.textContent).toContain("May");

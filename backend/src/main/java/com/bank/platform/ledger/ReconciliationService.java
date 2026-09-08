@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Independent reconciliation (F15, V29). Derives what every customer balance
+ * Independent reconciliation (V29). Derives what every customer balance
  * SHOULD be from the journal alone - never by comparing the balance table
  * with itself - and reports three distinct layers so that a green \"the books
  * add up\" is never mistaken for \"every transaction was justified\":\n"

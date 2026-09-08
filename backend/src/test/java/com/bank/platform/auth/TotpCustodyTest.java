@@ -10,7 +10,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * F30 custody boundary: with a master key the stored payload never contains
+ * custody boundary: with a master key the stored payload never contains
  * the seed, round-trips through AES-256-GCM, and cannot be decrypted with a
  * wrong key, a tampered payload, or under another user's identity (AAD).
  */

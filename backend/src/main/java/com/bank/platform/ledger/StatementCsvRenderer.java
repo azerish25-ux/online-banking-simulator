@@ -9,7 +9,7 @@ import java.time.ZoneOffset;
  * <p>Pure: it reads ONLY the immutable {@link StatementService.Statement} it
  * is handed - no repository, no clock, no transaction - so the exported
  * rows can never come from a different database snapshot than the figures
- * beside them (F05). The caller (StatementService) owns the repeatable-read
+ * beside them. The caller (StatementService) owns the repeatable-read
  * boundary that builds the Statement; this class only turns immutable value
  * rows into escaped, ready-to-stream CSV.
  */

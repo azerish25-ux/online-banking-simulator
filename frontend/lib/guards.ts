@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Runtime response guards (F14). Generated types describe the contract at
+ * Runtime response guards. Generated types describe the contract at
  * compile time, but a server that misbehaves (or a proxy that rewrites a
  * body) must not be trusted just because TypeScript believes the shape - the
  * few places where the CLIENT BRANCHES on a response (login: session vs MFA
@@ -54,7 +54,7 @@ export const mfaChallengeSchema = z.object({
 export const loginOutcomeSchema = z.union([authSessionSchema, mfaChallengeSchema]);
 
 // ---------------------------------------------------------------------------
-// Financial read-model guards ( section 11): money, statuses, and
+// Financial read-model guards: money, statuses, and
 // timestamps are validated at runtime before the UI displays or branches on
 // them. A malformed decimal must never be coerced into a zero balance; an
 // unsupported state must never silently render as POSTED. Schemas stay
@@ -93,7 +93,7 @@ export const accountSchema = z
     type: accountTypeSchema,
     balance: amountString,
     status: accountStatusSchema,
-    // Loan-only authoritative fields (section 7): null on non-loans; tolerated when
+    // Loan-only authoritative fields: null on non-loans; tolerated when
     // absent (an older response) but validated when present.
     principalOwed: nullableAmount,
     interestOwed: nullableAmount,
@@ -132,7 +132,7 @@ export const transactionSchema = z
 
 export const transactionListSchema = z.array(transactionSchema);
 
-/** The cursor-paged history envelope (F26). */
+/** The cursor-paged history envelope. */
 export const historyPageSchema = z.object({
   items: transactionListSchema,
   total: z.number().int().nonnegative(),

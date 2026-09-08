@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * F26 - the history feed pages with a keyset cursor over the immutable
+ * the history feed pages with a keyset cursor over the immutable
  * (created_at, seq) ordering key, never an OFFSET.
  *
  * <p>Every deposit in these tests shares one fixed business clock, so rows tie

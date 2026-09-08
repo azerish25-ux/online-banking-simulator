@@ -34,7 +34,7 @@ public final class AccountMapper {
     return totalOwed(account).subtract(account.getPrincipal()).max(BigDecimal.ZERO);
   }
 
-  /** Available credit is the PRINCIPAL headroom, not balance-based (F16/section 7). */
+  /** Available credit is the PRINCIPAL headroom, not balance-based. */
   static BigDecimal availableCredit(Account account) {
     return account.getCreditLimit().subtract(account.getPrincipal()).max(BigDecimal.ZERO);
   }

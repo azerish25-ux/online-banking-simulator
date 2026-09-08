@@ -25,7 +25,7 @@ import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * F04: request time and posting time are separate facts. A review-threshold
+ * request time and posting time are separate facts. A review-threshold
  * transfer is REQUESTED when its HELD row is created and only POSTS when an
  * operator approves it - across a month boundary on purpose here. Statements,
  * monthly summaries and daily totals must cut on the posting time (money in
@@ -168,7 +168,7 @@ class PostingTimeTest {
     org.junit.jupiter.api.Assertions.assertTrue(janCsv.contains("15000.0000"),
         "January statement shows the January posting");
 
-    // A second review of the same row is a stale decision (section 16): the case was
+    // A second review of the same row is a stale decision: the case was
     // already settled AND reviewed, so the operator endpoint answers 409 and
     // the losing console refreshes to the winner's POSTED outcome - money
     // cannot move a second time.

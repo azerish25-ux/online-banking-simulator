@@ -42,14 +42,14 @@ public final class AuthDtos {
   /**
    * Enabling a NEW factor only needs the new code. REPLACING an active factor
    * additionally requires the current password and a code from the existing
-   * authenticator (F02 reauthentication boundary).
+   * authenticator (reauthentication boundary).
    */
   public record TotpEnableRequest(
       @NotBlank String code,
       String currentPassword,
       String currentCode) {}
 
-  /** Disabling an active factor requires password + current factor code (F02). */
+  /** Disabling an active factor requires password + current factor code. */
   public record TotpDisableRequest(@NotBlank String password, @NotBlank String code) {}
 
   public record TotpSetupResponse(String secret, String qrDataUri) {}

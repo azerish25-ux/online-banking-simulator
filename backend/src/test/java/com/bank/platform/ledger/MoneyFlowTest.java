@@ -75,7 +75,7 @@ class MoneyFlowTest {
     String txId = objectMapper.readValue(first.getResponse().getContentAsString(), JsonNode.class)
         .get("id").asText();
 
-    // Replay with the same key and the SAME intent (F06): same row, balances
+    // Replay with the same key and the SAME intent: same row, balances
     // untouched. A changed payload under a used key is a conflict - see
     // IdempotencyScopingTest.changedIntentUnderSameKeyIsAConflict.
     MvcResult replay = mvc.perform(post("/api/v1/transfers")

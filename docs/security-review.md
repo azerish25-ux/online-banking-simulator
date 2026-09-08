@@ -1,6 +1,6 @@
 # Security Review
 
-(Originally "Part 6"; re-verified through the hardening release - refresh
+Re-verified through the hardening release - refresh
 rotation, TOTP, proxy-header trust flag, deposit caps, RFC-7807 everywhere -
 and again through the 1.1.0 deep-dive audit of 2026-09-04 (session-refresh
 persistence, idempotency scoping, the interest race, the TOTP web UI, a
@@ -13,24 +13,23 @@ passwords by UTF-8 byte length instead of characters. The 1.3.0 audit
 (2026-09-05) throttled TOTP verification per account, tied the access-token
 cookie to its JWT's lifetime, capped credit at one open loan, made history
 orderings deterministic via the `seq` column, and paginated the review queue.
-The same-day hardening release added the reconciled journal + posting-time
-(F15/F04), scoped idempotency with a request fingerprint (F06), resumable
-interest (F16), an email outbox that commits delivery intent with the operation
-(F25), keyset history pagination (F26), evidence-backed kind classification
-(V24), and the honest OpenAPI contract (F14).)
+The same-day 1.3.x hardening campaign added the reconciled journal + posting-time,
+scoped idempotency with a request fingerprint, resumable
+interest, an email outbox that commits delivery intent with the operation,
+keyset history pagination, evidence-backed kind classification
+(V24), and the honest OpenAPI contract.)
 
 Scope: Spring Boot API + Next.js frontend, local single-instance deployment.
 Method: code review + automated tests + disposable-real-PostgreSQL runs. As of
-the N-pass (residual closure, 2026-09-06), backend `./mvnw -B verify` is
+the latest residual closure (2026-09-06), backend `./mvnw -B verify` is
 green at **176 tests / 0 failures** (JaCoCo gate met) and frontend
 lint/tsc/vitest are green at **98 tests**; the migration/journal/concurrency
 ITs are additionally run against real PostgreSQL in CI (job-scoped services)
 and against disposable local databases - never `bankdb`. This document's
 claims follow the implementation. The hardening campaign is merged via PR #17
-(the F01-F30 campaign plus a CI test-isolation fix) and the G1-G5 audit pass
-via PR #18,
-and the N01-N04 residual closure currently sits as an uncommitted working-tree
-diff on `master` (per policy). CI runs eight jobs (backend incl. the kindchain
+(the F01-F30 campaign plus a CI test-isolation fix), the audit close-out via
+PR #18,
+and the residual closure as the following hardening commits on `master`. CI runs eight jobs (backend incl. the kindchain
 IT step, frontend, docker, concurrency-postgres, cutover-postgres,
 journal-postgres, contract, banking-e2e); the local Playwright sweep passed
 19/19 on 2026-09-05 and re-passed 19/19 on 2026-09-06 on an ephemeral stack.
@@ -40,9 +39,9 @@ journal-postgres, contract, banking-e2e); the local Playwright sweep passed
 | # | Control | How it holds |
 |---|---------|--------------|
 | 1 | Password storage | BCrypt(12), never logged or returned (no getter on the wire; `UserResponse` excludes hash); the 72-byte BCrypt ceiling is enforced as bytes (`@PasswordBytes`), so multibyte passwords can't silently truncate |
-| 2 | AuthN | JWT HS256 (algorithm pinned), 15-min access tokens, `sub`/`role`/`iss`/`aud`/`jti`/`purpose`/`sv` claims, signature + algorithm + issuer + audience + purpose verified per request; access and MFA-challenge tokens are mutually exclusive (typed parse paths, F01) |
+| 2 | AuthN | JWT HS256 (algorithm pinned), 15-min access tokens, `sub`/`role`/`iss`/`aud`/`jti`/`purpose`/`sv` claims, signature + algorithm + issuer + audience + purpose verified per request; access and MFA-challenge tokens are mutually exclusive (typed parse paths) |
 | 3 | AuthZ | Stateless filter sets `ROLE_*`; `/admin/**` additionally guarded by `@PreAuthorize("hasRole('ADMIN')")` (defense in depth: `AdminService` re-checks the role). Credit is bounded: at most one open LOAN account per user (service check + PostgreSQL partial unique index, V15) |
-| 4 | Credential stuffing | Token-bucket rate limit on login/register/mfa-verify (20/min default, `Retry-After`, isolated test at 5/min). Client identity (F03): forwarding headers are honored ONLY when the direct socket peer is inside the `RATE_LIMIT_TRUSTED_PROXIES` CIDR allowlist (default empty = never), so a spoofed `X-Forwarded-For` cannot mint a fresh bucket - the key is the socket address. That is spoof-proof but coarse behind a proxy: every request through one Next.js proxy shares its socket bucket in the compose/dev topology, so the real per-identity protection is the per-account login/TOTP budget (10 fails/15 min per account, existence-safe) on top of the network bucket. `RateLimitTrustedProxyTest` (5) pins the allowlist boundary (forged IPv4/IPv6, chains, malformed/oversized values, distinct clients staying distinct) |
+| 4 | Credential stuffing | Token-bucket rate limit on login/register/mfa-verify (20/min default, `Retry-After`, isolated test at 5/min). Client identity: forwarding headers are honored ONLY when the direct socket peer is inside the `RATE_LIMIT_TRUSTED_PROXIES` CIDR allowlist (default empty = never), so a spoofed `X-Forwarded-For` cannot mint a fresh bucket - the key is the socket address. That is spoof-proof but coarse behind a proxy: every request through one Next.js proxy shares its socket bucket in the compose/dev topology, so the real per-identity protection is the per-account login/TOTP budget (10 fails/15 min per account, existence-safe) on top of the network bucket. `RateLimitTrustedProxyTest` (5) pins the allowlist boundary (forged IPv4/IPv6, chains, malformed/oversized values, distinct clients staying distinct) |
 | 4b | TOTP brute force | Six-digit codes are only 10^6 values, so a per-IP limit alone cannot stop guessing from many addresses or from a held session. `mfa/verify`, `totp/enable` and `totp/disable` share a per-account failure budget (5/min, success resets) that answers 429 `Retry-After` when exhausted (`TotpThrottle`) |
 | 5 | Login enumeration | Identical "Invalid email or password" for unknown email vs wrong password; register-duplicate 409 is accepted tradeoff |
 | 6 | Money safety | Pessimistic locking (ID-ordered), `NUMERIC(19,4)` + `BigDecimal`, amounts as JSON strings; idempotency keys scoped to owner + source account + kind (a foreign replay returns 404, never another user's row); interest accrual selects candidates `FOR UPDATE` so concurrent runs can't double-accrue |
@@ -63,9 +62,9 @@ journal-postgres, contract, banking-e2e); the local Playwright sweep passed
 4. **No account lockout** - per-IP rate limiting + BCrypt cost + the per-account TOTP budget make online brute force uneconomical; a hard lockout would risk user-enumeration and support load.
 5. **Middleware role check is UX-only** - it decodes (not verifies) the JWT for routing; the API re-verifies signature + role on every call.
 6. **Idle sessions bounce on next navigation** - the `bank_token` cookie's Max-Age mirrors the 15-minute JWT (a stolen cookie dies with the token it carries), so a session idle past that TTL is redirected to login on its next page load even though the HttpOnly refresh cookie could still repair it. Active sessions rotate silently and never notice; a full BFF (no browser-visible tokens) would remove the trade-off.
-7. **Real-tab browser witnesses run locally on an ephemeral stack** - Playwright sweeps passed 19/19 on 2026-09-05 and 19/19 on 2026-09-06 against a second backend (:8081, disposable PostgreSQL, `APP_JWT_ACCESS_SECONDS=15`) and a second frontend (:3111, built with `BACKEND_URL` baked at build time, `APP_CORS_ORIGINS` including the ephemeral origin) - the user's pre-existing :3000/:8080 processes stay untouched. Since the N-pass, a default local `npx playwright test` boots its own fresh build on :3000 and FAILS loudly when the port is occupied (no stale-app testing), an `e2e/global-setup.ts` identity probe guards `E2E_BASE_URL` runs, and the a11y spec seeds through the same frontend proxy the browser uses. The sweeps gave the F22 two-tab refresh/peer-logout witness and the F23 live-page CSP-nonce witness their real-browser evidence (CI's `banking-e2e` job remains the canonical gate on every push). One caveat: the app's CORS allow-list is enforced per-origin even behind the same-origin proxy (the rewrite forwards `Origin`), so any future ephemeral frontend must add its origin to `APP_CORS_ORIGINS`.
+7. **Real-tab browser witnesses run locally on an ephemeral stack** - Playwright sweeps passed 19/19 on 2026-09-05 and 19/19 on 2026-09-06 against a second backend (:8081, disposable PostgreSQL, `APP_JWT_ACCESS_SECONDS=15`) and a second frontend (:3111, built with `BACKEND_URL` baked at build time, `APP_CORS_ORIGINS` including the ephemeral origin) - the user's pre-existing :3000/:8080 processes stay untouched. Since that closure pass, a default local `npx playwright test` boots its own fresh build on :3000 and FAILS loudly when the port is occupied (no stale-app testing), an `e2e/global-setup.ts` identity probe guards `E2E_BASE_URL` runs, and the a11y spec seeds through the same frontend proxy the browser uses. The sweeps gave the two-tab refresh/peer-logout witness and the live-page CSP-nonce witness their real-browser evidence (CI's `banking-e2e` job remains the canonical gate on every push). One caveat: the app's CORS allow-list is enforced per-origin even behind the same-origin proxy (the rewrite forwards `Origin`), so any future ephemeral frontend must add its origin to `APP_CORS_ORIGINS`.
 
-## v2 - hardening series (Phase C)
+## v2 - hardening series
 
 - `X-Forwarded-For` is ignored unless the socket peer is inside `RATE_LIMIT_TRUSTED_PROXIES` (a CIDR allowlist, default empty); deposits capped at `DEPOSIT_MAX` (default 100000) and flagged at the review threshold.
 - Actuator matchers narrowed to health/info; CORS allows + exposes `X-Request-Id`.

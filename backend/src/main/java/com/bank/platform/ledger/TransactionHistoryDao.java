@@ -11,7 +11,7 @@ import java.util.UUID;
 import org.springframework.stereotype.Repository;
 
 /**
- * Server-backed history filters ( section 14: "do not filter only the
+ * Server-backed history filters ("do not filter only the
  * currently loaded ten rows and describe it as searching account history").
  * The customer feed's date window already ran in SQL; this DAO extends the
  * SAME native keyset query with amount range, kind(s), state(s) and a

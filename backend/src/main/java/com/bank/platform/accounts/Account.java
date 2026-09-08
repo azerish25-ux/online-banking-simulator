@@ -42,7 +42,7 @@ public class Account {
   private BigDecimal creditLimit = BigDecimal.ZERO;
 
   /**
-   * Outstanding drawn principal on a LOAN (F16), tracked separately from the
+   * Outstanding drawn principal on a LOAN, tracked separately from the
    * interest that has accrued on it. Draws consume principal headroom up to
    * the credit limit; interest charges deepen the balance WITHOUT touching
    * this, so a maxed loan is never silently forgiven interest. Repayments

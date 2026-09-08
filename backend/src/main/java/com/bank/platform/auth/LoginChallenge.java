@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One password-stage MFA login challenge (F30). A challenge carries its own
+ * One password-stage MFA login challenge. A challenge carries its own
  * random identity, the user it was minted for, an expiry, a consumption state
  * and an attempt budget. Verification must atomically transition exactly one
  * unused, unexpired challenge to consumed; replays, concurrent twins and

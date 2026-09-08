@@ -64,7 +64,7 @@
       <artifactId>pdfbox</artifactId>
       <version>3.0.8</version>
     </dependency>
-    <!-- Unicode Arabic shaping + bidirectional text ( section 10): the
+    <!-- Unicode Arabic shaping + bidirectional text: the
          statement renderer shapes Arabic/Persian letters into joined
          presentation forms before drawing, instead of hand-reversing
          isolated letterforms. ICU4J is the maintained reference
@@ -100,7 +100,7 @@
     </dependency>
     <!-- Flyway 12 splits database support into modules; PostgreSQL (the
          production database) is not in flyway-core, so migrations need this
-         module on the classpath to run at all (F15 PG ITs). -->
+         module on the classpath to run at all (PostgreSQL ITs). -->
     <dependency>
       <groupId>org.flywaydb</groupId>
       <artifactId>flyway-database-postgresql</artifactId>

@@ -28,7 +28,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 
 /**
- * F01 regression: tokens are single-purpose. A login challenge (purpose=mfa,
+ * regression: tokens are single-purpose. A login challenge (purpose=mfa,
  * MFA audience) must NEVER authenticate a protected request, and an access
  * token must NEVER complete an MFA challenge. Purpose-less tokens, wrong
  * purpose/audience/issuer, expired tokens, bad signatures, and unapproved

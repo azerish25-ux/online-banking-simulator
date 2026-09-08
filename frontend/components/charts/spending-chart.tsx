@@ -7,7 +7,7 @@ export type MonthPoint = { month: string; inflow: string; outflow: string };
  * Hand-rolled SVG bar pair per month. Restrained financial colors: navy for
  * money in, slate for money out, hairline grid - all from the design tokens.
  *
- * Values are never tooltip-only (section 14): the exact decimal strings render into a
+ * Values are never tooltip-only: the exact decimal strings render into a
  * real data table under the chart that a visible toggle expands, and the
  * collapsed table stays in the accessibility tree so assistive technology
  * reads the same figures the geometry approximates.
@@ -46,7 +46,7 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           />
         ))}
         {/* The solid baseline is the zero axis: a $0 month shows its label with
-            no bar at all rather than a fake nonzero sliver (section 14). */}
+            no bar at all rather than a fake nonzero sliver. */}
         <line
           x1={pad} x2={W - pad}
           y1={H - pad} y2={H - pad}
@@ -90,7 +90,7 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
         </button>
         <span className="text-xs text-content-secondary">USD · by month</span>
       </div>
-      {/* The exact-value data table (section 14): visible when toggled, and always in
+      {/* The exact-value data table: visible when toggled, and always in
           the accessibility tree so values are never tooltip-only. */}
       <table id={tableId} className={showValues ? "mt-3 w-full text-sm" : "sr-only"}>
         <caption className="sr-only">Monthly money in and out, by month, in USD</caption>

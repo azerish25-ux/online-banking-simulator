@@ -36,7 +36,7 @@ const tx = {
   reviewed: true
 };
 
-describe("runtime financial guards (F14/section 11)", () => {
+describe("runtime financial guards", () => {
   it("accepts a well-formed account and tolerates additive fields", () => {
     const parsed = requireShape(accountSchema, { ...account, extraField: "ignored" }, "account");
     expect(parsed.balance).toBe("1250.0000");

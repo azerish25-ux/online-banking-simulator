@@ -25,7 +25,7 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-describe("pending-op store (operation-keyed, F06 lifecycle)", () => {
+describe("pending-op store (operation-keyed)", () => {
   it("keeps two operations of the same kind side by side", () => {
     const one = record({ key: "k-1", amount: "10.00" });
     const two = record({ key: "k-2", amount: "25.00" });

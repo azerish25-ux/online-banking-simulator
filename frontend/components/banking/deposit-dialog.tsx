@@ -65,7 +65,7 @@ export function DepositDialog({
   // submit time) - the owner fires exactly once, so a refetch after the
   // deposit can never replay this toast.
   const lastAmount = React.useRef("0");
-  // Editing a deposit that was already attempted is a NEW intent (F06): the
+  // Editing a deposit that was already attempted is a NEW intent: the
   // outstanding idempotency key made retries of THAT deposit safe - it must
   // not silently carry an edited amount to the server. Track the attempted
   // intent and reset the key only when the user moves away from it, so a
@@ -91,7 +91,7 @@ export function DepositDialog({
     },
     success: {
       // The deposit answer nests the account under the recoverable operation
-      // identity (F06 lifecycle), so the toast unwraps it.
+      // identity (lifecycle), so the toast unwraps it.
       toast: (result) => ({
         message:
           "Deposited " + usd(lastAmount.current) + " to " + result.account.type

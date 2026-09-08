@@ -93,7 +93,7 @@ public class AuthController {
       @Valid @RequestBody LoginRequest request, HttpServletResponse response) {
     User user = authService.login(request.email(), request.password());
     if (user.isTotpEnabled()) {
-      // F30: the returned challenge is a PERSISTED row; the token's subject is
+      // the returned challenge is a PERSISTED row; the token's subject is
       // the challenge's random id (never the email), so a challenge cannot be
       // re-targeted and its use is single-shot.
       LoginChallenge challenge = challengeService.issue(user);
@@ -137,11 +137,11 @@ public class AuthController {
   /**
    * Promote the pending enrollment. When an active factor exists this is a
    * replacement and requires the current password + existing-factor code
-   * (F02); an ordinary bearer token alone can never swap the factor.
+   *; an ordinary bearer token alone can never swap the factor.
    */
   /**
    * Enabling (or replacing) the factor bumps the user's security version and
-   * revokes every outstanding refresh token (F02) - which would invalidate
+   * revokes every outstanding refresh token - which would invalidate
    * THIS session's access token on its very next call. So the response
    * reissues a fresh credential pair under the NEW version: the caller stays
    * signed in across the factor change and the old credentials stay dead.

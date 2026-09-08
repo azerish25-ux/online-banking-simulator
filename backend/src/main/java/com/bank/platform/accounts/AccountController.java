@@ -57,7 +57,7 @@ public class AccountController {
   }
 
   /**
-   * Every user-submitted funding must carry an idempotency key (F06); the
+   * Every user-submitted funding must carry an idempotency key; the
    * service enforces it (the header is read here and forwarded). An identical
    * replay returns the account's current state AND the original operation's
    * identity; reusing the key for a different amount is a 409 conflict.

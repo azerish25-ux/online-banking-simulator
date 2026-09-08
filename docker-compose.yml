@@ -1,6 +1,6 @@
 # Production-like full stack (CI builds this; local dev stays Docker-free - see start-all.ps1).
 #
-# F24 hardening notes:
+# Hardening notes:
 # - No service publishes to 0.0.0.0. The database is reachable ONLY on the
 #   compose network (plus an explicit 127.0.0.1 forward below for host
 #   tooling); the frontend binds the loopback interface.
@@ -12,7 +12,7 @@
 # - Rate limiting buckets by socket address because no sanitizing edge is
 #   deployed here. RATE_LIMIT_TRUSTED_PROXIES stays empty: enabling it before
 #   a proxy that strips client-supplied X-Forwarded-For is verified would let
-#   spoofed headers replenish login budgets (F03). Run a real TLS-terminating
+#   spoofed headers replenish login budgets. Run a real TLS-terminating
 #   reverse proxy in front of :3000 for anything beyond a demo; HTTPS is what
 #   makes COOKIE_SECURE=true meaningful.
 services:
@@ -54,7 +54,7 @@ services:
       PG_PASSWORD: ${PG_PASSWORD:-bankapp_secret_change_me}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-production-0123456789abcdef-0123456789abcdef}
       APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:-change-me-admin-123}
-      # F30 custody: without this, TOTP seeds would fall back to plaintext.
+      # Custody: without this, TOTP seeds would fall back to plaintext.
       # Override with a real secret (DeploymentEnvGuard refuses placeholders
       # in production mode).
       APP_TOTP_MASTER_KEY: ${APP_TOTP_MASTER_KEY:-dev-totp-master-key-change-me}
@@ -63,7 +63,7 @@ services:
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # Auth rate-limit buckets must key on the real client IP, never on the
       # Next proxy's own address. Forwarding headers are honored ONLY for
-      # allowlisted peers (F03). No allowlist is set by default: without a
+      # allowlisted peers. No allowlist is set by default: without a
       # verified sanitizing edge the backend buckets by socket address, which
       # is spoof-proof but coarse.
       RATE_LIMIT_TRUSTED_PROXIES: ""

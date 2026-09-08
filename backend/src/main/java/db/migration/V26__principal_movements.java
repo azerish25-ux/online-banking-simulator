@@ -15,7 +15,7 @@ import org.flywaydb.core.api.migration.Context;
  * the period, never from today's principal. That requires an immutable
  * record of what changed principal and when - draws (principal up),
  * principal repayments (principal down, interest extinguished first under the
- * F16 repayment policy) and the legacy cutover baseline. Every row carries
+(repayment policy) and the legacy cutover baseline. Every row carries
  * the financial transaction that produced it (unique per account + source, so
  * a movement can never be recorded twice), and rows are append-only like the
  * journal.

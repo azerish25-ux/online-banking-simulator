@@ -12,7 +12,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
- * section 19 - the e2e identity endpoint must refuse any target that is
+ * The e2e identity endpoint must refuse any target that is
  * not THIS run before the first write:
  *
  * <ul>

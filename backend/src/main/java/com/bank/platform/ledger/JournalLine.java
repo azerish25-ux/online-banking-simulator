@@ -10,7 +10,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One signed posting of a journal entry (F15). A line names exactly one side:
+ * One signed posting of a journal entry. A line names exactly one side:
  * a customer {@code accountId} (whose balance projection this line moves -
  * positive increases the balance) or a named {@code counteraccount} (the
  * balancing side that keeps signed deltas summing to zero per currency).

@@ -57,7 +57,7 @@ public class DeploymentEnvGuard implements ApplicationRunner {
       insecure.put("JWT_SECRET (compose default)", devDefaults.get("JWT_SECRET").equals(composeJwt));
       insecure.put("APP_ADMIN_PASSWORD", devDefaults.get("APP_ADMIN_PASSWORD").equals(devAdmin));
       insecure.put("PG_PASSWORD", devDefaults.get("PG_PASSWORD").equals(devDb));
-      // F30 fail-closed: production must supply a real TOTP master key, and a
+      // fail-closed: production must supply a real TOTP master key, and a
       // missing or placeholder value is a startup error, never a silent fall
       // back to plaintext-at-rest seeds.
       insecure.put("APP_TOTP_MASTER_KEY (missing or placeholder)",

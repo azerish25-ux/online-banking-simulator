@@ -47,7 +47,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
   const account = useAccount(id);
   // 404/410 mean the account truly does not exist or was closed; any other
   // failure (offline, 429, 500) is a load problem with a retry - it must NOT
-  // masquerade as "Account not found" (F10).
+  // masquerade as "Account not found".
   const accountNotFound = account.isError && (account.error?.status === 404 || account.error?.status === 410);
   const recent = useTransactions(id, "", 8);
   const isLoan = account.data?.type === "LOAN";
@@ -132,7 +132,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
               <Badge tone={frozen ? "warning" : "neutral"}>{statusText(account.data.status)}</Badge>
             </div>
             {/* The identifier sits under the recognizable title with a copy
-                control - never the page's giant heading (section 14). */}
+                control - never the page's giant heading. */}
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <p className="mono muted break-all text-sm">{account.data.iban}</p>
               <Button type="button" variant="ghost" size="sm" onClick={() => void copyIban()}>
@@ -183,7 +183,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
           </Card>
 
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
-            {/* Activity is primary content for an account (section 14). */}
+            {/* Activity is primary content for an account. */}
             <Card className="lg:col-span-2">
               <CardTitle>Recent activity</CardTitle>
               <CardDescription>
@@ -227,7 +227,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
             </Card>
 
             {/* Virtual cards stay available but sit beside, never ahead of,
-                the account's financial record (section 14). */}
+                the account's financial record. */}
             {!isLoan && (
               <Card>
                 <div className="mb-3 flex items-center justify-between">

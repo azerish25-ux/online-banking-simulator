@@ -39,7 +39,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         users.findByEmail(parsed.subject()).ifPresent(user -> {
           // A token minted before a factor change carries a stale security
           // version: reject it so old access credentials do not outlive the
-          // revocation (F02). Authorities always come from the database row.
+          // revocation. Authorities always come from the database row.
           if (user.getSecurityVersion() != parsed.securityVersion()) {
             return;
           }

@@ -12,7 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 
 /**
- * F15 enforcement: the journal writer is only reachable inside the transaction
+ * enforcement: the journal writer is only reachable inside the transaction
  * that owns the financial operation. A posting must commit or roll back with
  * the operation's balance flip - never float on its own. This test deliberately
  * runs WITHOUT a test-managed transaction and proves the boundary rejects an

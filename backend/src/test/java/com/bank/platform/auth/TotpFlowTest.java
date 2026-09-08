@@ -87,7 +87,7 @@ class TotpFlowTest {
     // The access token works, and disabling restores plain login.
     mvc.perform(get("/api/v1/auth/me").header("Authorization", "Bearer " + access))
         .andExpect(status().isOk());
-    // Disabling an active factor requires the current password too (F02).
+    // Disabling an active factor requires the current password too.
     mvc.perform(post("/api/v1/auth/totp/disable")
             .header("Authorization", "Bearer " + access)
             .contentType(MediaType.APPLICATION_JSON)

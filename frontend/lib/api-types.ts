@@ -31,7 +31,7 @@ export type Page<T> = {
   totalElements: number;
 };
 
-// Cursor-paged history envelope (F26): the transactions feed pages by an
+// Cursor-paged history envelope: the transactions feed pages by an
 // opaque keyset cursor, not by page numbers. nextCursor is null on the last
 // page; omit/blank the cursor to restart at the newest page.
 export type HistoryPage<T> = {

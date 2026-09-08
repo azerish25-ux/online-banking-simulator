@@ -24,7 +24,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  * stuffing and enumeration floods. Single-instance scope is fine for this
  * deployment shape; a Redis bucket would replace it behind a load balancer.
  *
- * <p>Client identity (F03): forwarding headers are TRUSTED ONLY when the
+ * <p>Client identity: forwarding headers are TRUSTED ONLY when the
  * request's direct socket peer is inside the explicitly configured
  * {@code app.auth.rate-limit.trusted-proxies} CIDR allowlist (default: empty,
  * i.e. never). With no configured trusted edge, a spoofed

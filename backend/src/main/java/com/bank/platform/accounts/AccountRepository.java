@@ -39,7 +39,7 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
   Optional<Account> findByIdForUpdate(UUID id);
 
   /**
-   * Accrual candidates (F16): the types that accrue and are still active, in
+   * Accrual candidates: the types that accrue and are still active, in
    * deterministic id order so overlapping runs walk the same sequence. Each
    * account is then locked individually and its per-account unit of work
    * arbitrated by the (account, period) accrual-row uniqueness.

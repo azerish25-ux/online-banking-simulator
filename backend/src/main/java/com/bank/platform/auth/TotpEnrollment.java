@@ -9,7 +9,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * A pending TOTP enrollment (F02). Starting setup creates a pending row with a
+ * A pending TOTP enrollment. Starting setup creates a pending row with a
  * NEW secret and NEVER touches the active factor. The row expires and is
  * promoted only after the new authenticator verifies; cancelling or
  * abandoning it leaves the old factor untouched. Secrets travel through the

@@ -6,7 +6,7 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-### Full local Playwright sweep (F22/F23 witnesses + five real fixes)
+### Full local Playwright sweep (two real-browser witnesses + five real fixes)
 
 - The whole browser suite now runs against an ephemeral stack (second backend
   on a free port against a disposable PostgreSQL DB, second frontend on a free
@@ -14,10 +14,10 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
   `playwright.config.ts`): **19/19 passed** on the real app - banking journey,
   operator console, TOTP round trip, statement exports, WCAG 2.2 contrast, and
   the two deferred real-tab witnesses.
-- F22 witness: `two-tab.spec.ts` - two real tabs share one session, survive a
+- Witness ``two-tab.spec.ts` - two real tabs share one session, survive a
   full reload past access-token expiry via the silent refresh, and logging out
   in one tab evicts the peer through the auth BroadcastChannel.
-- F23 witness: `headers.spec.ts` - live pages carry the full header set, the
+- Witness ``headers.spec.ts` - live pages carry the full header set, the
   CSP's per-request nonce is the one applied to the document's own scripts,
   production `script-src` has no unsafe-eval/unsafe-inline, and static assets
   carry the header set without a nonce CSP.
@@ -37,7 +37,7 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 
 Leftover close-out - receipts, states, and operator queue language.
 
-### Durable receipts (F11)
+### Durable receipts
 
 - Transfers are now a two-step flow: the first submit validates and freezes a
   REVIEW of the exact source/destination/amount/memo; editing returns to the
@@ -50,7 +50,7 @@ Leftover close-out - receipts, states, and operator queue language.
   pending decision no longer disables unrelated rows, declining needs a
   confirmation, and held rows show their memo.
 
-### Truthful states & copy (F10/F19)
+### Truthful states & copy
 
 - Notifications, beneficiaries, and the admin review queue / daily totals /
   audit sections now distinguish loading, empty, and failed-with-retry - a
@@ -58,7 +58,7 @@ Leftover close-out - receipts, states, and operator queue language.
 - Landing/about copy audited (demo seams already honest; no fabricated
   customers, certifications, or throughput claims found).
 
-### F30 real-PostgreSQL leg
+### MFA challenge real-PostgreSQL leg
 
 - Challenge single-use consumption, persisted budgets, and account lockout
   are now also verified against real PostgreSQL (disposable database).
@@ -66,7 +66,7 @@ Leftover close-out - receipts, states, and operator queue language.
 Fifth pass - commit-safe notifications and repair of the interaction
 primitives before the design polish.
 
-### Commit-safe email outbox (F25)
+### Commit-safe email outbox
 
 - Email delivery is now an outbox INTENT committed with the operation that
   produced it: a rolled-back deposit sends nothing, a committed operation's
@@ -76,7 +76,7 @@ primitives before the design polish.
   and operators list/requeue dead letters (`GET/POST /api/v1/admin/email-outbox`).
   Delivery dedupes on a unique `delivery_key` (V25, PG-verified).
 
-### Frontend primitives & truthful states (F09/F10/F11/F18/F19 kernels)
+### Frontend primitives & truthful states
 
 - Modal focus lifecycle is keyed on `open` alone (latest-callback ref), so
   typing in a controlled input never yanks focus to the close button; scroll
@@ -90,7 +90,7 @@ primitives before the design polish.
 - Dashboard totals name their scope and currency; the spending chart draws no
   fake bars for zero months (labelled baseline instead).
 
-### Docs & ops (F27/F29)
+### Docs & ops
 
 - security-review/devops-ci/architecture/README corrected to implementation
   evidence with the tested source state (starting commit + working tree).
@@ -98,46 +98,46 @@ primitives before the design polish.
   both services with deadlines, captures logs, and exits non-zero with the
   relevant log tail.
 
-### Read model & API contract (F05/F07/F14/F17/F20/F21/F26/F28)
+### Read model & API contract
 
-- **Statements are one immutable snapshot (F05).** A statement (CSV or PDF) is
+- **Statements are one immutable snapshot.** A statement (CSV or PDF) is
   composed in a single repeatable-read transaction into one immutable
   snapshot - identity, window, as-of, opening figure, posted rows, closing
   figure, IBAN map - and both renderers are pure over it, so the row list and
   the balance figures can never come from two different moments again. Past
   periods show true window closes, never today's balance.
-- **The read-model cache is honest (F07).** Caffeine is configured under the
+- **The read-model cache is honest.** Caffeine is configured under the
   supported Spring cache namespace with typed defaults, the summary cache
   keys on normalized month windows + as-of, and invalidation is
   transaction-aware (clears for same-tx visibility and again at completion so
   a concurrent pre-commit repopulation cannot outlive the commit) across
   every money path.
-- **History pages by keyset cursor, not OFFSET (F26).** `GET /transactions`
+- **History pages by keyset cursor, not OFFSET.** `GET /transactions`
   returns `{items, total, nextCursor}` and takes an opaque `cursor` over the
   immutable DB-assigned `seq`; rows inserted between page reads never
   duplicate or skip, equal timestamps page exactly once, and the feed is
   documented as live history (a cursor is a position - refresh starts at the
   newest page). Frontend `useTransactions`/`queryKeys` and the activity pager
   follow the cursor chain.
-- **Public stats classify transfers by kind + posted status (F28).** Loan
+- **Public stats classify transfers by kind + posted status.** Loan
   interest charges carry a from side and used to inflate the hero's transfer
   count/volume; only POSTED rows the rail labelled TRANSFER count now.
-- **Legacy kinds are reclassified on evidence, never by memo guessing (F21).**
+- **Legacy kinds are reclassified on evidence, never by memo guessing.**
   V24 corrects V8's memo-substring classifications from audit provenance and
   row structure, archives every decision in `transaction_kind_review` (with
   original classification, reason, memo excerpt) for operator review, and
   labels unprovable rows UNCERTAIN - balances, memos and identifiers never
   change. `GET /api/v1/admin/kind-review` surfaces the quarantine.
-- **PDF statements render real Unicode (F20).** The PDF embeds a
+- **PDF statements render real Unicode.** The PDF embeds a
   licensed broad-coverage font (OFL DejaVu Sans, license bundled) instead of
   substituting missing glyphs: Persian/Arabic, accents and long memos render
   correctly with measured wrapping, page numbers and as-of metadata; RTL runs
   keep a faithful text layer.
-- **Amount formatting is exact (F17).** Frontend formatting now does exact
+- **Amount formatting is exact.** Frontend formatting now does exact
   4-decimal-unit arithmetic (no float cents drift), rejects invalid amounts
   instead of showing `$0.00`, and normalizes negative zero; receipts keep
   sub-cent precision.
-- **The API contract names reality (F14).** Login documents both outcomes
+- **The API contract names reality.** Login documents both outcomes
   with their real codes (200 session / 202 MFA challenge); every error is one
   typed RFC-7807 `ApiProblem`; response schemas carry explicit `required`
   lists with genuinely nullable fields (`fromIban`/`toIban`/`memo`/`postedAt`)
@@ -146,7 +146,7 @@ primitives before the design polish.
   repairs and validates the login branch and error envelope with zod at
   runtime.
 
-### Financial core (F04/F06/F15/F16)
+### Financial core
 
 - **Posting time is real.** `transactions` now record request time
   (`created_at`) and posting time (`posted_at`) separately (V19). A
@@ -156,7 +156,7 @@ primitives before the design polish.
   all bucket on `posted_at`, and every money path reads from one injected
   business clock, so a month-boundary approval lands in the month it settled
   in. HELD/CANCELLED rows stay NULL and a DB CHECK keeps POSTED rows honest.
-- **Deposits are idempotent like transfers (F06).** Every deposit and every
+- **Deposits are idempotent like transfers.** Every deposit and every
   transfer requires an `Idempotency-Key`, scoped to its originator and
   fingerprinted with a canonical SHA-256 request hash. Replaying the same
   intent returns the original result; reusing a key for different money is
@@ -164,7 +164,7 @@ primitives before the design polish.
   resolves the caller's own operation by key. The deposit dialog keeps one
   key per funding intent - persisted across reloads, reset on intent
   change/logout - so the retry contract holds in the UI too.
-- **The ledger has a reconciled journal (F15).** `journal_entries` and
+- **The ledger has a reconciled journal.** `journal_entries` and
   `journal_lines` are append-only (PostgreSQL triggers refuse UPDATE/DELETE
   even for the application role) and record one balanced entry per posted
   operation - a customer line mirrored by a named counteraccount. Money can
@@ -174,7 +174,7 @@ primitives before the design polish.
   reproduces its balance, so the whole history reconciles to the journal;
   legacy rows were preserved untouched. Operators can check drift via
   `GET /api/v1/admin/reconciliation` - reported, never auto-repaired.
-- **Interest is bounded, resumable, and no longer forgives debt (F16).**
+- **Interest is bounded, resumable, and no longer forgives debt.**
   Accrual runs in per-account transactions guarded by a unique
   `(account, period)` row, so overlapping scheduler/admin runs cannot
   double-post and an interrupted batch resumes. Savings earn actual/365 daily
@@ -188,7 +188,7 @@ primitives before the design polish.
   (backend 152 tests, frontend 82 tests) and the OpenAPI contract for the two
   new endpoints.
 
-### Supported dependency alignment (F13)
+### Supported dependency alignment
 
 - **The runtime lines are back inside current support windows.** Next.js 14 →
   **16.3** (Active LTS) with React 18 → **19.2** and the React 19 types;
@@ -528,8 +528,8 @@ ledger races and leak paths closed, and the product shed its invented brand
 ## [1.1.0] - 2026-09-04
 
 Ten-phase deep-dive audit (code, migrations, CI, UI) fixing the real gaps the
-1.0.0 hardening ledger overstated. Every phase shipped with its regression
-proof; the security review and the self-audit ledger below it were updated in
+1.0.0 hardening pass overstated. Every phase shipped with its regression
+proof; the security review and the audit notes below it were updated in
 the same pass so claims and code never drift again.
 
 ### Session integrity
@@ -593,8 +593,8 @@ the same pass so claims and code never drift again.
 
 - Fully-qualified type names replaced with imports across the backend;
   duplicate iban-map and statement-download helpers deduped; the generated
-  contract was regenerated and the docs (README, security review, self-audit
-  ledger) now match the shipped code.
+  contract was regenerated and the docs (README, security review, testing
+  notes) now match the shipped code.
 
 ## [1.0.0] - 2026-09-03
 

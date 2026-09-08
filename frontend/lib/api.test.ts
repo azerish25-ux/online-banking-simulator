@@ -5,7 +5,7 @@ import { ACCESS_TOKEN_COOKIE_MAX_AGE, ApiError, SESSION_EXPIRED_EVENT, api, auth
  * jsdom has no BroadcastChannel, so two "tabs" are simulated with a tiny
  * in-memory bus that delivers postMessage to every other open instance with
  * the same channel name - exactly the browser contract api.ts relies on for
- * cross-tab session coordination (F22).
+ * cross-tab session coordination.
  */
 type FakeMessageEvent = { data: unknown };
 
@@ -71,7 +71,7 @@ describe("token cookie", () => {
   });
 
   it("mirrors the VALIDATED access-token lifetime when one is provided", () => {
-    // section 9: the cookie dies exactly when the JWT does - the auth response's
+    // The cookie dies exactly when the JWT does - the auth response's
     // expiresInSeconds, not a client-side guess.
     expect(tokenCookie("abc.123", 900)).toContain("max-age=900");
     expect(tokenCookie("abc.123", 30)).toContain("max-age=30");
@@ -81,7 +81,7 @@ describe("token cookie", () => {
   });
 });
 
-describe("credential adoption ( section 9)", () => {
+describe("credential adoption", () => {
   it("installs the token from a VALIDATED auth response with its lifetime", async () => {
     setToken("old");
     // jsdom's document.cookie drops attributes, so capture every raw
@@ -244,7 +244,7 @@ describe("silent refresh", () => {
   });
 });
 
-describe("cross-tab session channel (F22)", () => {
+describe("cross-tab session channel", () => {
   it("a deliberate logout in one tab reaches a sibling tab's listener", () => {
     const peer = vi.fn();
     const unsubscribe = subscribeAuthChannel(peer);
@@ -284,7 +284,7 @@ describe("cross-tab session channel (F22)", () => {
   });
 });
 
-describe("TOTP credential rejections keep the session (F02)", () => {
+describe("TOTP credential rejections keep the session", () => {
   it("a wrong TOTP code after a successful refresh surfaces the 401 without expiring", async () => {
     setToken("expired-token");
     (global.fetch as ReturnType<typeof vi.fn>) = vi.fn()

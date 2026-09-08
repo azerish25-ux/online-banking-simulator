@@ -15,7 +15,7 @@ import { expect, test, type Page } from "@playwright/test";
  * distinct amounts so each success toast is uniquely matchable, and balance
  * assertions retry until the post-deposit refetch lands (a read right after
  * the toast can still see the pre-deposit balance). Full simulator
- * identifiers come from each account's detail page (section 14 masks the dashboard
+ * identifiers come from each account's detail page (the dashboard masks the
  * list); the review queue rows show masked tails like the customer feed.
  */
 
@@ -76,7 +76,7 @@ async function loginOperator(page: Page): Promise<void> {
 
 /** Open account row `row` (1-based creation order: Checking, then Savings)
  *  and read its full simulator identifier from the detail page - the only
- *  place the dashboard shows it in full (section 14 masks the account list). */
+ *  place the dashboard shows it in full (the account list is masked). */
 async function accountIban(page: Page, row: number): Promise<string> {
   const links = page.locator("main table a[href*='/accounts/']");
   await links.nth(row - 1).click();
@@ -125,7 +125,7 @@ async function placeHeldTransfer(page: Page, toIban: string, memo: string): Prom
   await page.getByLabel("Recipient IBAN").fill(toIban);
   await page.getByLabel("Amount (USD)").fill("10000");
   await page.getByLabel("Memo (optional)").fill(memo);
-  // F11: submit opens REVIEW; Confirm & send actually submits.
+  // submit opens REVIEW; Confirm & send actually submits.
   await page.getByRole("button", { name: /Review transfer/ }).click();
   await expect(page.getByRole("region", { name: "Review your transfer" })).toBeVisible();
   await page.getByRole("button", { name: "Confirm & send" }).click();
@@ -197,7 +197,7 @@ test("operator approve and decline of a HELD transfer is reflected everywhere", 
   await loginOperator(page);
   const declinedQueueRow = queueRowFor(page, checkingTail, savingsTail);
   await expect(declinedQueueRow).toContainText("$10,000.00", { timeout: 10_000 });
-  // F11: Decline needs an explicit confirmation before the decision lands.
+  // Decline needs an explicit confirmation before the decision lands.
   await declinedQueueRow.getByRole("button", { name: "Decline" }).click();
   await expect(page.getByRole("heading", { name: "Decline this transfer?" })).toBeVisible();
   await page.getByRole("button", { name: "Decline transfer" }).click();

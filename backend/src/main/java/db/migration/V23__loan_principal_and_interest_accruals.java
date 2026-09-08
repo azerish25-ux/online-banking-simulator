@@ -5,7 +5,7 @@ import org.flywaydb.core.api.migration.BaseJavaMigration;
 import org.flywaydb.core.api.migration.Context;
 
 /**
- * F16: loan principal tracked separately from accrued interest, and per-account
+ * loan principal tracked separately from accrued interest, and per-account
  * accrual bookkeeping.
  *
  * <ul>
@@ -48,7 +48,7 @@ public class V23__loan_principal_and_interest_accruals extends BaseJavaMigration
           + "  created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,\n"
           + "  CONSTRAINT uq_accrual_account_period UNIQUE (account_id, period)\n"
           + ")");
-      // Legacy debt becomes principal at cutover (F16 policy).
+      // Legacy debt becomes principal at cutover (policy).
       stmt.execute("UPDATE accounts SET principal = "
           + "CASE WHEN type = 'LOAN' AND balance < 0 THEN -balance ELSE 0 END");
       // The old limit check capped the BALANCE (so a maxed loan forgave its

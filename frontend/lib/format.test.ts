@@ -23,7 +23,7 @@ describe("usd", () => {
     expect(usd("2.6750")).toBe("$2.68");
     expect(usd("1234.5678")).toBe("$1,234.57");
   });
-  it("makes invalid input unavailable rather than zero (F17)", () => {
+  it("makes invalid input unavailable rather than zero", () => {
     // Malformed money must never read as a real $0.00 balance.
     expect(usd("nope")).toBe("-");
     expect(usd("")).toBe("-");
@@ -31,7 +31,7 @@ describe("usd", () => {
     expect(totalUsd(["100.00", "junk"])).toBe("-");
   });
 
-  it("normalizes negative zero and half boundaries (F17)", () => {
+  it("normalizes negative zero and half boundaries", () => {
     expect(usd("-0.0000")).toBe("$0.00");
     expect(usd("-0.0049")).toBe("$0.00"); // half below the cent rounds to zero
     expect(usd("-0.0050")).toBe("-$0.01"); // HALF_UP: away from zero
@@ -39,7 +39,7 @@ describe("usd", () => {
   });
 });
 
-describe("exact sums and review precision (F17)", () => {
+describe("exact sums and review precision", () => {
   it("sums at the ledger scale and rounds only the final result", () => {
     // 0.0049 + 0.0049 = 0.0098 - per-item rounding would give $0.00 + $0.00;
     // summing at ten-thousandths and rounding once shows the true $0.01.
@@ -50,7 +50,7 @@ describe("exact sums and review precision (F17)", () => {
     expect(totalUsd(["9007199254740991.0001", "0.9999"])).toBe("$9,007,199,254,740,992.00");
   });
 
-  it("never hides a nonzero sub-cent amount on a review (F17)", () => {
+  it("never hides a nonzero sub-cent amount on a review", () => {
     expect(usdReview("0.0049")).toBe("$0.0049");
     expect(usdReview("-0.0049")).toBe("-$0.0049");
     expect(usdReview("1234.5678")).toBe("$1,234.5678");

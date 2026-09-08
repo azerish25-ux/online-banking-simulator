@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * F15: posted operations carry a balanced journal; HELD/CANCELLED intents do
+ * posted operations carry a balanced journal; HELD/CANCELLED intents do
  * not. A deposit credits the customer account and debits the simulator-funding
  * counteraccount; a transfer moves money between the two customer accounts;
  * an approved held transfer journals exactly once (at settlement); a declined

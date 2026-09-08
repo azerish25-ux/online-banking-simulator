@@ -4,7 +4,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.Base64;
 
 /**
- * Opaque keyset cursor for the transaction-history feed (F26).
+ * Opaque keyset cursor for the transaction-history feed.
  *
  * <p>The page ordering key is {@code seq}, the database-assigned monotonic
  * insert identity (V14). It is immutable, total (no two rows share one), and

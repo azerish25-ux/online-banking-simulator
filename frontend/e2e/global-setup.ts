@@ -1,7 +1,7 @@
 import { request } from "@playwright/test";
 
 /**
- * Identity preflight for the browser suite ( section 19): the suite must
+ * Identity preflight for the browser suite: the suite must
  * never seed or write against a stale, leftover or unrelated application and
  * pass green. A health body and a CSP header do not identify the actual
  * database or source build, so before ANY seeding step this setup demands a

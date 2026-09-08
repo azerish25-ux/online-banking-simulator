@@ -162,7 +162,7 @@ class StatementBalanceTest {
   /**
    * Draw then repay the full amount: the loan returns exactly to zero, and
    * the statement figures carry the negative draw then the zero closing. An
-   * over-repayment is rejected under the F16 policy - a repayment may never
+   * over-repayment is rejected under the repayment policy - a repayment may never
    * exceed the amount owed, so a loan balance cannot go positive.
    */
   @Test
@@ -175,7 +175,7 @@ class StatementBalanceTest {
     String loanIban = loan.get("iban").asText();
 
     // Fund checking, draw the limit, then try to over-repay: the sender can
-    // afford it, but the repayment cap rejects it (F16).
+    // afford it, but the repayment cap rejects it.
     client.deposit(alice, checkingId, "2000.00");
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)

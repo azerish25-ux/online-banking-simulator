@@ -99,7 +99,7 @@ const loan = (overrides: Record<string, unknown>) => ({
   ...overrides
 });
 
-describe("dashboard account list and summary strip (section 14)", () => {
+describe("dashboard account list and summary strip", () => {
   it("separates available funds from loan debt and shows the policy-derived loan split", async () => {
     const accounts = [
       checking("acc-1", "DE00000000000000000001", "1250.0000"),
@@ -112,7 +112,7 @@ describe("dashboard account list and summary strip (section 14)", () => {
     const many = (text: string | RegExp) => expect(screen.getAllByText(text).length).toBeGreaterThan(0);
 
     // The summary strip names the scope: spendable funds and debt are two
-    // separate figures - net position is never the headline (section 14).
+    // separate figures - net position is never the headline.
     expect(await screen.findByText("Available funds")).toBeInTheDocument();
     many("$1,250.00");
     expect(screen.getByText("Loan debt")).toBeInTheDocument();
@@ -123,7 +123,7 @@ describe("dashboard account list and summary strip (section 14)", () => {
     // bare "-$600.00" balance.
     many("Principal $500.00 · Interest $100.00 · Credit left $400.00");
     expect(screen.queryByText("-$600.00")).not.toBeInTheDocument();
-    // The accounts table lists names and masked identifiers (section 14).
+    // The accounts table lists names and masked identifiers.
     many("Checking");
     many("Loan");
     many("...000001");
@@ -166,7 +166,7 @@ describe("dashboard account list and summary strip (section 14)", () => {
   it("treats a sub-cent obligation as debt and renders its exact amount", async () => {
     // A $0.0001 debt rounds to $0.00 in cents - the dashboard must still
     // detect it from the authoritative decimal and display the exact amount
-    // instead of a zero-dollar figure (section 14).
+    // instead of a zero-dollar figure.
     const accounts = [
       checking("acc-1", "DE00000000000000000001", "0.0000"),
       loan({ balance: "-0.0001", principalOwed: "0.0001", interestOwed: "0.0000", totalOwed: "0.0001", availableCredit: "999.9999" })

@@ -8,7 +8,7 @@ import java.util.UUID;
  * account response must not reach into the ledger package to find its DTO.
  * Mapped by {@link AccountMapper}, the single construction site.
  *
- * <p>Loan debt fields ( section 7): a drawn loan's authoritative
+ * <p>Loan debt fields: a drawn loan's authoritative
  * figures are derived server-side from the policy state - principal owed,
  * the unpaid interest on top of it, total owed, and available credit (credit
  * headroom on PRINCIPAL, never balance-derived). They are null on every

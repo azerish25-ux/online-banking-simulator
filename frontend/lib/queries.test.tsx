@@ -238,7 +238,7 @@ describe("query hooks", () => {
       paths.push(path);
       if (path.includes("unread-count")) return { unread: 1 };
       // The deposit endpoint now answers with the recoverable operation
-      // envelope (F06 lifecycle), not a bare account.
+      // envelope (lifecycle), not a bare account.
       return {
         account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
         operationId: "op-d1",

@@ -1,4 +1,4 @@
--- F04: separate the moment money actually moved (posted_at) from the moment
+-- separate the moment money actually moved (posted_at) from the moment
 -- the instruction was recorded (created_at). A review-threshold transfer is
 -- REQUESTED when its HELD row is created but only POSTS when an operator
 -- approves it - possibly in a later month - so monthly summaries, statements,

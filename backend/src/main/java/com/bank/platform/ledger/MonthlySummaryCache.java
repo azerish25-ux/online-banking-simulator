@@ -37,7 +37,7 @@ public class MonthlySummaryCache {
    * Monthly inflow/outflow (oldest first, zero-filled) for the {@code window}
    * months ending at (and including) {@code asOf}.
    *
-   * <p>The cache key (F07) names the account, the WINDOW SIZE and the
+   * <p>The cache key names the account, the WINDOW SIZE and the
    * explicit AS-OF MONTH, so two requests that anchor in different months can
    * never share one cached list: advancing the business clock across a month
    * end with NO financial mutation must produce the new window, and a stale
@@ -61,7 +61,7 @@ public class MonthlySummaryCache {
     // other money-movement read (statements, daily totals, public stats)
     // applies the same POSTED filter; the summary must not be the outlier.
     for (Transaction tx : transactions.findSettledByAccountSince(accountId, TxStatus.POSTED, since)) {
-      // Bucket on the posting month (F04): an approval that lands after a
+      // Bucket on the posting month: an approval that lands after a
       // month boundary belongs to the month the money moved, not the month it
       // was requested.
       YearMonth key = YearMonth.from(tx.getPostedAt().atZone(ZoneOffset.UTC));

@@ -51,7 +51,7 @@ public class AdminService {
   }
 
   /**
-   * Operator decision on a queue item ( section 16). Every decision
+   * Operator decision on a queue item. Every decision
    * carries a bounded, required-in-the-UI reason and the case state the
    * operator SAW ({@code expectedStatus}/{@code expectedReviewed}); when the
    * row is no longer in that state a {@link DecisionConflictException} (409)

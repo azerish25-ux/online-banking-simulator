@@ -7,7 +7,7 @@ import { Button } from "./button";
  * A fetch that failed - never a silent "empty". Rendered where the failure
  * happened (inside the Card whose data is missing) with an explicit retry, so
  * a failed history fetch can never read as "No transactions" and a failed
- * account request never as "Account not found" (F10). Distinct from
+ * account request never as "Account not found". Distinct from
  * EmptyState on purpose: an error is not the absence of data.
  */
 export function LoadFailed({

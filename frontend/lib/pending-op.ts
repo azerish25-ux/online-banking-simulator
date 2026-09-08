@@ -1,5 +1,5 @@
 /**
- * Minimum unresolved-operation identities (F06 lifecycle). When a money
+ * Minimum unresolved-operation identities (lifecycle). When a money
  * mutation ends ambiguously (network drop, 5xx, 429, timeout, killed tab)
  * the client does NOT know whether the server committed - so it must never
  * mint a fresh idempotency key for the next attempt. This store keeps the

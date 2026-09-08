@@ -58,7 +58,7 @@ public class OpenApiConfig {
   }
 
   /**
-   * F14 contract repairs that no single annotation can express:
+   * Contract repairs that no single annotation can express:
    *
    * <ol>
    *   <li><b>Required fields</b> - springdoc derives schema property lists

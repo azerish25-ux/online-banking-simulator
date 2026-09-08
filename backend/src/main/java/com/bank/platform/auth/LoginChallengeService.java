@@ -10,7 +10,7 @@ import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Lifecycle owner for persisted login challenges (F30). Issuing creates one
+ * Lifecycle owner for persisted login challenges. Issuing creates one
  * unused row with a bounded lifetime; verifying consumes it atomically in the
  * caller's transaction; failed attempts are recorded in a SEPARATE transaction
  * so the rollback that follows a rejected code can never erase the attempt
@@ -51,7 +51,8 @@ public class LoginChallengeService {
   }
 
   /**
-   * Reserves ONE verification attempt BEFORE any code is checked (section 9): a single conditional UPDATE books the attempt only while the
+   * Reserves ONE verification attempt BEFORE any code is checked:
+   * a single conditional UPDATE books the attempt only while the
    * challenge is unused, unexpired, and under its five-attempt budget, and it
    * commits in its own REQUIRES_NEW transaction so the rejection rollback
    * that follows a wrong code can never erase the booking. Concurrent

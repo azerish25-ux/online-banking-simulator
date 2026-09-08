@@ -131,7 +131,7 @@ class LedgerEventContractTest {
 
     AuditLog log = auditRow("TRANSFER_APPROVED");
     assertEquals(heldId, log.getEntityId());
-    // section 16: the decision reason is part of the audit contract - bounded and
+    // The decision reason is part of the audit contract - bounded and
     // plain (the API default when a programmatic caller sends none).
     assertEquals(Map.of("amount", "12000.0000", "from", aliceIban, "to", bobIban,
             "reason", "Operator decision"),
@@ -158,7 +158,7 @@ class LedgerEventContractTest {
 
     AuditLog log = auditRow("TRANSFER_DECLINED");
     assertEquals(heldId, log.getEntityId());
-    // section 16: the decline reason is recorded on the audit trail.
+    // The decline reason is recorded on the audit trail.
     assertEquals(Map.of("amount", "12000.0000", "from", aliceIban, "to", bobIban,
             "reason", "Operator decision"),
         AuditLog.metadataMap(log.getMetadata()));

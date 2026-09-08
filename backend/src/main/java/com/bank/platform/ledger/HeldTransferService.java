@@ -50,7 +50,7 @@ public class HeldTransferService {
    * Review-threshold path: records the intent as HELD without moving money.
    * Funds are re-checked under locks when an operator approves; the sender is
    * told the transfer is awaiting review rather than sent. The canonical
-   * intent hash (F06) rides the row so an identical replay returns the HELD
+   * intent hash rides the row so an identical replay returns the HELD
    * intent and a changed payload under the same key is a conflict.
    */
   public Transaction holdForReview(User sender, Account fromRef, Account toRef, BigDecimal scaled,
@@ -105,7 +105,7 @@ public class HeldTransferService {
       // losing operator must see the winning outcome, not an error toast.
       throw new DecisionConflictException(transactionId, tx.getStatus().name(), tx.isReviewed());
     }
-    // Settlement time (F04): reported/statement months cut here, and this is
+    // Settlement time: reported/statement months cut here, and this is
     // the moment the money actually moved - approval can land well after the
     // request, across a month or year boundary. The stamp rides the atomic
     // HELD→POSTED flip so the transition and its time cannot diverge.
@@ -113,7 +113,7 @@ public class HeldTransferService {
     if (transactions.resolveAwaitingReview(transactionId, TxStatus.HELD, TxStatus.POSTED, postedAt) == 0) {
       // The atomic flip lost: someone else settled (or cancelled) this HELD
       // row between our read and the flip. Surface the CURRENT state so the
-      // losing console can refresh and show the winner's decision (F16).
+      // losing console can refresh and show the winner's decision.
       Transaction current = transactions.findById(transactionId)
           .orElseThrow(() -> new TransactionNotFoundException(transactionId));
       throw new DecisionConflictException(transactionId, current.getStatus().name(), current.isReviewed());
@@ -127,7 +127,7 @@ public class HeldTransferService {
 
     // Approval is when money actually moves, so THIS is where the journal is
     // written - a HELD intent created no entry, and the losing operator in an
-    // approval race rolls back before ever reaching here (F15). The posting
+    // approval race rolls back before ever reaching here. The posting
     // time stamped on the row and the journal's are one instant. A draw or a
     // principal repayment in a settled transfer also leaves its immutable
     // principal-movement row (V26), keyed to this transaction.
@@ -141,7 +141,7 @@ public class HeldTransferService {
         JournalService.Posting.account(tx.getToAccountId(), tx.getAmount()));
 
     events.transferApproved(actor, tx, moved.from(), moved.to(), decisionReason);
-    // Evict only after this settlement commits (F07) - a rollback must not
+    // Evict only after this settlement commits - a rollback must not
     // clear caches for an approval that never happened.
     invalidation.clearSynchronized("summaries", "public-stats");
     return tx;

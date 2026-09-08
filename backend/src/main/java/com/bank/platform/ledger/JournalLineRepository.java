@@ -9,7 +9,7 @@ import org.springframework.data.jpa.repository.Query;
 
 public interface JournalLineRepository extends JpaRepository<JournalLine, UUID> {
 
-  /** An account's journal postings from an instant on - the daily-balance source (F16). */
+  /** An account's journal postings from an instant on - the daily-balance source. */
   List<JournalLine> findByAccountIdAndPostedAtGreaterThanEqualOrderByPostedAtAsc(
       UUID accountId, Instant from);
 

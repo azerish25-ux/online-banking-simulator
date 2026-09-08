@@ -64,7 +64,7 @@ export const queryKeys = {
   // The cursor (blank = newest page) is part of the key: two different
   // positions in the same feed are two different result sets and must not
   // collide in the cache. The optional filter tuple member makes each
-  // server-filtered view its own cache entry too ( section 14).
+  // server-filtered view its own cache entry too.
   transactions: (
     accountId: string,
     cursor: string,
@@ -114,7 +114,7 @@ export function useAccount(id: string): UseQueryResult<Account, ApiError> {
 }
 
 /**
- * Server-side history predicates ( section 14): the customer feed's
+ * Server-side history predicates: the customer feed's
  * amount range, kind(s), state(s) and reference/counterparty search are SQL
  * predicates over the WHOLE account history. Empty members mean "open" - an
  * empty applied filter is a normal unfiltered browse, not a query for empty
@@ -129,7 +129,7 @@ export type HistoryFilters = {
 };
 
 /**
- * One of the caller's own operations by id (F11 durable receipt). The route
+ * One of the caller's own operations by id (durable receipt). The route
  * is bookmarkable and the lookup is originator-scoped server-side; a foreign
  * or unknown id answers 404 either way. Re-fetching after a HELD→POSTED
  * transition returns the current authoritative status and posting time.
@@ -225,7 +225,7 @@ export function usePublicStats(): UseQueryResult<PublicStats, ApiError> {
 }
 
 /**
- * A deposit answer (F06 lifecycle): the updated account plus the recoverable
+ * A deposit answer (lifecycle): the updated account plus the recoverable
  * operation identity (transaction id, idempotency key, authoritative status)
  * that backs the durable receipt lookup. Aliased straight off the generated
  * OpenAPI schema - one authoritative definition, no parallel shape.
@@ -407,7 +407,7 @@ export async function resolveUnresolvedOperation(
     // A 401 during RECOVERY is ambiguous, never definitive: the ORIGINAL
     // dispatch may have committed with a token that expired afterwards, so
     // this replay is refused by the filter without telling us what happened.
-    // The record is kept; the user re-authenticates and checks again (section 6/section 15).
+    // The record is kept; the user re-authenticates and checks again.
     if (err instanceof ApiError && err.status === 401) {
       return {
         kind: "unknown",
@@ -438,7 +438,7 @@ export async function resolveUnresolvedOperation(
 // server recorded nothing, so the key was NOT consumed and the next attempt
 // may mint a fresh one. 409 (key already names a different operation) and
 // 429 (throttled) are NOT proof of rejection - the key is kept so a retry
-// deduplicates against whatever the server actually did (F06). The predicate
+// deduplicates against whatever the server actually did. The predicate
 // itself is owned by money-failure.ts - the single authority on the
 // definitive-vs-ambiguous boundary.
 
@@ -448,7 +448,7 @@ function currentUserId(qc: ReturnType<typeof useQueryClient>): string | undefine
 }
 
 /**
- * Operation key lifecycle shared by deposit and transfer (F06 lifecycle).
+ * Operation key lifecycle shared by deposit and transfer (lifecycle).
  * One key per SUBMITTED operation. A key is minted on the first dispatch and
  * reused only when this page is retrying the SAME submitted operation:
  *
@@ -502,7 +502,7 @@ function nextOperationKey(
   return { key, userId };
 }
 
-/** Records the dispatched identity BEFORE the request goes out (F06). */
+/** Records the dispatched identity BEFORE the request goes out. */
 function persistBeforeDispatch(
   qc: ReturnType<typeof useQueryClient>,
   kind: "transfer" | "deposit",
@@ -554,7 +554,7 @@ export function useDeposit(): DepositMutation {
   }, []);
   const mutation = useMutation<DepositResult, ApiError, { accountId: string; amount: string }>({
     mutationFn: ({ accountId, amount }) => {
-      // Every user-submitted funding must carry an idempotency key (F06); an
+      // Every user-submitted funding must carry an idempotency key; an
       // identical replay returns the original result, never a second credit.
       const intent = { accountId, amount };
       const { key, userId } = nextOperationKey(qc, "deposit", keyRef, intent);
@@ -602,7 +602,7 @@ export interface TransferInput {
 /**
  * Transfer → refresh accounts, history, summary, notifications, hero.
  *
- * Idempotency-key lifecycle (F06): one key per *logical send intent*. The
+ * Idempotency-key lifecycle: one key per *logical send intent*. The
  * key is minted on the first attempt and reused across retries (network
  * failures, 5xx, 429, reloads) so a retry can never double-post - the server
  * returns the original row. The key is dropped only when the intent is
@@ -765,7 +765,7 @@ export function useSetCardStatus(): UseMutationResult<
 
 /** Enabling a NEW factor only needs the new code. REPLACING an active factor
  *  (the backend detects it from the user's state) additionally requires the
- *  current password and a code from the EXISTING authenticator (F02). */
+ *  current password and a code from the EXISTING authenticator. */
 export type TotpEnableInput = { code: string; currentPassword?: string; currentCode?: string };
 
 export function useTotpSetup(): UseMutationResult<{ secret: string; qrDataUri: string }, ApiError, void> {
@@ -774,7 +774,7 @@ export function useTotpSetup(): UseMutationResult<{ secret: string; qrDataUri: s
   });
 }
 
-/** Abandons a pending enrollment - never touches an active factor (F02). */
+/** Abandons a pending enrollment - never touches an active factor. */
 export function useTotpCancel(): UseMutationResult<void, ApiError, void> {
   return useMutation({
     mutationFn: () => api<void>("/v1/auth/totp/cancel", { method: "POST" })
@@ -799,7 +799,7 @@ export function useTotpEnable(): UseMutationResult<AuthResponse, ApiError, TotpE
   });
 }
 
-/** Disabling MFA requires the current password AND a factor code (F02). */
+/** Disabling MFA requires the current password AND a factor code. */
 export function useTotpDisable(): UseMutationResult<AuthResponse, ApiError, { password: string; code: string }> {
   const qc = useQueryClient();
   return useMutation({
@@ -872,7 +872,7 @@ export type DecisionInput = {
 };
 
 /**
- * Operator decision ( section 16). Every decision carries the bounded
+ * Operator decision. Every decision carries the bounded
  * REQUIRED reason plus the case state the console displayed; when the row is
  * no longer in that state the server answers 409 and the queue refetches to
  * the winning decision. A lost race must never keep the optimistic toast.

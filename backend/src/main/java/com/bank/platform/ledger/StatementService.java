@@ -70,7 +70,7 @@ public class StatementService {
   }
 
   /**
-   * One immutable, fully materialized statement (F05). The whole document is
+   * One immutable, fully materialized statement. The whole document is
    * built from a SINGLE coherent read: one account read, one row query, one
    * opening-cut aggregate and one IBAN resolution, all inside one
    * REPEATABLE_READ transaction, so every figure and row on the page comes
@@ -84,7 +84,7 @@ public class StatementService {
    * later produces a visibly NEW document (a later asOf), never a silent
    * mutation of an earlier one.
    *
-   * <p>The statement carries ONLY immutable VALUE data (F05): account and
+   * <p>The statement carries ONLY immutable VALUE data: account and
    * row shapes are plain records copied at snapshot time, never live JPA
    * entities - a row that posts after the snapshot, or a memo changed later,
    * can never mutate what a rendered document already holds. Renderers
@@ -149,7 +149,7 @@ public class StatementService {
     // through a self-invoked @Transactional method: Spring's proxy advice does
     // not apply when a bean calls its own annotated method, so leaning on the
     // annotation here would silently downgrade the CSV to the caller's
-    // isolation (F05). The template is the boundary; the read inside it is
+    // isolation. The template is the boundary; the read inside it is
     // one coherent snapshot and the CSV renderer serializes it without more
     // queries.
     Statement statement = snapshotTx.execute(status -> {
@@ -248,7 +248,7 @@ public class StatementService {
    * the layout engine (measured wrapping, ICU-shaping + bidi RTL text, page
    * footer and true page count). The renderer is pure: it reads only the
    * immutable {@link Statement}, so rendering the same statement twice
-   * produces identical bytes even after money moves in the database (F05).
+   * produces identical bytes even after money moves in the database.
    */
   public byte[] renderPdf(Statement statement) {
     return pdf.render(statement);

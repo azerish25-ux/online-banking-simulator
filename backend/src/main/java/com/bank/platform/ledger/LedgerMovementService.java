@@ -106,7 +106,7 @@ public class LedgerMovementService {
    * floor: a LOAN may only draw against PRINCIPAL headroom (the credit limit
    * minus what is already drawn) - accrued interest never creates borrowing
    * capacity, and a loan at its limit is not silently forgiven interest, it
-   * simply cannot borrow more (F16). Every other account type must stay
+   * simply cannot borrow more. Every other account type must stay
    * non-negative.
    */
   public void assertAffordable(Account from, BigDecimal amount) {
@@ -125,7 +125,7 @@ public class LedgerMovementService {
   /**
    * A repayment (credit into a LOAN) may not exceed the amount owed, so a
    * loan balance never goes positive. Interest is extinguished before
-   * principal (F16 repayment policy).
+   * principal (repayment policy).
    */
   private void assertLoanRepayment(Account loan, BigDecimal amount) {
     BigDecimal owed = loan.getBalance().negate();

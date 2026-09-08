@@ -26,7 +26,7 @@ public final class TransferDtos {
 
   /**
    * {@code createdAt} is the request time; {@code postedAt} is when money
-   * actually moved (null until a held transfer is approved - F04). The status
+   * actually moved (null until a held transfer is approved ). The status
    * enum serializes by name; typing it here puts the legal values in the
    * contract instead of an open string.
    */
@@ -44,7 +44,7 @@ public final class TransferDtos {
 
   /**
    * {@code createdAt} is the request time; {@code postedAt} is when money
-   * actually moved (null while HELD or when CANCELLED - F04). Kind and status
+   * actually moved (null while HELD or when CANCELLED ). Kind and status
    * are the domain enums, serialized by name, so the OpenAPI contract lists
    * the exact legal values.
    */
@@ -62,7 +62,7 @@ public final class TransferDtos {
       @Schema(nullable = true, description = "Operator surfaces only: id of the REVERSAL row when this posted transaction has been reversed. Always null on customer-facing feeds.") UUID reversalId) {}
 
   /**
-   * History feed envelope (F26). {@code items} are newest-first and
+   * History feed envelope. {@code items} are newest-first and
    * {@code nextCursor} is the opaque keyset position after the last item -
    * pass it back as {@code cursor} to fetch the next page, or omit it to
    * start at the newest page again. {@code null} {@code nextCursor} means the
@@ -73,7 +73,7 @@ public final class TransferDtos {
       List<TransactionResponse> items, long total, String nextCursor) {}
 
   /**
-   * One recoverable operation in the authorized list (F06). Unlike the
+   * One recoverable operation in the authorized list. Unlike the
    * history/feed shapes it carries the idempotency key itself: recovery means
    * being able to resume the EXACT same operation after a lost response or a
    * cleared browser record, which a key-less row cannot do.
@@ -89,7 +89,7 @@ public final class TransferDtos {
       String idempotencyKey) {}
 
   /**
-   * The authorized recovery list (F06): the caller's own keyed operations
+   * The authorized recovery list: the caller's own keyed operations
    * over a bounded recent window, newest first.
    */
   public record OperationListResponse(List<OperationListItem> items) {}

@@ -10,7 +10,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 /**
- * The ONLY writer of journal entries (F15). Every posted business operation
+ * The ONLY writer of journal entries. Every posted business operation
  * calls {@link #post} inside its own transaction, so the operation's status
  * flip, its journal postings, the balance projection updates, the audit row
  * and the notification all commit (or all roll back) together.
@@ -106,7 +106,7 @@ public class JournalService {
     // the financial operation: a posting must commit (or roll back) with the
     // operation's balance flip and status change, never float on its own. A
     // caller that forgets the transaction boundary gets a loud error at the
-    // write, not a silently detached journal entry (F15 enforcement).
+    // write, not a silently detached journal entry (enforced).
     if (!TransactionSynchronizationManager.isActualTransactionActive()) {
       throw new TransferValidationException(
           "Journal entries may only be written inside the transaction that "

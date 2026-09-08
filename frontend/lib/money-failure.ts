@@ -24,7 +24,7 @@ export type MoneyFailure = {
 };
 
 /**
- * Truthful copy for a failed deposit/transfer (F06 interrupted-response UX).
+ * Truthful copy for a failed deposit/transfer (interrupted-response UX).
  *
  * The danger after an interrupted money operation is a user who does not know
  * whether it went through and acts on a guess. A definitive rejection proves

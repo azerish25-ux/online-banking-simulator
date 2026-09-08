@@ -87,7 +87,7 @@ public class AuthService {
   @Transactional(readOnly = true)
   public User login(String email, String rawPassword) {
     String normalized = email.trim().toLowerCase();
-    // Account-level budget on top of the per-IP limiter (F03). Keyed on the
+    // Account-level budget on top of the per-IP limiter. Keyed on the
     // normalized email whether or not it exists, so the answer never reveals
     // whether an account is real.
     loginThrottle.verifyAvailable(normalized);
@@ -105,9 +105,10 @@ public class AuthService {
   }
 
   /**
-   * F30 verification of a persisted login challenge (see {@link #verifyMfaChallenge}).
+   * Verification of the persisted login challenge (see {@link #verifyMfaChallenge}).
    *
-   * The attempt is RESERVED atomically before any code is checked (section 9): one conditional UPDATE books it only while the challenge is
+   * The attempt is RESERVED atomically before any code is checked:
+   * one conditional UPDATE books it only while the challenge is
    * unused, unexpired and under its budget, committing in a short REQUIRES_NEW
    * boundary so a concurrent burst can never overshoot the five-attempt limit
    * and a rejected code can never erase its own booking. The final consume is
@@ -140,7 +141,7 @@ public class AuthService {
   }
 
   // -------------------------------------------------------------------------
-  // F02: the TOTP lifecycle. Starting a setup NEVER touches the active factor:
+  // the TOTP lifecycle. Starting a setup NEVER touches the active factor:
   // a fresh secret lives in a pending enrollment and is promoted only after
   // the new authenticator verifies. Replacing or disabling an ACTIVE factor
   // requires a recent password plus a code from the EXISTING factor - never
@@ -252,7 +253,7 @@ public class AuthService {
     return user;
   }
 
-  // --- secret custody helpers (F30) ------------------------------------------
+  // --- secret custody helpers ------------------------------------------
 
   String secretOf(User user) {
     if (user.getTotpKeyVersion() >= 1) {

@@ -12,7 +12,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * Pure layout checks for the PDF description engine ( section 10),
+ * Pure layout checks for the PDF description engine,
  * without a Spring context or database: every claim is measured against the
  * REAL embedded font.
  *

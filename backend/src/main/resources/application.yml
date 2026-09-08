@@ -36,13 +36,13 @@ app:
     rate-limit:
       per-minute: ${AUTH_RATE_LIMIT:20}
       # Forwarding headers (X-Forwarded-For) are honored ONLY when the direct
-      # socket peer falls inside this CIDR allowlist (F03). Empty = never
+      # socket peer falls inside this CIDR allowlist. Empty = never
       # trust them: the bucket key is the socket address, so spoofed headers
       # cannot mint fresh buckets. The compose deployment sets this to the
       # frontend network AFTER its sanitizing edge is verified.
       trusted-proxies: ${RATE_LIMIT_TRUSTED_PROXIES:}
     refresh-days: ${AUTH_REFRESH_DAYS:7}
-  # TOTP secret custody (F30). Empty = legacy plaintext (local demo only).
+  # TOTP secret custody. Empty = legacy plaintext (local demo only).
   # Production deployments MUST set APP_TOTP_MASTER_KEY; DeploymentEnvGuard
   # refuses to start in production mode without a non-default key.
   totp:
@@ -55,7 +55,7 @@ app:
     savings-annual-rate: ${SAVINGS_RATE:0.04}
     loan-annual-rate: ${LOAN_RATE:0.12}
   cache:
-    # Typed binding consumed by LedgerCacheConfig (F07). The old nested
+    # Typed binding consumed by LedgerCacheConfig. The old nested
     # `caffeine.spec` string lived under the wrong namespace - Spring's cache
     # auto-configuration never read it, so these caches actually ran unbounded
     # and without expiry. LedgerCacheConfig builds the CaffeineCacheManager

@@ -17,11 +17,11 @@ import { ApiError } from "../../lib/api";
 import { fmtDate, maskIban, usd } from "../../lib/format";
 import type { Tx } from "../../lib/api-types";
 
-/** What an operator is deciding about one queue case (section 16). */
+/** What an operator is deciding about one queue case. */
 type DecisionAction = "approve" | "decline" | "acknowledge";
 
 /**
- * Operator queue ( section 16): HELD rows are intents - approving
+ * Operator queue: HELD rows are intents - approving
  * settles the transfer, declining cancels it, so no money moves until an
  * operator decides. A flagged-but-POSTED row (large deposit) already credited,
  * so it only needs acknowledging to leave the queue.
@@ -45,7 +45,7 @@ export function ReviewQueueSection() {
   const [reason, setReason] = React.useState("");
   const [staleConflict, setStaleConflict] = React.useState<string | null>(null);
   // Per-row busy: one pending decision disables THAT row's buttons only - an
-  // unrelated row stays actionable (F11).
+  // unrelated row stays actionable.
   const decisionBusyId = review.isPending ? review.variables?.id : decline.isPending ? decline.variables?.id : undefined;
   const busy = (id: string) => decisionBusyId === id;
 
@@ -59,7 +59,7 @@ export function ReviewQueueSection() {
     rowsAtPageStart.current = rows.length;
   }, [rows.length, queuePage]);
 
-  // Success copy derives from the AUTHORITATIVE response (F11): approve and
+  // Success copy derives from the AUTHORITATIVE response: approve and
   // acknowledge settle through the same review mutation, and what actually
   // happened - the row's returned kind/status - decides the words, never which
   // button was clicked.
@@ -136,7 +136,7 @@ export function ReviewQueueSection() {
     const body = {
       id: decision.tx.id,
       reason: clean,
-      // The state THIS console displayed - the server's stale check (section 16).
+      // The state THIS console displayed - the server's stale check.
       expectedStatus: decision.tx.status,
       expectedReviewed: decision.tx.reviewed
     };

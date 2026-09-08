@@ -24,7 +24,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * F15 reconciliation: balances must derive from the journal, not compare the
+ * reconciliation: balances must derive from the journal, not compare the
  * balance table with itself. A healthy ledger reconciles; a deliberately
  * corrupted projection or an injected unbalanced entry is REPORTED (never
  * silently repaired), and the operator-visible endpoint exposes the result.

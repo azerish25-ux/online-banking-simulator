@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One balanced group of posted accounting entries (F15). Immutable by
+ * One balanced group of posted accounting entries. Immutable by
  * construction - the DB forbids UPDATE/DELETE on PostgreSQL (V21) and this
  * class exposes no setters - so a correction must be a NEW authorized entry
  * linked through {@link #reversesEntryId}, never an edit of history.

@@ -1,6 +1,6 @@
 package com.bank.platform.ledger;
 
-/** The kind of business operation a journal entry records (F15). */
+/** The kind of business operation a journal entry records. */
 public enum JournalKind {
   /** A funding deposit; the balancing side is SIMULATOR_FUNDING. */
   DEPOSIT,

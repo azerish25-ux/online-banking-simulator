@@ -8,7 +8,7 @@ import java.util.UUID;
 import org.junit.jupiter.api.Test;
 
 /**
- * section 7: the account wire shape carries authoritative principal
+ * The account wire shape carries authoritative principal
  * owed, interest owed, total owed, and available credit - derived server-side
  * from the loan policy (available credit is principal headroom, never
  * balance-derived). Non-loan accounts carry nulls.

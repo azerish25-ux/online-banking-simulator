@@ -30,7 +30,7 @@ export default function TransfersPage() {
   const beneficiaries = useBeneficiaries();
   const transfer = useTransfer();
   const [receipt, setReceipt] = React.useState<{ id: string; toIban: string; amount: string; status: string } | null>(null);
-  // F11 explicit state machine: the form is DRAFT until the user asks to
+  // Explicit state machine: the form is DRAFT until the user asks to
   // review; REVIEW freezes the payload; submitting sends exactly the reviewed
   // snapshot - never silently re-read live form values. Editing a field exits
   // review back to DRAFT (and the intent-change effect resets the key).

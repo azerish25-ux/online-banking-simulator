@@ -110,8 +110,7 @@ class IdempotencyScopingTest {
     client.transferWithKey(alice, bobIban, "40.00", key);
 
     // The same sender reusing the key for a different destination must never
-    // replay silently or double-post: it is a conflicting use of one key (F06
-    // - one key names one intent, and a changed intent is a 409 conflict).
+    // replay silently or double-post: it is a conflicting use of one key (    // - one key names one intent, and a changed intent is a 409 conflict).
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
             .header("Idempotency-Key", key)
@@ -132,7 +131,7 @@ class IdempotencyScopingTest {
     String key = "idem-payload-" + UUID.randomUUID();
     client.transferWithKey(alice, bobIban, "40.00", key);
 
-    // F06: the key identifies the logical intent, not just the destination.
+    // the key identifies the logical intent, not just the destination.
     // A retry that changed the amount under the same key is a conflict (409)
     // - never a silent replay of the older row, never a second posting.
     mvc.perform(post("/api/v1/transfers")
@@ -152,7 +151,7 @@ class IdempotencyScopingTest {
     String bobIban = client.accountIban(bob);
     client.deposit(alice, aliceId, "100.00");
 
-    // User-submitted money movements require an idempotency key (F06).
+    // User-submitted money movements require an idempotency key.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
             .contentType(MediaType.APPLICATION_JSON)

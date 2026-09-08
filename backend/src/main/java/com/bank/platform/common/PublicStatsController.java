@@ -15,7 +15,7 @@ import org.springframework.web.bind.annotation.RestController;
  * evicted on register/transfer so the hero never shows stale counts after
  * money moves.
  *
- * <p>F28: the transfer figure is a KIND + posted-status classification, never
+* <p>the transfer figure is a KIND + posted-status classification, never
  * a "has a from side" test. The interest engine posts loan charges that DO
  * carry a from side and deposits/credits that do not - counting rows by their
  * shape presented engine interest as user transfers. Only rows the rail

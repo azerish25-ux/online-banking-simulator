@@ -20,7 +20,7 @@ jobs:
           cache: maven
       - working-directory: backend
         run: ./mvnw -B verify
-      # F21 forward-only kind-reclassification chain over a V7-era fixture.
+      # Forward-only kind-reclassification chain over a V7-era fixture.
       # The class is *IT-named, which Maven's default surefire/failsafe
       # naming never picks up, so it must be requested explicitly (H2 in
       # PostgreSQL mode - no service needed).
@@ -53,7 +53,7 @@ jobs:
         run: npx playwright install chromium
       # smoke.spec.ts runs backend-less; a11y + banking need the full stack (banking-e2e job).
       # E2E_BACKENDLESS tells the global-setup preflight there is no backend/database to
-      # identify for this job (section 19).
+      # identify for this job.
       - working-directory: frontend
         run: npx playwright test smoke.spec.ts
         env:
@@ -96,7 +96,7 @@ jobs:
           -Dspring.datasource.password=ci-secret
           -Dspring.datasource.driver-class-name=org.postgresql.Driver
 
-  # F15 migration gate on real PostgreSQL: migrate a FRESH database to V21,
+  # Migration gate on real PostgreSQL: migrate a FRESH database to V21,
   # seed realistic pre-journal accounts + legacy transaction rows, then migrate
   # to head. V22 must book exactly one reconciling OPENING_BALANCE entry per
   # non-zero account against MIGRATION_OPENING, preserve every legacy row, and
@@ -127,7 +127,7 @@ jobs:
           -Dit.pg.user=bankapp
           -Dit.pg.password=ci-secret
 
-  # F15 journal guarantees that only PostgreSQL can prove (H2's weaker locking
+  # Journal guarantees that only PostgreSQL can prove (H2's weaker locking
   # hides them): append-only BEFORE UPDATE/DELETE triggers reject even the app
   # role, the (kind, operation_ref) unique constraint refuses a duplicate
   # journal for one operation, a corrupted balance projection surfaces in the
@@ -245,7 +245,7 @@ jobs:
       # silently refresh + retry (session.spec.ts waits out the TTL on purpose;
       # the other specs would fail outright if silent refresh were broken).
       # E2E_MARKER is the RUN-SPECIFIC identity the playwright global-setup
-      # preflight demands (section 19): the same value must reach the backend boot and
+      # preflight demands: the same value must reach the backend boot and
       # the Playwright step below, so a leftover/stale server is refused
       # before the first seed instead of silently receiving the suite's data.
       - name: Boot backend with the run marker

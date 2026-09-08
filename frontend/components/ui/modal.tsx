@@ -39,7 +39,7 @@ export function Modal({
   // identity of onClose. A dialog that owns a controlled input whose state
   // lives in the page re-renders the parent on each keystroke, which re-
   // creates the inline onClose; if that identity restarted this effect the
-  // close button would steal focus after every character (F09). Restore to
+  // close button would steal focus after every character. Restore to
   // the actual opener and unlock scroll on close/unmount.
   React.useEffect(() => {
     if (!open) return;

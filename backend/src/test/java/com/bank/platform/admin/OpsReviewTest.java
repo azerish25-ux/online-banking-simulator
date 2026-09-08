@@ -155,8 +155,8 @@ class OpsReviewTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.content[0].entityId").value(heldId));
 
-    // A second decision on the same row is a stale-decision CONFLICT (409,
-    // section 16): the losing operator is told the case already moved so the queue
+    // A second decision on the same row is a stale-decision CONFLICT (409):
+    // the losing operator is told the case already moved so the queue
     // refreshes to the winning outcome - never an optimistic second toast.
     mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/decline")
             .header("Authorization", "Bearer " + admin))
@@ -191,7 +191,7 @@ class OpsReviewTest {
 
     // The loser's console now answers a stale decision: 409 naming the case's
     // CURRENT state, so the queue refreshes to the winning outcome instead of
-    // preserving an optimistic toast (section 16).
+    // preserving an optimistic toast.
     mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/review")
             .header("Authorization", "Bearer " + admin)
             .contentType(MediaType.APPLICATION_JSON)

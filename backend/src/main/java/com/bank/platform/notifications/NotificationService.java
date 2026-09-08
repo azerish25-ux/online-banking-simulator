@@ -14,7 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * In-app notifications plus the outbox INTENT for external delivery. The
- * email stub is never called here (F25): {@link #notify} records the in-app
+ * email stub is never called here: {@link #notify} records the in-app
  * row and commits a {@code email_outbox} row in the caller's transaction, and
  * {@link EmailOutboxWorker} calls the provider only after that commit. A
  * rolled-back operation therefore never sends mail, and a committed

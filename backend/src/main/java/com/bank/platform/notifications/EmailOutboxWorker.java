@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 /**
- * Delivery half of F25. Runs on a schedule and ONLY ever touches rows a
+ * Delivery half. Runs on a schedule and ONLY ever touches rows a
  * previous transaction COMMITTED (PENDING rows were written in the
  * operation's transaction; DELIVERING rows that went stale are reclaimed).
  * A claim is an atomic conditional status flip, so concurrent workers (or

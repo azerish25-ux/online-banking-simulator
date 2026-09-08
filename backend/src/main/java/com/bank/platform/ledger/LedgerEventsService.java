@@ -128,7 +128,7 @@ public class LedgerEventsService {
   }
 
   /** Decision reasons are bounded, rendered-safe metadata - never whole
-   *  request payloads ( section 16). */
+   *  request payloads. */
   private static String boundedReason(String reason) {
     if (reason == null) {
       return "Operator decision";

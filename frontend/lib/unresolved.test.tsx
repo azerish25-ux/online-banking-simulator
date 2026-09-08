@@ -172,7 +172,7 @@ describe("unresolved-operation resolution", () => {
     // The first attempt could have posted with a token that expired after
     // commit; this replay is refused by the auth filter before the server can
     // say what happened. The record must survive so the user can check again
-    // after re-authentication (section 6/section 15) - never silently erase it as a
+    // after re-authentication - never silently erase it as a
     // definitive rejection.
     setToken("tok");
     upsertPendingOperation({

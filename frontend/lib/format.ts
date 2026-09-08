@@ -7,7 +7,7 @@
  * EXACT SCALE: the ledger keeps 4 decimals, so every amount is parsed into an
  * exact integer count of ten-thousandths (BigInt) - no floating point, no
  * premature rounding. A SINGLE value is rounded once, only when formatted for
- * the user (F17); any SUM is accumulated at the ten-thousandths scale and
+ * the user; any SUM is accumulated at the ten-thousandths scale and
  * rounded once at the end, so per-item rounding can never skew a total.
  *
  * ROUNDING: display rounds HALF_UP (half away from zero for both signs) to

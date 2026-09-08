@@ -19,7 +19,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * section 14: the customer feed's filters (amount range, kind, state,
+ * The customer feed's filters (amount range, kind, state,
  * reference/counterparty search) are SERVER-BACKED - SQL predicates over the
  * whole account history, never a client-side filter of the loaded page. The
  * same predicates feed the keyset page and its total, validation rejects a

@@ -150,7 +150,7 @@ class InterestCardsNotifyTest {
 
     CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
     // The daily-principal charge on the $999 principal (16 closing days) is NOT
-    // forgiven at the full limit: the debt deepens past -credit_limit - F16.
+    // forgiven at the full limit: the debt deepens past -credit_limit .
     assertEquals(2, interestService.accrueMonthly().get("accrued"));
     expectBalance(token, loanId, expectedLoanBalance("999.00",
         loanCharge(List.of(seg(15, 30, "999.00")))));

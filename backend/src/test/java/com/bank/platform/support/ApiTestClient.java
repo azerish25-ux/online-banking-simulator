@@ -61,7 +61,7 @@ public final class ApiTestClient {
         .get(0).get("iban").asText();
   }
 
-  /** Every deposit needs its own key (F06): fundings are user operations. */
+  /** Every deposit needs its own key: fundings are user operations. */
   public void deposit(String token, String accountId, String amount) throws Exception {
     mvc.perform(post("/api/v1/accounts/" + accountId + "/deposit")
             .header("Authorization", "Bearer " + token)
@@ -91,7 +91,7 @@ public final class ApiTestClient {
   }
 
   public String transferWithKey(String token, String toIban, String amount, String idempotencyKey) throws Exception {
-    // Every transfer needs a key (F06): one-shot transfers mint their own.
+    // Every transfer needs a key: one-shot transfers mint their own.
     String key = idempotencyKey != null ? idempotencyKey
         : "tx-" + java.util.UUID.randomUUID();
     var request = post("/api/v1/transfers")

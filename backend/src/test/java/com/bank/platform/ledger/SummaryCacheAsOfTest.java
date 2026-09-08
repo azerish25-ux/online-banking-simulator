@@ -22,7 +22,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import tools.jackson.databind.ObjectMapper;
 
 /**
- * F07 - the monthly-summary cache key must name the AS-OF MONTH, not just the
+ * the monthly-summary cache key must name the AS-OF MONTH, not just the
  * account and window size. A deposit in January is cached under the January
  * anchor; advancing the business clock to March with NO financial mutation
  * must produce a fresh March window (empty inflow), never the stale January

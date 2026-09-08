@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Commit-side half of F25: {@link #enqueue} writes the delivery INTENT in the
+ * Commit-side half: {@link #enqueue} writes the delivery INTENT in the
  * caller's transaction (the operation's own), so a rolled-back operation
  * never produces mail. Deduplication happens on the stable
  * {@code deliveryKey} (unique index): re-enqueuing the same logical event

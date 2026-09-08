@@ -70,7 +70,7 @@ class OpenApiContractTest {
   }
 
   /**
-   * F14 semantic surface: the spec must NAME reality, not just exist. Login
+   * Semantic surface: the spec must NAME reality, not just exist. Login
    * lists both success outcomes with their real codes (200 session, 202 MFA
    * challenge), errors reference the single ApiProblem schema, response
    * schemas carry required lists with genuine nullability, enums enumerate

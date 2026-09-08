@@ -14,7 +14,7 @@ import { usePageTitle } from "../../lib/page-title";
 import { AboutDemoLink } from "./demo-seam";
 
 /**
- * Navigation vocabulary ( section 13): Overview, Transfers, Activity,
+ * Navigation vocabulary: Overview, Transfers, Activity,
  * Recipients (the existing /beneficiaries URL is kept), Notifications,
  * Security, and - for the operator role only - Operations.
  */
@@ -34,7 +34,7 @@ const NAV: NavItem[] = [
  * highlighted - /transfers/receipt/{id} is still "Transfers", /accounts/{id}
  * is still "Overview". Exact-prefix-with-boundary matching replaces the old
  * unsafe arbitrary prefix AND the exact-only rule that left receipt/detail
- * pages with no active item (app-shell section 13 anchor).
+ * pages with no active item.
  */
 function isActive(item: NavItem, pathname: string): boolean {
   if (pathname === item.section) return true;
@@ -93,7 +93,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   // Drawer lifecycle: Escape closes, navigation closes, focus returns to the
   // menu button. The drawer never unmounts page state - it is an overlay, so
-  // opening it can never discard a form or an unresolved operation (section 13).
+  // opening it can never discard a form or an unresolved operation.
   React.useEffect(() => {
     if (!drawerOpen) return;
     closeRef.current?.focus();
@@ -118,7 +118,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       clearToken();
       qc.clear();
       // Sibling tabs share the cookie jar but not this React tree: tell them
-      // to evict their cached user data and leave the app too (F22).
+      // to evict their cached user data and leave the app too.
       broadcastLogout();
       router.push(Routes.login);
     }

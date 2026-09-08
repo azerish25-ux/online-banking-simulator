@@ -5,7 +5,7 @@ import { Routes } from "./lib/routes";
 const IS_DEV = process.env.NODE_ENV === "development";
 
 /**
- * Per-request security headers for HTML documents (F23). Runs as proxy.ts on the Node.js runtime (Next 16 renamed the middleware file convention).. The CSP is the
+ * Per-request security headers for HTML documents. Runs as proxy.ts on the Node.js runtime (Next 16 renamed the middleware file convention).. The CSP is the
  * strict one: a fresh nonce per request gates every inline and framework
  * script (Next applies it automatically to the scripts it renders), so no
  * XSS that smuggles a <script> tag into the DOM can execute. React inline

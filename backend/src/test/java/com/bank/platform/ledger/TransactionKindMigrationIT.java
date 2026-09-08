@@ -13,7 +13,7 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * F21 - forward-only kind reclassification, chained over a PRE-V8 fixture.
+ * forward-only kind reclassification, chained over a PRE-V8 fixture.
  *
  * <p>The V8 migration (checksummed, never edited) classified legacy rows by
  * memo substrings. This test migrates a fresh database only to V7, seeds

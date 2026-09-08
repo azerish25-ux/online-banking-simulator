@@ -17,7 +17,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Run-specific identity endpoint for the browser suite's preflight (section 19). A health body and CSP header do not identify the actual
+ * Run-specific identity endpoint for the browser suite's preflight.
+ * A health body and CSP header do not identify the actual
  * database or source build, so before ANY seeding or destructive browser
  * step the suite asks THIS endpoint to name itself.
  *

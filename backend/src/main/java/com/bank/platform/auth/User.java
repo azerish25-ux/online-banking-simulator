@@ -35,7 +35,7 @@ public class User {
   @Column(name = "totp_secret", length = 64)
   private String totpSecret;
 
-  // F30 secret custody: when a master key is configured, the usable seed is
+  // Secret custody: when a master key is configured, the usable seed is
   // stored encrypted in totp_secret_ciphertext (key version >= 1) and the
   // legacy totp_secret column is cleared. Version 0 rows are pre-migration
   // plaintext that the startup migrator converts once a key is supplied.
@@ -48,7 +48,7 @@ public class User {
   /**
    * Bumped on every factor change. Access tokens carry the version they were
    * minted under and the auth filter rejects stale ones, so an old access
-   * token stops working the moment a factor changes (F02).
+   * token stops working the moment a factor changes.
    */
   @Column(name = "security_version", nullable = false)
   private int securityVersion;

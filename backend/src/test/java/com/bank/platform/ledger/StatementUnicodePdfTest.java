@@ -24,7 +24,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 /**
- * F20 - the statement PDF must not corrupt names or money descriptions.
+ * the statement PDF must not corrupt names or money descriptions.
  *
  * <p>The renderer embeds a Unicode TrueType font (DejaVu Sans, bundled under
  * src/main/resources/fonts with its license) and places every cell at a

@@ -8,7 +8,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * One archived classification question (F21). When V24 (or any future
+ * One archived classification question. When V24 (or any future
  * evidence pass) corrects or cannot prove a legacy transaction's kind, the
  * original classification, the reason, and the memo excerpt are preserved
  * here for operator review - balances and history are never altered to make
