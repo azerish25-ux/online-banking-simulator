@@ -66,7 +66,12 @@ test("review-threshold transfer is held for review, never reported as posted", a
 
   await expect(page.getByRole("heading", { name: "Transfer submitted for review" })).toBeVisible();
   await expect(page.getByText(/sent once an operator approves it/)).toBeVisible();
-  await expect(page.getByText("$10,000.00 →")).toBeVisible();
+  // The receipt card renders the amount and the destination as separate
+  // nodes. Scope to the card's own paragraphs: an unscoped text match would
+  // also hit the (invisible) "From account" option that carries the same
+  // balance figure.
+  await expect(page.locator("p.nums", { hasText: "$10,000.00" })).toBeVisible();
+  await expect(page.locator("p.mono", { hasText: "→" })).toBeVisible();
 
   // The durable receipt route shows the authoritative HELD state.
   await page.getByRole("link", { name: /Open permanent receipt/ }).click();
@@ -115,7 +120,11 @@ test("full money loop in the browser", async ({ page }) => {
   await page.getByRole("button", { name: "Confirm & send" }).click();
 
   await expect(page.getByRole("heading", { name: "Transfer posted" })).toBeVisible();
-  await expect(page.getByText("$120.00 →")).toBeVisible();
+  // Same receipt-card shape as the held-transfer flow: scope to its own
+  // paragraphs (amount node and arrow node), never a bare text match that
+  // can land on the invisible select option carrying the same figure.
+  await expect(page.locator("p.nums", { hasText: "$120.00" })).toBeVisible();
+  await expect(page.locator("p.mono", { hasText: "→" })).toBeVisible();
   const receiptHref = await page
     .getByRole("link", { name: /Open permanent receipt/ })
     .getAttribute("href");

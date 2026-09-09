@@ -107,7 +107,9 @@ test("transfer form is keyboard reachable with labelled fields", async ({ page }
   await page.getByLabel("Email").fill("bob@bank.local");
   await page.getByLabel("Password", { exact: true }).fill("secret123");
   await page.getByRole("button", { name: /^Log in$/ }).click();
-  await expect(page).toHaveURL(/\/dashboard/);
+  // Sign-in continues to the guarded destination the proxy carried in
+  // ?next= - Bob lands on the transfers form itself, not the dashboard.
+  await expect(page).toHaveURL(/\/transfers/);
   await page.goto("/transfers");
   await page.getByLabel("Recipient IBAN").focus();
   await page.keyboard.press("Tab");
@@ -212,10 +214,16 @@ test("authed surfaces and overlays meet WCAG 2.2 AA text contrast", async ({ pag
 test("mobile nav at 375px meets WCAG 2.2 AA text contrast", async ({ page }) => {
   await page.setViewportSize({ width: 375, height: 720 });
   await loginAsAlice(page);
-  const nav = page.locator("header nav");
-  await expect(nav).toBeVisible();
+  // Below the md breakpoint the desktop rail is display:none and navigation
+  // lives in the burger drawer: open it before auditing its links.
+  const menu = page.getByRole("button", { name: "Open navigation menu" });
+  await expect(menu).toBeVisible();
+  await menu.click();
+  const drawer = page.getByRole("dialog", { name: "Navigation menu" });
+  await expect(drawer).toBeVisible();
+  const nav = drawer.getByRole("navigation", { name: "Primary tasks" });
   await nav.locator("a").first().waitFor();
-  const r = await auditTextContrast(page, "header nav");
+  const r = await auditTextContrast(page, '[role="dialog"][aria-label="Navigation menu"]');
   expect(
     r.failures,
     "mobile nav (" + r.sampled + " text nodes)" + (r.failures.length ? "\n" + r.failures.join("\n") : "")

@@ -109,9 +109,13 @@ function queueRowFor(page: Page, fromTail: string, toTail: string) {
 }
 
 /** The audit-log row for exactly one transfer: both tails (badge action is
- *  already pinned by the server-side filter). */
+ *  already pinned by the server-side filter). Scoped to the audit card
+ *  itself: a settled case re-lists in the review queue with the same tails
+ *  and amount, so page-wide li matching can pick the queue row instead. */
 function auditRowFor(page: Page, fromTail: string, toTail: string) {
-  return page
+  const auditCard = page
+    .locator("section.panel", { has: page.getByRole("heading", { name: "Audit log" }) });
+  return auditCard
     .locator("li")
     .filter({ hasText: "..." + fromTail })
     .filter({ hasText: "..." + toTail });
@@ -165,7 +169,12 @@ test("operator approve and decline of a HELD transfer is reflected everywhere", 
   await loginOperator(page);
   const queueRow = queueRowFor(page, checkingTail, savingsTail);
   await expect(queueRow).toContainText("$10,000.00", { timeout: 10_000 });
+  // Approve opens the decision dialog: a reason is REQUIRED (preserved in
+  // the audit trail) before the confirm button enables.
   await queueRow.getByRole("button", { name: "Approve" }).click();
+  await expect(page.getByRole("dialog", { name: "Approve and settle this transfer?" })).toBeVisible();
+  await page.getByLabel("Decision reason").fill("Funds verified; pattern matches customer's history");
+  await page.getByRole("button", { name: "Approve transfer" }).click();
   await expect(page.getByText("Approved. Transfer settled.")).toBeVisible();
   await expect(queueRow).toHaveCount(0, { timeout: 10_000 }); // queue empties for this transfer
 
@@ -196,9 +205,10 @@ test("operator approve and decline of a HELD transfer is reflected everywhere", 
   await loginOperator(page);
   const declinedQueueRow = queueRowFor(page, checkingTail, savingsTail);
   await expect(declinedQueueRow).toContainText("$10,000.00", { timeout: 10_000 });
-  // Decline needs an explicit confirmation before the decision lands.
+  // Decline also runs through the decision dialog with a required reason.
   await declinedQueueRow.getByRole("button", { name: "Decline" }).click();
-  await expect(page.getByRole("heading", { name: "Decline this transfer?" })).toBeVisible();
+  await expect(page.getByRole("dialog", { name: "Decline this transfer?" })).toBeVisible();
+  await page.getByLabel("Decision reason").fill("Sender could not confirm the instruction");
   await page.getByRole("button", { name: "Decline transfer" }).click();
   await expect(page.getByText("Declined. No money moved.")).toBeVisible();
   await expect(declinedQueueRow).toHaveCount(0, { timeout: 10_000 });

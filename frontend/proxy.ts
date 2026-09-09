@@ -81,6 +81,9 @@ export function proxy(request: NextRequest) {
     const guarded = [Routes.dashboard, Routes.transfers, Routes.activity, Routes.beneficiaries, "/accounts", Routes.notifications, Routes.settings];
     if (!token && guarded.some((p) => path.startsWith(p))) {
       redirect = new URL(Routes.login, request.url);
+      // Carry the intended destination so the login page can continue the
+      // journey after a silent session repair (or the next sign-in).
+      redirect.searchParams.set("next", request.nextUrl.pathname + request.nextUrl.search);
     }
   }
 
