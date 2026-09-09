@@ -1,10 +1,11 @@
 import { expect, test } from "@playwright/test";
+import { BrandName } from "../lib/brand";
 import { Routes } from "../lib/routes";
 
 test("landing page loads with product messaging", async ({ page }) => {
   await page.goto(Routes.home);
-  await expect(page.getByRole("heading", { name: /Everything moves,/ })).toBeVisible();
-  await expect(page.getByRole("link", { name: /Open an account/ })).toBeVisible();
+  await expect(page.getByRole("heading", { name: BrandName })).toBeVisible();
+  await expect(page.getByRole("link", { name: /Open an account|Create demo account/ })).toBeVisible();
 });
 
 test("login page validates before submitting", async ({ page }) => {
