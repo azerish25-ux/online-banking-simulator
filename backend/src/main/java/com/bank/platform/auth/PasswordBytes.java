@@ -12,7 +12,7 @@ import java.lang.annotation.Target;
 import java.nio.charset.StandardCharsets;
 
 /**
- * BCrypt truncates at 72 BYTES, not 72 characters - an emoji password of 30
+ * BCrypt truncates at 72 BYTES, not 72 characters: an emoji password of 30
  * characters is 120 bytes and two distinct such passwords can silently share
  * one stored hash after truncation. @Size caps characters, so the byte ceiling
  * needs its own validator.

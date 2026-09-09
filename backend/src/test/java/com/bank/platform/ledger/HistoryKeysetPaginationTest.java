@@ -36,13 +36,13 @@ import org.springframework.transaction.annotation.Transactional;
  * (created_at, seq) ordering key, never an OFFSET.
  *
  * <p>Every deposit in these tests shares one fixed business clock, so rows tie
- * exactly on created_at and only the DB-assigned seq can order them - the
+ * exactly on created_at and only the DB-assigned seq can order them: the
  * condition that made offset paging fragile. The acceptance cases are the
  * ones OFFSET gets wrong: rows inserted BETWEEN two page reads must not shift
  * the older pages (no duplicate, no skip), equal timestamps must page exactly
  * once each, the final page must end with a null cursor and the exact union
  * of identities, and a mutable review-state change (HELD → POSTED) must not
- * reorder the feed. A cursor is a position, not a snapshot promise - new rows
+ * reorder the feed. A cursor is a position, not a snapshot promise: new rows
  * are visible by starting a fresh page, and a changed date window resets
  * paging to that window's newest page.
  */
@@ -118,7 +118,7 @@ class HistoryKeysetPaginationTest {
     assertEquals(first.subList(10, 15), pageThree.ids, "final boundary is the oldest five");
     assertEquals(null, pageThree.nextCursor, "no nextCursor on the final page");
 
-    // The live model: the newcomer is visible by starting a fresh page - not
+    // The live model: the newcomer is visible by starting a fresh page: not
     // smuggled into an older cursor walk.
     Page fresh = fetch(token, accountId, 5, null);
     assertEquals(List.of(newcomer, first.get(0), first.get(1), first.get(2), first.get(3)),
@@ -151,7 +151,7 @@ class HistoryKeysetPaginationTest {
 
   /**
    * An operator resolving a HELD instruction changes mutable review state on
-   * an immutable history row - the feed's identity and order must not move.
+   * an immutable history row: the feed's identity and order must not move.
    */
   @Test
   void reviewStateChangeDoesNotReorderTheFeed() throws Exception {
@@ -182,7 +182,7 @@ class HistoryKeysetPaginationTest {
 
   private record Page(List<String> ids, String nextCursor) {}
 
-  /** Seeds {@code n} deposits at the current clock instant (no id returned - deposit's body is the account). */
+  /** Seeds {@code n} deposits at the current clock instant (no id returned: deposit's body is the account). */
   private void seed(String token, String accountId, int n) throws Exception {
     for (int i = 0; i < n; i++) {
       client.deposit(token, accountId, "1.00");
@@ -251,7 +251,7 @@ class HistoryKeysetPaginationTest {
     throw new AssertionError("row " + id + " not on the first page");
   }
 
-  /** A clock a test can wind forward - reset to May 1 in {@link #freezeClock()}. */
+  /** A clock a test can wind forward: reset to May 1 in {@link #freezeClock()}. */
   private static final class SettableClock extends Clock {
     private Instant instant = Instant.parse("2026-05-01T12:00:00Z");
 

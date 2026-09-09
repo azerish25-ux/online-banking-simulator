@@ -12,22 +12,22 @@ import org.flywaydb.core.api.migration.Context;
  * forward-only, evidence-backed transaction-kind review.
  *
  * <p>V8 (a checksummed, already-applied migration) classified every legacy
- * row by memo SUBSTRINGS - {@code memo LIKE '%interest%'} labelled an
+ * row by memo SUBSTRINGS: {@code memo LIKE '%interest%'} labelled an
  * ordinary user transfer whose memo merely mentioned \"interest\" as an
  * interest posting, and {@code memo LIKE 'Simulated deposit%'} left a deposit
  * with any other memo as TRANSFER. Historical migrations are never edited, so
  * this migration CORRECTS FORWARD with evidence, never guesses:
  *
  * <ol>
- *   <li><b>Audit provenance</b> - a row whose id appears in an
+ *   <li><b>Audit provenance</b>: a row whose id appears in an
  *       {@code INTEREST_POSTED} audit entry is engine interest (the interest
  *       job audits every posting by transaction id).</li>
- *   <li><b>Structure</b> - the interest engine never writes BOTH sides
+ *   <li><b>Structure</b>: the interest engine never writes BOTH sides
  *       (savings credits are to-only, loan charges are from-only), and only
  *       deposits write {@code from_account_id IS NULL}; a two-sided row
  *       labelled INTEREST by a memo substring is therefore a transfer, and a
  *       from-null non-interest row is a deposit.</li>
- *   <li><b>Quarantine, don't fabricate</b> - every correction is archived in
+ *   <li><b>Quarantine, don't fabricate</b>: every correction is archived in
  *       {@code transaction_kind_review} (original V8 classification, reason,
  *       memo excerpt preserved); genuinely ambiguous rows (engine-shaped but
  *       without audit provenance) are LABELLED {@code UNCERTAIN} in
@@ -66,7 +66,7 @@ public class V24__kind_classification_review extends BaseJavaMigration {
             + "AND a.entity_id = CAST(t.id AS VARCHAR))");
 
     // 2) Structural: two-sided rows are transfers (the engine never writes two
-    //    sides) - including V8's memo-INTEREST mislabels.
+    //    sides): including V8's memo-INTEREST mislabels.
     archive(connection,
         "SELECT t.id, t.kind FROM transactions t "
             + "WHERE t.kind = 'INTEREST' AND t.kind_evidence = 'LEGACY' "

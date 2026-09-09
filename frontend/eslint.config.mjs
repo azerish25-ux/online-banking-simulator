@@ -26,7 +26,7 @@ const eslintConfig = defineConfig([
         {
           name: "status",
           message:
-            "`status` is the legacy window.status DOM global - a typo for a local variable silently compiles and reads as \"\" at runtime (the HELD-transfer toast regression). Declare a local, e.g. `const held = d.status === \"HELD\"`."
+            "`status` is the legacy window.status DOM global: a typo for a local variable silently compiles and reads as \"\" at runtime (the HELD-transfer toast regression). Declare a local, e.g. `const held = d.status === \"HELD\"`."
         }
       ]
     }

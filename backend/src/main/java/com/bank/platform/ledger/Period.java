@@ -8,8 +8,8 @@ import java.time.ZoneOffset;
  * An inclusive calendar-day window over the ledger. Both {@code from} and
  * {@code to} name whole days that belong to the window; a {@code null} side
  * means the window is open on that side (no lower, or no upper, bound). Every
- * consumer - the statement row query, the statement balance cut, the PDF
- * "Period ... to ..." label, the CSV rows, the activity history filter - reads the
+ * consumer: the statement row query, the statement balance cut, the PDF
+ * "Period ... to ..." label, the CSV rows, the activity history filter: reads the
  * SAME half-open instant range {@code [start(), endExclusive())}, where an
  * open side flows through to SQL as "no constraint" rather than a made-up
  * instant. The inclusive-`to` rule therefore lives here once: a caller can no
@@ -18,7 +18,7 @@ import java.time.ZoneOffset;
  * closing).
  *
  * <p>A window whose two named days run backwards is rejected in the
- * constructor - the same mistake used to surface as a silent empty result on
+ * constructor: the same mistake used to surface as a silent empty result on
  * every read (200 with nothing in it), which is worse than an error because
  * the caller cannot tell "no rows match" from "your range is impossible".
  */
@@ -43,7 +43,7 @@ public record Period(LocalDate from, LocalDate to) {
     return new Period(null, to);
   }
 
-  /** One inclusive day - for a filter that names a single date. */
+  /** One inclusive day: for a filter that names a single date. */
   public static Period day(LocalDate date) {
     return new Period(date, date);
   }

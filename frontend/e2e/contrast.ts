@@ -1,7 +1,7 @@
 import type { Page } from "@playwright/test";
 
 /**
- * Contrast auditing from live computed styles - no axe-core dependency, no
+ * Contrast auditing from live computed styles: no axe-core dependency, no
  * screenshot diffing. For each visible text node inside a scope we read the
  * rendered foreground, the effective background (alpha-composited through the
  * element's ancestor chain down to the document), the font size and weight,

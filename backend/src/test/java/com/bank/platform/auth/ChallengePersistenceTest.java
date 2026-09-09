@@ -97,7 +97,7 @@ class ChallengePersistenceTest {
       mvc.perform(verify(challengeToken, "000000"))
           .andExpect(status().isUnauthorized());
     }
-    // A correct code now gets refused outright (429) - the account budget and
+    // A correct code now gets refused outright (429): the account budget and
     // the challenge budget are both exhausted.
     mvc.perform(verify(challengeToken, currentCode()))
         .andExpect(status().isTooManyRequests());
@@ -173,7 +173,7 @@ class ChallengePersistenceTest {
     CountDownLatch ready = new CountDownLatch(n);
     CountDownLatch start = new CountDownLatch(1);
     AtomicInteger verified = new AtomicInteger();   // wrong-code BadCredentials (a real verification ran)
-    AtomicInteger refused = new AtomicInteger();    // TooMany - refused BEFORE any code check
+    AtomicInteger refused = new AtomicInteger();    // TooMany: refused BEFORE any code check
     AtomicInteger unexpected = new AtomicInteger();
     java.util.concurrent.ConcurrentLinkedQueue<String> unexpectedDetail = new java.util.concurrent.ConcurrentLinkedQueue<>();
     for (int i = 0; i < n; i++) {
@@ -204,7 +204,7 @@ class ChallengePersistenceTest {
         + String.join(" | ", unexpectedDetail));
     assertEquals(n, verified.get() + refused.get(), "every request resolved to a defined outcome");
     // The core guarantee: however the 24 requests interleave, at most five may
-    // actually verify a code - everyone else is refused before verification.
+    // actually verify a code: everyone else is refused before verification.
     LoginChallenge row = challenges.findById(challengeId).orElseThrow();
     assertEquals(5, row.getFailedAttempts(), "the five-attempt budget is never overshot");
     assertEquals(5, verified.get(), "no more than the budgeted verifications may run");

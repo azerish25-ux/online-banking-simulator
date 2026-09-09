@@ -7,6 +7,6 @@ package com.bank.platform.auth;
 public class TooManyTotpAttemptsException extends RuntimeException {
 
   public TooManyTotpAttemptsException() {
-    super("Too many invalid codes - try again in a minute");
+    super("Too many invalid codes: try again in a minute");
   }
 }

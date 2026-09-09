@@ -23,7 +23,7 @@ jobs:
       # Forward-only kind-reclassification chain over a V7-era fixture.
       # The class is *IT-named, which Maven's default surefire/failsafe
       # naming never picks up, so it must be requested explicitly (H2 in
-      # PostgreSQL mode - no service needed).
+      # PostgreSQL mode; no service needed).
       - working-directory: backend
         run: ./mvnw -B test -Dtest=TransactionKindMigrationIT
 
@@ -100,7 +100,7 @@ jobs:
   # seed realistic pre-journal accounts + legacy transaction rows, then migrate
   # to head. V22 must book exactly one reconciling OPENING_BALANCE entry per
   # non-zero account against MIGRATION_OPENING, preserve every legacy row, and
-  # V23 must establish loan principal. Needs its own job-scoped database - it
+  # V23 must establish loan principal. Needs its own job-scoped database; it
   # never shares a schema another test has written to.
   cutover-postgres:
     runs-on: ubuntu-latest

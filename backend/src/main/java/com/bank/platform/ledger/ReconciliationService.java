@@ -13,18 +13,18 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Independent reconciliation (V29). Derives what every customer balance
- * SHOULD be from the journal alone - never by comparing the balance table
- * with itself - and reports three distinct layers so that a green \"the books
+ * SHOULD be from the journal alone: never by comparing the balance table
+ * with itself: and reports three distinct layers so that a green \"the books
  * add up\" is never mistaken for \"every transaction was justified\":\n"
  *\n"
  * <ul>\n"
- *   <li><b>Accounting consistency</b> ({@code balanced}) - every entry's\n"
+ *   <li><b>Accounting consistency</b> ({@code balanced}): every entry's\n"
  *       signed lines net to zero per currency, account projections equal\n"
  *       their lines, one journal per operation, no unexplained money.\n"
- *   <li><b>Operation relationships</b> ({@code operationConsistent}) - every\n"
+ *   <li><b>Operation relationships</b> ({@code operationConsistent}): every\n"
  *       posted TRANSFER/DEPOSIT/REVERSAL instruction has its expected journal\n"
  *       counterpart (no settled operation without its entry).</li>\n"
- *   <li><b>Reversal integrity</b> ({@code reversalConsistent}) - every linked\n"
+ *   <li><b>Reversal integrity</b> ({@code reversalConsistent}): every linked\n"
  *       reversal names an entry that exists, and no entry is reversed twice.\n"
  *       A wrong-but-balanced charge passes layer 1; these layers are what\n"
  *       keep an operator from trusting a merely balanced ledger.</li>\n"

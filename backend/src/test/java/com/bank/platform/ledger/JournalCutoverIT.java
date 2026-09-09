@@ -16,8 +16,8 @@ import org.junit.jupiter.api.Test;
  *
  * <p>This test deliberately does NOT boot the Spring context. It migrates a
  * fresh database up to V21 (the journal schema, before the cutover runs),
- * seeds realistic pre-journal state - accounts whose balances were produced by
- * legacy transaction rows that no journal can reproduce with certainty - and
+ * seeds realistic pre-journal state: accounts whose balances were produced by
+ * legacy transaction rows that no journal can reproduce with certainty: and
  * then migrates to the latest schema. The V22 cutover must book ONE labelled
  * OPENING_BALANCE entry per non-zero account against the MIGRATION_OPENING
  * counteraccount, preserve every legacy row untouched, and leave balances that
@@ -46,7 +46,7 @@ class JournalCutoverIT {
     UUID savings = UUID.randomUUID();
     UUID loan = UUID.randomUUID();
 
-    // 1) Migrate only up to the journal schema - the cutover has NOT run yet.
+    // 1) Migrate only up to the journal schema: the cutover has NOT run yet.
     Flyway.configure().dataSource(url, user, password).target("21").load().migrate();
 
     // 2) Seed pre-journal state: a user, three accounts with balances produced
@@ -100,7 +100,7 @@ class JournalCutoverIT {
       assertEquals(new BigDecimal("400.0000"), scalar(c,
           "SELECT principal FROM accounts WHERE id = '" + loan + "'"));
 
-      // Legacy rows and identifiers are untouched - preserved, not re-written.
+      // Legacy rows and identifiers are untouched: preserved, not re-written.
       assertEquals(2L, count(c, "SELECT COUNT(*) FROM transactions"), "legacy rows preserved");
       assertEquals(0L, count(c,
           "SELECT COUNT(*) FROM journal_entries WHERE kind <> 'OPENING_BALANCE'"),

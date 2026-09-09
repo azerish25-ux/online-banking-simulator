@@ -59,7 +59,7 @@ export const queryKeys = {
   me: ["me"] as const,
   accounts: ["accounts"] as const,
   accountDetail: (id: string) => ["account", id] as const,
-  // The authorized recovery list - the caller's own recent keyed operations.
+  // The authorized recovery list: the caller's own recent keyed operations.
   recentOperations: ["operations", "recent"] as const,
   // The cursor (blank = newest page) is part of the key: two different
   // positions in the same feed are two different result sets and must not
@@ -116,7 +116,7 @@ export function useAccount(id: string): UseQueryResult<Account, ApiError> {
 /**
  * Server-side history predicates: the customer feed's
  * amount range, kind(s), state(s) and reference/counterparty search are SQL
- * predicates over the WHOLE account history. Empty members mean "open" - an
+ * predicates over the WHOLE account history. Empty members mean "open": an
  * empty applied filter is a normal unfiltered browse, not a query for empty
  * values.
  */
@@ -228,7 +228,7 @@ export function usePublicStats(): UseQueryResult<PublicStats, ApiError> {
  * A deposit answer (lifecycle): the updated account plus the recoverable
  * operation identity (transaction id, idempotency key, authoritative status)
  * that backs the durable receipt lookup. Aliased straight off the generated
- * OpenAPI schema - one authoritative definition, no parallel shape.
+ * OpenAPI schema: one authoritative definition, no parallel shape.
  */
 export type DepositResult = Deposit;
 
@@ -246,7 +246,7 @@ export function useRecentOperations(limit = 25, enabled = true): UseQueryResult<
 }
 
 /**
- * The money invalidation graph - the exact set of queries a posted deposit or
+ * The money invalidation graph: the exact set of queries a posted deposit or
  * transfer makes stale. The live forms AND the recovery replay both resolve
  * money here, so the graph cannot drift between them.
  */
@@ -279,7 +279,7 @@ export type UnresolvedOperation = PendingOperation;
  * session's store holds (an operation is only "unresolved" because a response
  * never arrived); the SERVER list is the authority that ENDS that state:
  *
- *  - an operation the server recorded is resolved in fact - its outcome is no
+ *  - an operation the server recorded is resolved in fact: its outcome is no
  *    longer unknown and the money already shows in accounts/activity, so the
  *    record is cleared here and never offered as "unknown";
  *  - an operation the server has never seen stays listed for a safe keyed
@@ -287,7 +287,7 @@ export type UnresolvedOperation = PendingOperation;
  *    its fetch failed (absence proves nothing).
  *
  * The server records no read-state, so only operations THIS session still
- * holds a record for are surfaced - the store marks an op as unacknowledged,
+ * holds a record for are surfaced: the store marks an op as unacknowledged,
  * the server is what ends that state. The store emits PENDING_OPS_EVENT on
  * every write, so an operation that ends ambiguously while this surface is
  * mounted (e.g. a deposit dialog behind it) appears without a reload.
@@ -359,7 +359,7 @@ export type UnresolvedOutcome =
  * Resolves ONE saved operation by re-sending the IDENTICAL keyed request the
  * original dispatch carried. The server deduplicates on the key, so the
  * replay either returns the ORIGINAL result (the operation already posted or
- * sits held - never a second credit) or completes a request that never
+ * sits held: never a second credit) or completes a request that never
  * arrived. Outcomes:
  *
  *  - 2xx            → resolved: authoritative status; the record is cleared.
@@ -416,18 +416,17 @@ export async function resolveUnresolvedOperation(
     }
     const failure = classifyMoneyFailure(kind, err);
     if (!failure.ambiguous) {
-      // Definitive rejection: the server recorded nothing - resolve + clear.
+      // Definitive rejection: the server recorded nothing: resolve + clear.
       removePendingOperation(userId, kind, key);
       return { kind: "rejected", message: failure.message };
     }
     if (err instanceof ApiError && err.status === 409) {
       try {
-        // Same key, different intent: fetch the recorded operation by key -
-        // the server's answer is the truth, not our guess.
+        // Same key, different intent: fetch the recorded operation by key: // the server's answer is the truth, not our guess.
         const truth = await api<Tx>("/v1/operations?key=" + encodeURIComponent(key));
         return finish(truth.status, truth);
       } catch {
-        // Even the truth lookup failed - still unknown; keep the record.
+        // Even the truth lookup failed: still unknown; keep the record.
       }
     }
     return { kind: "unknown", message: failure.message };
@@ -437,9 +436,9 @@ export async function resolveUnresolvedOperation(
 // Definitive client rejections (validation, insufficient funds) mean the
 // server recorded nothing, so the key was NOT consumed and the next attempt
 // may mint a fresh one. 409 (key already names a different operation) and
-// 429 (throttled) are NOT proof of rejection - the key is kept so a retry
+// 429 (throttled) are NOT proof of rejection: the key is kept so a retry
 // deduplicates against whatever the server actually did. The predicate
-// itself is owned by money-failure.ts - the single authority on the
+// itself is owned by money-failure.ts: the single authority on the
 // definitive-vs-ambiguous boundary.
 
 /** The signed-in user id from the me query, when it has loaded. */
@@ -458,7 +457,7 @@ function currentUserId(qc: ReturnType<typeof useQueryClient>): string | undefine
  *    draft still carries them) match the current submit is resumed with its
  *    own key;
  *  - a genuinely different draft (edited amount/destination/account) never
- *    inherits an older operation's key - the older record stays in the store
+ *    inherits an older operation's key: the older record stays in the store
  *    (still recoverable) and the new submission mints a fresh key.
  *
  * The identity is persisted BEFORE the financial request is dispatched, so a
@@ -548,7 +547,7 @@ export function useDeposit(): DepositMutation {
   // Editing a draft is NOT resolving a submitted operation: the ref (in-page
   // retry memory) drops so the next submit mints a fresh key for the new
   // intent, but any pending record of an earlier ambiguous attempt survives
-  // in the store - still recoverable, never silently erased by an edit.
+  // in the store: still recoverable, never silently erased by an edit.
   const resetIdempotencyKey = React.useCallback(() => {
     keyRef.current = null;
   }, []);
@@ -585,7 +584,7 @@ export function useDeposit(): DepositMutation {
         return;
       }
       // Ambiguous outcome (network, 5xx, 429, 409): the record was persisted
-      // BEFORE dispatch - the store already carries this operation, and a
+      // BEFORE dispatch: the store already carries this operation, and a
       // retry (even after a reload) deduplicates on the server.
     }
   });
@@ -604,9 +603,9 @@ export interface TransferInput {
  *
  * Idempotency-key lifecycle: one key per *logical send intent*. The
  * key is minted on the first attempt and reused across retries (network
- * failures, 5xx, 429, reloads) so a retry can never double-post - the server
+ * failures, 5xx, 429, reloads) so a retry can never double-post: the server
  * returns the original row. The key is dropped only when the intent is
- * resolved: success, a definitive client rejection (400/422 - the server
+ * resolved: success, a definitive client rejection (400/422: the server
  * recorded nothing), or the user edits the form into a new intent.
  */
 export type TransferMutation = UseMutationResult<Tx, ApiError, TransferInput> & {
@@ -619,7 +618,7 @@ export function useTransfer(): TransferMutation {
   // Editing a draft is NOT resolving a submitted operation: the ref (in-page
   // retry memory) drops so the next submit mints a fresh key for the new
   // intent, but any pending record of an earlier ambiguous attempt survives
-  // in the store - still recoverable, never silently erased by an edit.
+  // in the store: still recoverable, never silently erased by an edit.
   const resetIdempotencyKey = React.useCallback(() => {
     keyRef.current = null;
   }, []);
@@ -661,7 +660,7 @@ export function useTransfer(): TransferMutation {
         return;
       }
       // Ambiguous outcome (network drop, 5xx, 429, or a 409 conflict whose
-      // original operation the retry will fetch): never discard the key - a
+      // original operation the retry will fetch): never discard the key: a
       // retry must deduplicate against whatever the server actually did. The
       // record was persisted BEFORE dispatch, so it survives a reload too.
     }
@@ -715,7 +714,7 @@ export function useMarkNotificationRead(): UseMutationResult<NotificationItem, A
   });
 }
 
-/** Bulk mark-read - one server round trip, not one per unread notification. */
+/** Bulk mark-read: one server round trip, not one per unread notification. */
 export function useMarkAllRead(): UseMutationResult<{ marked?: number }, ApiError, void> {
   const qc = useQueryClient();
   return useMutation({
@@ -774,7 +773,7 @@ export function useTotpSetup(): UseMutationResult<{ secret: string; qrDataUri: s
   });
 }
 
-/** Abandons a pending enrollment - never touches an active factor. */
+/** Abandons a pending enrollment: never touches an active factor. */
 export function useTotpCancel(): UseMutationResult<void, ApiError, void> {
   return useMutation({
     mutationFn: () => api<void>("/v1/auth/totp/cancel", { method: "POST" })
@@ -914,8 +913,8 @@ export function useDeclineTransaction(): UseMutationResult<Tx, ApiError, Decisio
 
 /**
  * Reverses a POSTED transaction (V29) with the operator's mandatory reason.
- * The server authors a NEW reversal row that moves the money back - one per
- * original - so the success response is that row, never the edited original.
+ * The server authors a NEW reversal row that moves the money back: one per
+ * original: so the success response is that row, never the edited original.
  * Reversal moves money, so every operator readout that reflects balances or
  * flow is refreshed from the same graph the console lists use.
  */

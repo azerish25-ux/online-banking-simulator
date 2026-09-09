@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Runtime response guards. Generated types describe the contract at
  * compile time, but a server that misbehaves (or a proxy that rewrites a
- * body) must not be trusted just because TypeScript believes the shape - the
+ * body) must not be trusted just because TypeScript believes the shape: the
  * few places where the CLIENT BRANCHES on a response (login: session vs MFA
  * challenge) or parses an error body validate it with zod before acting.
  */
@@ -64,7 +64,7 @@ export const loginOutcomeSchema = z.union([authSessionSchema, mfaChallengeSchema
 // ---------------------------------------------------------------------------
 
 /** A ledger amount travels as a decimal string with at most 4 fraction
- *  digits (optional sign) - never a JSON number, never more precision than
+ *  digits (optional sign): never a JSON number, never more precision than
  *  the ledger keeps. */
 const amountPattern = /^-?\d+(\.\d{1,4})?$/;
 
@@ -105,7 +105,7 @@ export const accountSchema = z
 export const accountListSchema = z.array(accountSchema);
 
 /** Supported transaction lifecycle states. Anything else is unrecognized and
- *  fails closed - the UI must never guess what an unknown state means. */
+ *  fails closed: the UI must never guess what an unknown state means. */
 export const txStatusSchema = z.enum(["POSTED", "HELD", "CANCELLED"]);
 
 export const transactionSchema = z

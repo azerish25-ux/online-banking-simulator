@@ -75,7 +75,7 @@ class EmailOutboxCommitTest {
   /**
    * Records deliveries; can be told to fail the next N sends OF ONE SUBJECT.
    * Budgets are keyed per subject (row) so one test's failures can never
-   * spill into another test's delivery - the interference that made the
+   * spill into another test's delivery: the interference that made the
    * earlier shared-counter version order-dependent.
    */
   static class RecordingSender implements NotificationService.EmailSender {
@@ -123,7 +123,7 @@ class EmailOutboxCommitTest {
     // This class owns its isolated datasource; wipe it so each test starts
     // with an empty outbox. Without the wipe, one test's leftover PENDING
     // rows are swept by a later test's deliverDue() and consume the shared
-    // RecordingSender failure budget - order-dependent interference.
+    // RecordingSender failure budget: order-dependent interference.
     outbox.deleteAll();
     notificationRepo.deleteAll();
     client = new ApiTestClient(mvc, json);

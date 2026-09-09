@@ -5,7 +5,7 @@ export type MonthPoint = { month: string; inflow: string; outflow: string };
 
 /**
  * Hand-rolled SVG bar pair per month. Restrained financial colors: navy for
- * money in, slate for money out, hairline grid - all from the design tokens.
+ * money in, slate for money out, hairline grid: all from the design tokens.
  *
  * Values are never tooltip-only: the exact decimal strings render into a
  * real data table under the chart that a visible toggle expands, and the

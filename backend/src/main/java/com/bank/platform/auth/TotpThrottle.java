@@ -9,8 +9,7 @@ import org.springframework.stereotype.Component;
  * Per-account throttle for TOTP code verification (the MFA login challenge,
  * and enabling/disabling 2FA from a session). The per-IP auth rate limit
  * stops credential stuffing from a single address, but it cannot stop code
- * guessing from many addresses or from a session an attacker already holds -
- * and six digits are only 10^6 values. A small per-account failure budget per
+ * guessing from many addresses or from a session an attacker already holds: * and six digits are only 10^6 values. A small per-account failure budget per
  * window makes brute force impractical without locking out a user for long.
  *
  * Buckets live in a bounded, time-evicted cache (like the auth rate limiter):

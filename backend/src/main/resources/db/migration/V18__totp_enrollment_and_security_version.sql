@@ -3,7 +3,7 @@
 -- users.security_version: bumped on every factor change (enroll, replace,
 -- disable). Access tokens carry the version they were minted under; the auth
 -- filter rejects a token whose version no longer matches, so OLD ACCESS
--- CREDENTIALS stop working the moment a factor changes - not merely at the
+-- CREDENTIALS stop working the moment a factor changes, not merely at the
 -- next refresh rotation.
 alter table users
     add column security_version integer not null default 0;

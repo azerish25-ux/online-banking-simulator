@@ -14,7 +14,7 @@ import org.springframework.test.context.ActiveProfiles;
 /**
  * enforcement: the journal writer is only reachable inside the transaction
  * that owns the financial operation. A posting must commit or roll back with
- * the operation's balance flip - never float on its own. This test deliberately
+ * the operation's balance flip: never float on its own. This test deliberately
  * runs WITHOUT a test-managed transaction and proves the boundary rejects an
  * untransactioned write.
  */

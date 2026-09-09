@@ -20,7 +20,7 @@ import org.springframework.test.context.ActiveProfiles;
  * The reuse-detection proof under concurrency. Two threads present the SAME
  * refresh token at the same time (two tabs, or a thief racing a legitimate
  * refresh). Rotation must consume the token atomically: exactly one rotation
- * wins, and the loser burns the whole family - so the winning token is revoked
+ * wins, and the loser burns the whole family: so the winning token is revoked
  * too and the account must re-authenticate. Without the atomic conditional
  * consume, both rotations used to pass the in-Java revoked check and mint two
  * parallel valid sessions, defeating family-burn theft detection.
@@ -59,7 +59,7 @@ class RefreshRotationConcurrencyTest {
           winnerToken.set(pair.refreshToken());
           successes.incrementAndGet();
         } catch (BadCredentialsException expected) {
-          // The loser: the token was already consumed - the family must burn.
+          // The loser: the token was already consumed: the family must burn.
           failures.incrementAndGet();
         } catch (Exception e) {
           unexpected.incrementAndGet();

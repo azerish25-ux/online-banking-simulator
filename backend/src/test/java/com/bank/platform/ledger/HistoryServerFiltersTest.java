@@ -20,7 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The customer feed's filters (amount range, kind, state,
- * reference/counterparty search) are SERVER-BACKED - SQL predicates over the
+ * reference/counterparty search) are SERVER-BACKED: SQL predicates over the
  * whole account history, never a client-side filter of the loaded page. The
  * same predicates feed the keyset page and its total, validation rejects a
  * bad range/term before any query, and a search term is matched literally
@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
 @ActiveProfiles("test")
 // Rolls the fixture back after each method: this class runs before the
 // Journal* suites in a shared in-memory DB, and those suites assert GLOBAL
-// journal counts - committed fixture rows would leak into them (the pattern
+// journal counts: committed fixture rows would leak into them (the pattern
 // every ledger MockMvc suite in this module follows).
 @Transactional
 class HistoryServerFiltersTest {
@@ -50,7 +50,7 @@ class HistoryServerFiltersTest {
     deposit(alice, aliceId, "30000.00");
     // Two kinds, two states, three memos, two counterparties' worth of rows:
     //   DEPOSIT 30000.00 (seed), TRANSFER 550.00 rent, TRANSFER 15000.00
-    //   kitchen (HELD - at/above the $10k review threshold, money never
+    //   kitchen (HELD: at/above the $10k review threshold, money never
     //   moved), TRANSFER 3.50 coffee, DEPOSIT 77.00.
     transfer(alice, bobIban, "550.00", "Rent for september");
     transfer(alice, bobIban, "15000.00", "Kitchen renovation"); // HELD

@@ -20,7 +20,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * The refresh cookie must be scoped to the path the BROWSER actually requests.
  * The UI talks to the API only through the Next.js rewrite proxy (/backend/*),
  * so a cookie scoped to the backend's own /api/v1/auth route would never be
- * sent - every session would die at access-token expiry. This pins the Path
+ * sent: every session would die at access-token expiry. This pins the Path
  * attribute so the proxy shape cannot silently regress again.
  */
 @SpringBootTest

@@ -74,7 +74,7 @@ public class AuditLog {
 
   /**
    * JSON object builder for audit context. Serialized with Jackson (a shared
-   * mapper is fine - it is stateless after configuration), so values with
+   * mapper is fine: it is stateless after configuration), so values with
    * quotes, backslashes or control characters are escaped instead of producing
    * malformed JSON.
    */

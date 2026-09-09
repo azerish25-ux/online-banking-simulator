@@ -59,7 +59,7 @@ public class AdminService {
    *
    * A HELD transfer (large transfer awaiting review) is APPROVED: money moves
    * under locks inside the same transaction, the row becomes POSTED, and both
-   * parties are notified - all inside {@link HeldTransferService#settleHeldTransfer},
+   * parties are notified: all inside {@link HeldTransferService#settleHeldTransfer},
    * which owns the whole held-transfer lifecycle. A flagged-but-posted row (e.g. a
    * large simulated deposit, which credits the moment it arrives) is
    * acknowledged here: there is no money to settle, so the flag is cleared.
@@ -79,7 +79,7 @@ public class AdminService {
 
     // Only posted flagged rows (e.g. a large simulated deposit that credits on
     // arrival) are acknowledged; a CANCELLED or already-resolved row is not a
-    // live queue item anymore - and an already-reviewed one is a race loss.
+    // live queue item anymore: and an already-reviewed one is a race loss.
     if (tx.getStatus() != TxStatus.POSTED || !tx.isFlagged() || tx.isReviewed()) {
       throw new DecisionConflictException(transactionId, tx.getStatus().name(), tx.isReviewed());
     }
@@ -92,7 +92,7 @@ public class AdminService {
     return tx;
   }
 
-  /** Declines a HELD transfer - the lifecycle logic lives in the ledger. */
+  /** Declines a HELD transfer: the lifecycle logic lives in the ledger. */
   @Transactional
   public Transaction declineTransaction(String adminEmail, UUID transactionId,
       String decisionReason, String expectedStatus, Boolean expectedReviewed) {
@@ -107,7 +107,7 @@ public class AdminService {
     return heldTransfers.declineHeldTransfer(adminEmail, transactionId, decisionReason);
   }
 
-  /** A stale expected state means the case already moved - surface it as a conflict. */
+  /** A stale expected state means the case already moved: surface it as a conflict. */
   private static void requireExpected(Transaction tx, String expectedStatus, Boolean expectedReviewed) {
     if (expectedStatus != null && !expectedStatus.equals(tx.getStatus().name())) {
       throw new DecisionConflictException(tx.getId(), tx.getStatus().name(), tx.isReviewed());
@@ -149,7 +149,7 @@ public class AdminService {
     accounts.save(account);
     // Immutable transition record (V27) in the SAME transaction: the interest
     // job prices only days the account was ACTIVE, so a frozen period is never
-    // charged - now or retroactively after re-activation.
+    // charged: now or retroactively after re-activation.
     statusHistory.save(new AccountStatusChange(account.getId(), status, clock.instant()));
     String action = status == AccountStatus.FROZEN ? "ACCOUNT_FROZEN" : "ACCOUNT_UNFROZEN";
     audits.save(AuditLog.of(admin.getId(), action, "Account", account.getId().toString(),

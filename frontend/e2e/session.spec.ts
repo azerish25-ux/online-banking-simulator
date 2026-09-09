@@ -2,7 +2,7 @@ import { expect, test } from "@playwright/test";
 
 /**
  * Proves the session survives a real access-token expiry through the silent
- * refresh path - the regression the refresh-cookie `Path` bug caused (cookie
+ * refresh path: the regression the refresh-cookie `Path` bug caused (cookie
  * scoped to `/api/v1/auth` while the browser only calls `/backend/v1/auth/*`,
  * so every session died at the first expiry).
  *

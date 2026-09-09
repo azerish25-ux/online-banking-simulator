@@ -27,7 +27,7 @@ import tools.jackson.databind.ObjectMapper;
 /**
  * request time and posting time are separate facts. A review-threshold
  * transfer is REQUESTED when its HELD row is created and only POSTS when an
- * operator approves it - across a month boundary on purpose here. Statements,
+ * operator approves it: across a month boundary on purpose here. Statements,
  * monthly summaries and daily totals must cut on the posting time (money in
  * the month it moved), while the interactive history keeps the request time.
  * The test drives the business clock (TimeConfig bean replaced by a settable
@@ -65,7 +65,7 @@ class PostingTimeTest {
   @Test
   void heldApprovalAcrossMonthPostsIntoSettlementMonth() throws Exception {
     // End of May: Alice funds 20,000 and requests a 12,000 wire (>= threshold,
-    // so it is HELD - created May 31, nothing has moved).
+    // so it is HELD: created May 31, nothing has moved).
     String alice = client.register("posting-alice@example.com", "Posting Alice");
     String bob = client.register("posting-bob@example.com", "Posting Bob");
     String aliceId = client.accountId(alice);
@@ -81,7 +81,7 @@ class PostingTimeTest {
         .andExpect(status().isOk());
 
     // May statement: only the deposit posted in May. The wire was requested in
-    // May but posted in June, so it must NOT appear - and the balance figures
+    // May but posted in June, so it must NOT appear: and the balance figures
     // must agree with the rows (opening 0, +20,000 → closing 20,000).
     String mayCsv = csv(alice, aliceId, "2026-05-01", "2026-05-31");
     org.junit.jupiter.api.Assertions.assertTrue(
@@ -95,7 +95,7 @@ class PostingTimeTest {
         juneCsv.contains("12000.0000"), "June statement shows the June posting");
 
     // Monthly summary buckets on posting month too: May inflow 20,000 (outflow
-    // zero - the wire had not moved yet), June outflow 12,000.
+    // zero: the wire had not moved yet), June outflow 12,000.
     JsonNode summary = mvc.perform(get("/api/v1/accounts/{id}/summary", aliceId)
             .header("Authorization", "Bearer " + alice)
             .param("months", "3"))
@@ -145,7 +145,7 @@ class PostingTimeTest {
 
   @Test
   void heldApprovalAcrossYearEndPostsIntoTheNewYear() throws Exception {
-    // December 31: a review-threshold wire is requested - nothing has moved.
+    // December 31: a review-threshold wire is requested: nothing has moved.
     CLOCK.set(Instant.parse("2026-12-31T22:00:00Z"));
     String alice = client.register("posting-ye@example.com", "Posting Year End");
     String bob = client.register("posting-ye-b@example.com", "Posting Year End B");
@@ -170,7 +170,7 @@ class PostingTimeTest {
 
     // A second review of the same row is a stale decision: the case was
     // already settled AND reviewed, so the operator endpoint answers 409 and
-    // the losing console refreshes to the winner's POSTED outcome - money
+    // the losing console refreshes to the winner's POSTED outcome: money
     // cannot move a second time.
     mvc.perform(post("/api/v1/admin/transactions/{id}/review", heldId)
             .header("Authorization", "Bearer " + client.adminToken()))
@@ -243,7 +243,7 @@ class PostingTimeTest {
         .andReturn().getResponse().getContentAsString();
   }
 
-  /** A clock a test can wind forward - never frozen across tests (reset in @BeforeEach). */
+  /** A clock a test can wind forward: never frozen across tests (reset in @BeforeEach). */
   private static final class SettableClock extends Clock {
     private Instant instant = Instant.parse("2026-05-31T22:00:00Z");
 

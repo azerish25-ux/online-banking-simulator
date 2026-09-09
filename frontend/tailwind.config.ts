@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Simulator design tokens - the light financial workspace.
+ * Simulator design tokens: the light financial workspace.
  *
  * One source of truth: cool gray workspace and white surfaces, near-navy
  * operational text, a deep-navy primary action, and semantic status pairs.
@@ -41,14 +41,14 @@ export default {
           secondary: "#536273",
           faint: "#64748B"
         },
-        // Semantic status text/surface pairs - pale surface + dark text tone.
+        // Semantic status text/surface pairs: pale surface + dark text tone.
         success: { DEFAULT: "#17613D", surface: "#ECF5EF", border: "#BFDBCB", strong: "#DCEEE4" },
         warning: { DEFAULT: "#805300", surface: "#FFF4D6", border: "#E7D29A", strong: "#F6E8B8" },
         danger: { DEFAULT: "#A32532", surface: "#FCEFF1", border: "#EABEC3", strong: "#F7DBDE" },
         info: { DEFAULT: "#205A83", surface: "#EEF4FA", border: "#C4DBEC", strong: "#DCE9F3" },
         // Money-out bars in the flow chart (money-in uses action-primary).
         outflow: "#7C93A9",
-        // Modal/backdrop scrim - cool charcoal veil over the light page.
+        // Modal/backdrop scrim: cool charcoal veil over the light page.
         scrim: "#1B2A38"
       },
       fontFamily: {
@@ -61,7 +61,7 @@ export default {
         panel: "none",
         dialog: "0 8px 24px rgba(23, 35, 48, 0.14)"
       },
-      // Motion language - bank-quiet: fast, small, no bounce. Applied with
+      // Motion language: bank-quiet: fast, small, no bounce. Applied with
       // `motion-safe:animate-*` so prefers-reduced-motion removes it entirely.
       keyframes: {
         "overlay-in": { from: { opacity: "0" } },

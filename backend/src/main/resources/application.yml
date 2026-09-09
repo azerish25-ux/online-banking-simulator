@@ -56,7 +56,7 @@ app:
     loan-annual-rate: ${LOAN_RATE:0.12}
   cache:
     # Typed binding consumed by LedgerCacheConfig. The old nested
-    # `caffeine.spec` string lived under the wrong namespace - Spring's cache
+    # `caffeine.spec` string lived under the wrong namespace; Spring's cache
     # auto-configuration never read it, so these caches actually ran unbounded
     # and without expiry. LedgerCacheConfig builds the CaffeineCacheManager
     # from these values and CachePolicyTest inspects the live policy.

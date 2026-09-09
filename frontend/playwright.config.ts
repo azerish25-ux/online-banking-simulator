@@ -16,8 +16,8 @@ export default defineConfig({
   // The TOTP round-trip logout click is load-sensitive on GitHub runners: on
   // a contended first attempt the shell's re-render churn makes the click
   // land on <html> (the element detaches and re-resolves) for the whole
-  // timeout. It passes locally and on every rerun - a slow-runner artifact,
-  // not an app bug - so CI retries the test once instead of failing the job.
+  // timeout. It passes locally and on every rerun: a slow-runner artifact,
+  // not an app bug: so CI retries the test once instead of failing the job.
   retries: process.env.CI ? 1 : 0,
   // The canonical origin is :3000 (matches the backend's default CORS
   // allow-list and the CI banking-e2e job). For an EPHEMERAL sweep, point
@@ -25,7 +25,7 @@ export default defineConfig({
   // and this config follows it; the browser stays same-origin with that
   // frontend, so its proxy keeps every API call same-origin and the backend
   // CORS allow-list never comes into play. When E2E_BASE_URL is set the
-  // webServer is skipped - the caller already runs the app there.
+  // webServer is skipped: the caller already runs the app there.
   use: { baseURL: process.env.E2E_BASE_URL ?? "http://localhost:3000" },
   webServer: process.env.E2E_BASE_URL
     ? undefined
@@ -34,7 +34,7 @@ export default defineConfig({
         port: 3000,
         // Deliberately false: the local run must boot the build from THIS
         // checkout and fail loudly if :3000 is already taken (e.g. by an old
-        // start-all.ps1 session serving an outdated build) - never
+        // start-all.ps1 session serving an outdated build): never
         // silently run the suite against a stale application.
         reuseExistingServer: false
       }

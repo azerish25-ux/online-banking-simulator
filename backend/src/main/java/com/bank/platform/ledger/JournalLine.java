@@ -11,8 +11,7 @@ import java.util.UUID;
 
 /**
  * One signed posting of a journal entry. A line names exactly one side:
- * a customer {@code accountId} (whose balance projection this line moves -
- * positive increases the balance) or a named {@code counteraccount} (the
+ * a customer {@code accountId} (whose balance projection this line moves: * positive increases the balance) or a named {@code counteraccount} (the
  * balancing side that keeps signed deltas summing to zero per currency).
  * Immutable by construction; {@code postedAt} mirrors the entry's posting
  * time so per-account windows (e.g. daily closing balances for interest) can

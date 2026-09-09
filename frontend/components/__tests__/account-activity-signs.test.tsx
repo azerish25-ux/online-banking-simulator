@@ -119,7 +119,7 @@ describe("account recent-activity amounts", () => {
     );
 
     // Inbound (the viewed account is the destination) reads as a credit;
-    // outbound (the viewed account is the sender) reads as a debit - the
+    // outbound (the viewed account is the sender) reads as a debit: the
     // direction is unambiguous even with no From/To columns on this page.
     expect(await screen.findByText("+$500.00")).toBeInTheDocument();
     expect(screen.getByText("-$600.00")).toBeInTheDocument();

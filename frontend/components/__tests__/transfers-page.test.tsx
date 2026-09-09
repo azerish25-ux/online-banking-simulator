@@ -105,7 +105,7 @@ describe("transfers page HELD outcome", () => {
     await userEvent.type(await screen.findByLabelText("Recipient IBAN"), savings.iban);
     await userEvent.type(screen.getByLabelText("Amount (USD)"), "10000.00");
     await userEvent.type(screen.getByLabelText("Memo (optional)"), "big wire");
-    // the first click opens REVIEW - nothing is sent yet.
+    // the first click opens REVIEW: nothing is sent yet.
     await userEvent.click(screen.getByRole("button", { name: /Review transfer/ }));
 
     // The review shows the exact frozen payload, and the submit button is gone
@@ -117,7 +117,7 @@ describe("transfers page HELD outcome", () => {
     await userEvent.click(screen.getByRole("button", { name: "Confirm & send" }));
 
     // The receipt card must read HELD, and the toast must say the transfer is
-    // awaiting review - the regression where a bare `status` reference resolved
+    // awaiting review: the regression where a bare `status` reference resolved
     // to the legacy window.status global and toasted "Transfer posted.".
     await screen.findByRole("heading", { name: "Transfer submitted for review" });
     await waitFor(() =>

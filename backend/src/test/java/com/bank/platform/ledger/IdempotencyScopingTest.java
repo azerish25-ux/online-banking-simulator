@@ -27,8 +27,8 @@ import org.springframework.transaction.annotation.Transactional;
  * Idempotency keys are scoped to their originator: replaying your own key
  * returns the original row and moves money exactly once. Keys live in the
  * sender's own namespace (DB unique on from-account + key), so one user's key
- * string can never surface another user's transaction - reusing a foreign key
- * is simply a fresh transfer in the caller's own namespace - while reusing
+ * string can never surface another user's transaction: reusing a foreign key
+ * is simply a fresh transfer in the caller's own namespace: while reusing
  * your own key for a *different* destination is rejected outright.
  */
 @SpringBootTest
@@ -81,7 +81,7 @@ class IdempotencyScopingTest {
     client.transferWithKey(alice, bobIban, "60.00", key);
 
     // Bob uses the same key string for his OWN transfer: keys are namespaced
-    // per source account, so this is a fresh transfer in Bob's namespace - it
+    // per source account, so this is a fresh transfer in Bob's namespace: it
     // must post once, and must never surface Alice's transaction.
     String bobTxId = client.transferWithKey(bob, aliceIban, "5.00", key);
     MvcResult result = mvc.perform(get("/api/v1/transactions")
@@ -110,7 +110,7 @@ class IdempotencyScopingTest {
     client.transferWithKey(alice, bobIban, "40.00", key);
 
     // The same sender reusing the key for a different destination must never
-    // replay silently or double-post: it is a conflicting use of one key (    // - one key names one intent, and a changed intent is a 409 conflict).
+    // replay silently or double-post: it is a conflicting use of one key (    //: one key names one intent, and a changed intent is a 409 conflict).
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
             .header("Idempotency-Key", key)
@@ -133,7 +133,7 @@ class IdempotencyScopingTest {
 
     // the key identifies the logical intent, not just the destination.
     // A retry that changed the amount under the same key is a conflict (409)
-    // - never a silent replay of the older row, never a second posting.
+    //: never a silent replay of the older row, never a second posting.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
             .header("Idempotency-Key", key)

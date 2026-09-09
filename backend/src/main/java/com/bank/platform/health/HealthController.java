@@ -20,7 +20,7 @@ public class HealthController {
   /**
    * Canonical liveness endpoint (GET /api/health). Reachable without auth so
    * the Docker healthcheck, the dev scripts and CI can poll it. There is no
-   * /api/v1/health twin - a duplicate route would only invite drift.
+   * /api/v1/health twin: a duplicate route would only invite drift.
    */
   @GetMapping("/health")
   public Map<String, Object> health() {

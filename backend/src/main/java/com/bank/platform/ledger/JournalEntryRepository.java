@@ -27,7 +27,7 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
 
   /**
    * Operations that somehow produced more than one journal entry. The
-   * (kind, operation_ref) unique constraint already forbids this - the check
+   * (kind, operation_ref) unique constraint already forbids this: the check
    * exists so the reconciliation report can prove it and flag any regression.
    */
   @Query(value = "SELECT e.kind AS kind, e.operation_ref AS operationRef, COUNT(*) AS count "
@@ -35,7 +35,7 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
       nativeQuery = true)
   List<OperationGroup> duplicateOperations();
 
-  /** Per-currency net of ALL lines - must be empty (every entry balances). */
+  /** Per-currency net of ALL lines: must be empty (every entry balances). */
   @Query(value = "SELECT e.currency AS currency, SUM(l.amount) AS net "
       + "FROM journal_entries e JOIN journal_lines l ON l.entry_id = e.id "
       + "GROUP BY e.currency HAVING SUM(l.amount) <> 0",
@@ -47,7 +47,7 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
     BigDecimal getNet();
   }
 
-  /** Entries whose own lines do not sum to zero - a tampered or broken entry. */
+  /** Entries whose own lines do not sum to zero: a tampered or broken entry. */
   @Query(value = "SELECT CAST(e.id AS VARCHAR) AS entryId, e.kind AS kind, "
       + "e.operation_ref AS operationRef, "
       + "SUM(l.amount) AS net FROM journal_entries e "
@@ -64,7 +64,7 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
   }
 
   /**
-   * Orphaned reversal links - a reversal entry whose original entry no longer
+   * Orphaned reversal links: a reversal entry whose original entry no longer
    * exists (append-only tables make this impossible by construction; the
    * check proves it and flags any tampering or migration defect).
    */
@@ -83,7 +83,7 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
   }
 
   /**
-   * Duplicate reversal links - two entries claiming the same original. The
+   * Duplicate reversal links: two entries claiming the same original. The
    * one-reversal-per-original rule forbids it; the check proves it.
    */
   @Query(value = "SELECT CAST(e.reverses_entry_id AS VARCHAR) AS original, COUNT(*) AS count "
@@ -98,7 +98,7 @@ public interface JournalEntryRepository extends JpaRepository<JournalEntry, UUID
   }
 
   /**
-   * Posted TRANSFER/DEPOSIT/REVERSAL transactions with NO journal entry - an
+   * Posted TRANSFER/DEPOSIT/REVERSAL transactions with NO journal entry: an
    * operation that settled without its accounting counterpart (the DB unique
    * on (kind, operation_ref) and the transaction-boundary enforcement make
    * this impossible in normal flow; the check proves it to an operator).

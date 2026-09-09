@@ -61,7 +61,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("ActivitySection - the console reversal workbench", () => {
+describe("ActivitySection: the console reversal workbench", () => {
   it("marks a reversal row with its parent and reason, and its original as Reversed", async () => {
     renderSection([
       tx("r1", {

@@ -112,14 +112,14 @@ describe("dashboard account list and summary strip", () => {
     const many = (text: string | RegExp) => expect(screen.getAllByText(text).length).toBeGreaterThan(0);
 
     // The summary strip names the scope: spendable funds and debt are two
-    // separate figures - net position is never the headline.
+    // separate figures: net position is never the headline.
     expect(await screen.findByText("Available funds")).toBeInTheDocument();
     many("$1,250.00");
     expect(screen.getByText("Loan debt")).toBeInTheDocument();
     many("$600.00");
 
-    // The loan row shows every authoritative value - principal, interest,
-    // total owed, available credit - with policy-derived figures, never a
+    // The loan row shows every authoritative value: principal, interest,
+    // total owed, available credit: with policy-derived figures, never a
     // bare "-$600.00" balance.
     many("Principal $500.00 · Interest $100.00 · Credit left $400.00");
     expect(screen.queryByText("-$600.00")).not.toBeInTheDocument();
@@ -159,12 +159,12 @@ describe("dashboard account list and summary strip", () => {
     expect(screen.getByText("Booked deposits")).toBeInTheDocument();
     many("$600.00");
     expect(screen.getByText("1 frozen account is on deposit but not spendable")).toBeInTheDocument();
-    many("Frozen - not spendable");
+    many("Frozen: not spendable");
     many("Frozen");
   });
 
   it("treats a sub-cent obligation as debt and renders its exact amount", async () => {
-    // A $0.0001 debt rounds to $0.00 in cents - the dashboard must still
+    // A $0.0001 debt rounds to $0.00 in cents: the dashboard must still
     // detect it from the authoritative decimal and display the exact amount
     // instead of a zero-dollar figure.
     const accounts = [

@@ -1,7 +1,7 @@
 -- separate the moment money actually moved (posted_at) from the moment
 -- the instruction was recorded (created_at). A review-threshold transfer is
 -- REQUESTED when its HELD row is created but only POSTS when an operator
--- approves it - possibly in a later month - so monthly summaries, statements,
+-- approves it, possibly in a later month, so monthly summaries, statements,
 -- daily totals and public stats must bucket and cut on posted_at, never on
 -- creation time. HELD and CANCELLED rows never moved money and keep
 -- posted_at NULL; legacy POSTED rows (which predate the distinction) are

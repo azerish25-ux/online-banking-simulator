@@ -21,7 +21,7 @@ import type { Tx } from "../../lib/api-types";
 type DecisionAction = "approve" | "decline" | "acknowledge";
 
 /**
- * Operator queue: HELD rows are intents - approving
+ * Operator queue: HELD rows are intents: approving
  * settles the transfer, declining cancels it, so no money moves until an
  * operator decides. A flagged-but-POSTED row (large deposit) already credited,
  * so it only needs acknowledging to leave the queue.
@@ -44,7 +44,7 @@ export function ReviewQueueSection() {
   const [decision, setDecision] = React.useState<{ tx: Tx; action: DecisionAction } | null>(null);
   const [reason, setReason] = React.useState("");
   const [staleConflict, setStaleConflict] = React.useState<string | null>(null);
-  // Per-row busy: one pending decision disables THAT row's buttons only - an
+  // Per-row busy: one pending decision disables THAT row's buttons only: an
   // unrelated row stays actionable.
   const decisionBusyId = review.isPending ? review.variables?.id : decline.isPending ? decline.variables?.id : undefined;
   const busy = (id: string) => decisionBusyId === id;
@@ -61,7 +61,7 @@ export function ReviewQueueSection() {
 
   // Success copy derives from the AUTHORITATIVE response: approve and
   // acknowledge settle through the same review mutation, and what actually
-  // happened - the row's returned kind/status - decides the words, never which
+  // happened: the row's returned kind/status: decides the words, never which
   // button was clicked.
   useResultToast(review, {
     error: (err) => {
@@ -136,7 +136,7 @@ export function ReviewQueueSection() {
     const body = {
       id: decision.tx.id,
       reason: clean,
-      // The state THIS console displayed - the server's stale check.
+      // The state THIS console displayed: the server's stale check.
       expectedStatus: decision.tx.status,
       expectedReviewed: decision.tx.reviewed
     };
@@ -170,7 +170,7 @@ export function ReviewQueueSection() {
             approval; the sender and recipient are both notified.
           </p>
           <p className="muted mt-2">
-            Nothing has moved while the case was held - approving settles it now. Declining instead
+            Nothing has moved while the case was held: approving settles it now. Declining instead
             cancels the intent and no money ever moves.
           </p>
         </>
@@ -198,7 +198,7 @@ export function ReviewQueueSection() {
         <>
           <p>
             {usd(t.amount)} credited to <span className="mono">{maskIban(t.toIban ?? "")}</span> when
-            the deposit arrived. Acknowledging clears the flag - no money moves again.
+            the deposit arrived. Acknowledging clears the flag: no money moves again.
           </p>
         </>
       )

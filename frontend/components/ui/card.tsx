@@ -3,7 +3,7 @@ import { cn } from "../../lib/cn";
 
 /**
  * A section of the record: white surface, divider boundary, square corners,
- * no shadow. Content sits flush (px-4 py-3) - density comes from the grid,
+ * no shadow. Content sits flush (px-4 py-3): density comes from the grid,
  * not from floating chrome.
  */
 export function Card({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
@@ -16,7 +16,7 @@ export function CardHead({ className, ...props }: React.HTMLAttributes<HTMLDivEl
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  // Section title: 16/22, same size as body - hierarchy via weight only.
+  // Section title: 16/22, same size as body: hierarchy via weight only.
   return <h2 className={cn("text-base leading-[22px] font-semibold", className)} {...props} />;
 }
 

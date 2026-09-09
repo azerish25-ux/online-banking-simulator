@@ -13,7 +13,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 /**
  * Whatever an attacker puts in the Authorization header, the answer must be a
- * clean 401 from the security chain - never a 500. jjwt throws plain
+ * clean 401 from the security chain: never a 500. jjwt throws plain
  * IllegalArgumentException (not JwtException) for empty or structurally
  * broken tokens, which used to escape the auth filter entirely.
  */

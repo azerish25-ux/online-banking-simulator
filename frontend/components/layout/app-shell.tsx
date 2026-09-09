@@ -16,7 +16,7 @@ import { AboutDemoLink } from "./demo-seam";
 /**
  * Navigation vocabulary: Overview, Transfers, Activity,
  * Recipients (the existing /beneficiaries URL is kept), Notifications,
- * Security, and - for the operator role only - Operations.
+ * Security, and: for the operator role only: Operations.
  */
 type NavItem = { href: string; section: string; label: string };
 
@@ -31,7 +31,7 @@ const NAV: NavItem[] = [
 
 /**
  * Segment-aware active matching: a descendant route keeps its parent section
- * highlighted - /transfers/receipt/{id} is still "Transfers", /accounts/{id}
+ * highlighted: /transfers/receipt/{id} is still "Transfers", /accounts/{id}
  * is still "Overview". Exact-prefix-with-boundary matching replaces the old
  * unsafe arbitrary prefix AND the exact-only rule that left receipt/detail
  * pages with no active item.
@@ -92,7 +92,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     : NAV;
 
   // Drawer lifecycle: Escape closes, navigation closes, focus returns to the
-  // menu button. The drawer never unmounts page state - it is an overlay, so
+  // menu button. The drawer never unmounts page state: it is an overlay, so
   // opening it can never discard a form or an unresolved operation.
   React.useEffect(() => {
     if (!drawerOpen) return;
@@ -110,7 +110,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   async function logout() {
-    // Revoke server-side first - clearing the cookie alone used to leave the
+    // Revoke server-side first: clearing the cookie alone used to leave the
     // refresh token valid for its full lifetime.
     try {
       await fetch("/backend/v1/auth/logout", { method: "POST" });

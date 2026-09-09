@@ -6,7 +6,7 @@ import { totpCodesNearNow } from "./totp-code";
  * Security (the secret is read from the live screen and real RFC 6238 codes
  * are generated in-test), signs out, and the next login must challenge with
  * a code before any session exists. Then the user disables 2FA and the next
- * login must NOT challenge. The only fixed identity is none - the user is
+ * login must NOT challenge. The only fixed identity is none: the user is
  * self-registered, like the rest of the suite.
  */
 

@@ -10,13 +10,13 @@ import org.flywaydb.core.api.migration.Context;
  * from the immutable posted accounting entries that actually moved money:
  *
  * <ul>
- *   <li>{@code journal_entries} - one balanced group per posted operation:
+ *   <li>{@code journal_entries}: one balanced group per posted operation:
  *   unique entry identity (id), the operation reference (the originating
  *   transaction row id), currency, posting timestamp, a deterministic
  *   ordering key (the DB-assigned {@code seq}), and provenance memo. The
  *   (kind, operation_ref) uniqueness makes a duplicate retry unable to create
  *   a second journal for the same operation.</li>
- *   <li>{@code journal_lines} - the signed postings of an entry. Each line
+ *   <li>{@code journal_lines}: the signed postings of an entry. Each line
  *   names exactly one side: a customer {@code account_id} (a projection
  *   account) or a named {@code counteraccount} (the simulator-funding,
  *   interest, or migration-opening side). Signed deltas sum to zero per
@@ -25,7 +25,7 @@ import org.flywaydb.core.api.migration.Context;
  *
  * <p>Append-only is enforced with BEFORE UPDATE/DELETE triggers on PostgreSQL
  * (the production database), so even the application role cannot edit or
- * delete a posted entry - a correction is a NEW linked entry, never a
+ * delete a posted entry: a correction is a NEW linked entry, never a
  * mutation. H2 has no portable trigger for this migration, so there the
  * append-only contract is exercised through the service/API surface and the
  * reconciliation routine detects any tampering that repository conventions
@@ -35,7 +35,7 @@ public class V21__reconciled_journal extends BaseJavaMigration {
 
   @Override
   public void migrate(Context context) throws Exception {
-    // NOTE: never close context.getConnection() - Flyway owns it and will commit/rollback.
+    // NOTE: never close context.getConnection(): Flyway owns it and will commit/rollback.
     Connection connection = context.getConnection();
     try (var stmt = connection.createStatement()) {
       stmt.execute("CREATE TABLE IF NOT EXISTS journal_entries (\n"

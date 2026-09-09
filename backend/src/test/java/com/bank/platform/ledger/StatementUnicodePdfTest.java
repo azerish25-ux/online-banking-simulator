@@ -33,7 +33,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * wrap rather than being space-padded and cut.
  *
  * <p>Coverage is verified against the REAL embedded font (glyph width > 0 for
- * every fixture code point), not just text extraction - extraction can carry
+ * every fixture code point), not just text extraction: extraction can carry
  * a code point whose glyph is missing and prints as a blank box.
  */
 @SpringBootTest
@@ -61,12 +61,12 @@ class StatementUnicodePdfTest {
 
     // Fund, then move money with memos that exercise the failure modes: an
     // accented name, a Persian phrase (shaped + bidi-ordered by the ICU
-    // pipeline - the PDF's own extractor maps presentation forms back to base
+    // pipeline: the PDF's own extractor maps presentation forms back to base
     // letters and reorders to logical text, so the layer stays faithful), and
     // a long spaced memo that must WRAP, not truncate.
     client.deposit(alice, aliceId, "100000.00"); // max deposit amount
     String persianMemo = "پرداخت به فروشگاه تهران برای صورتحساب مهر";
-    String accentedMemo = "Rent São Paulo - Café Müller réservé";
+    String accentedMemo = "Rent São Paulo: Café Müller réservé";
     String longMemo =
         "Quarterly settlement for the joint household budget including utilities and rent "
             + "shared across all members of the household fund";
@@ -82,7 +82,7 @@ class StatementUnicodePdfTest {
     // LTR memos must survive EXACTLY (extraction may fold wrapped lines, so
     // compare with all whitespace removed).
     for (String needle : new String[] {
-        "Rent São Paulo - Café Müller réservé",
+        "Rent São Paulo: Café Müller réservé",
         "Quarterly settlement for the joint household budget including utilities and rent "
             + "shared across all members of the household fund"}) {
       assertTrue(compact(text).contains(compact(needle)),
@@ -116,7 +116,7 @@ class StatementUnicodePdfTest {
 
     // One UNBROKEN token far wider than the description column (no spaces to
     // wrap at): the renderer must split it at grapheme boundaries and print
-    // every character - a single overflowed line would clip it. Mixing a
+    // every character: a single overflowed line would clip it. Mixing a
     // Persian token exercises shaping + grapheme wrap together.
     String asciiToken = "EEREW-198273645-QWERTYUIOPASDFGHJKLZXCVBNM-"
         + "InternationalBankSettlementReferenceNumber-2026-09";

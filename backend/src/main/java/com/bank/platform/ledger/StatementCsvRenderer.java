@@ -3,11 +3,11 @@ package com.bank.platform.ledger;
 import java.time.ZoneOffset;
 
 /**
- * The CSV statement renderer - serialization in a file of its own so the
+ * The CSV statement renderer: serialization in a file of its own so the
  * snapshot assembler never does byte-level escaping.
  *
  * <p>Pure: it reads ONLY the immutable {@link StatementService.Statement} it
- * is handed - no repository, no clock, no transaction - so the exported
+ * is handed: no repository, no clock, no transaction: so the exported
  * rows can never come from a different database snapshot than the figures
  * beside them. The caller (StatementService) owns the repeatable-read
  * boundary that builds the Statement; this class only turns immutable value

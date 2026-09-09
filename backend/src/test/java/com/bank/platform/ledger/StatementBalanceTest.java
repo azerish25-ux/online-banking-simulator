@@ -31,7 +31,7 @@ import org.springframework.transaction.annotation.Transactional;
  * A statement's opening/closing figures must be true for the WINDOW on the
  * page, not for the account's lifetime. The default window happens to end
  * "now", so a buggy implementation that prints the current balance as the
- * closing passes every default-window test - it only fails once money moves
+ * closing passes every default-window test: it only fails once money moves
  * outside a requested past period. Both failure shapes are pinned here, plus
  * the two cut-algebra edges: rows that never moved money (HELD/CANCELLED
  * intents inside the window) must not shift a figure, and negative (drawn
@@ -65,7 +65,7 @@ class StatementBalanceTest {
     client.transfer(alice, bobIban, "40.00");
 
     // A window that ended yesterday contains no rows, and everything that
-    // moved (today) sits AFTER the window - the closing must read $0.00, the
+    // moved (today) sits AFTER the window: the closing must read $0.00, the
     // account's true balance at the end of yesterday, never $60.00.
     LocalDate yesterday = LocalDate.now(ZoneOffset.UTC).minusDays(1);
     String pdf = statementText(alice, aliceId, yesterday, yesterday);
@@ -92,7 +92,7 @@ class StatementBalanceTest {
   }
 
   /**
-   * HELD and CANCELLED rows are intents - no money ever moved - so they must
+   * HELD and CANCELLED rows are intents: no money ever moved: so they must
    * not shift Opening/Closing and must not appear in the statement CSV at
    * all. Both failure shapes (an intent counted as movement, an intent
    * printed as a row) would silently inflate the figures by the held amount
@@ -109,7 +109,7 @@ class StatementBalanceTest {
 
     client.deposit(alice, aliceId, "22000.00");
     // Two review-threshold transfers: the first is declined (CANCELLED), the
-    // second stays HELD. Neither moves money - the balance stays $22,000.
+    // second stays HELD. Neither moves money: the balance stays $22,000.
     String cancelled = heldTransfer(alice, bobIban, "10000.00", "Cancelled intent");
     mvc.perform(post("/api/v1/admin/transactions/" + cancelled + "/decline")
             .header("Authorization", "Bearer " + admin))
@@ -123,7 +123,7 @@ class StatementBalanceTest {
     assertTrue(pdf.contains("Opening $0.00"), "intents must not shift the opening:\n" + pdf);
     assertTrue(pdf.contains("Closing $22,000.00"), "intents must not shift the closing:\n" + pdf);
 
-    // The CSV prints movements, not intents - and the real deposit is there.
+    // The CSV prints movements, not intents: and the real deposit is there.
     String csv = statementCsv(alice, aliceId, today, today);
     assertTrue(csv.contains("22000.0000"), "the deposit must appear:\n" + csv);
     assertFalse(csv.contains("Cancelled intent"), "a CANCELLED row must not print:\n" + csv);
@@ -133,7 +133,7 @@ class StatementBalanceTest {
   /**
    * A drawn LOAN has a negative balance; the figures are balance-minus-cut,
    * so both the opening back-out and the closing carry the sign. This pins
-   * the algebra on negatives - the past/current window tests above only ever
+   * the algebra on negatives: the past/current window tests above only ever
    * exercise positive balances.
    */
   @Test
@@ -143,7 +143,7 @@ class StatementBalanceTest {
     JsonNode loan = openLoan(alice);
     String loanId = loan.get("id").asText();
 
-    // Draw the full $1,000 credit limit into checking - the LOAN floor.
+    // Draw the full $1,000 credit limit into checking: the LOAN floor.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)
             .header("Idempotency-Key", "tx-" + System.nanoTime())
@@ -162,7 +162,7 @@ class StatementBalanceTest {
   /**
    * Draw then repay the full amount: the loan returns exactly to zero, and
    * the statement figures carry the negative draw then the zero closing. An
-   * over-repayment is rejected under the repayment policy - a repayment may never
+   * over-repayment is rejected under the repayment policy: a repayment may never
    * exceed the amount owed, so a loan balance cannot go positive.
    */
   @Test

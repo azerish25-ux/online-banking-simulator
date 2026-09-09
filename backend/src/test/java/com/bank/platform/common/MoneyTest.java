@@ -8,7 +8,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * Money copy is user-facing: grouping and decimal separators must stay US even
- * when the server runs under another default locale - otherwise notifications
+ * when the server runs under another default locale: otherwise notifications
  * and PDF headers silently switch to "1.234,56" style output.
  */
 class MoneyTest {
@@ -37,7 +37,7 @@ class MoneyTest {
   /**
    * Display ties round half away from zero on BOTH signs. BigDecimal HALF_UP
    * means exactly that: -1.005 must read "-1.01" (toward the larger |value|),
-   * never "-1.00" - the request that spawned this test assumed the opposite
+   * never "-1.00": the request that spawned this test assumed the opposite
    * and would have "fixed" it into the wrong-looking result.
    */
   @Test
@@ -49,7 +49,7 @@ class MoneyTest {
 
   /**
    * Negative amounts are debt, and debt copy reads "-$600.00", not
-   * "$-600.00" - this is what loan statements (Opening/Closing on a drawn
+   * "$-600.00": this is what loan statements (Opening/Closing on a drawn
    * loan) would otherwise print. Runs under a foreign locale to prove the
    * sign placement never regresses with the symbols.
    */

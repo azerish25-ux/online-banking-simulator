@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.request.MockHttpServletRequestBuilde
  * inside the configured CIDR allowlist. Allowlisted peers get per-real-client
  * buckets (not one shared bucket for the proxy); every other peer is bucketed
  * by its socket address, so spoofed X-Forwarded-For can never mint a fresh
- * budget. The default (no allowlist) stays spoof-proof - see RateLimitTest.
+ * budget. The default (no allowlist) stays spoof-proof: see RateLimitTest.
  *
  * <p>Every test uses its own account email: the per-account login throttle
  * is deliberately NOT reset by a new client IP, so a shared fixture
@@ -69,7 +69,7 @@ class RateLimitTrustedProxyTest {
   void garbageAndOversizedHeadersCollapseToOneSocketBucket() throws Exception {
     String body = loginBody("client-c");
     // Five DIFFERENT oversized/garbage values must all map to the same socket
-    // bucket - an attacker rotating garbage to mint fresh buckets gets nothing.
+    // bucket: an attacker rotating garbage to mint fresh buckets gets nothing.
     String[] garbage = {
         "9.9.9.9" + "A".repeat(300),
         "1.1.1.1" + "B".repeat(300),

@@ -19,7 +19,7 @@ import { usd } from "../../lib/format";
 
 /**
  * Customer directory: search users, pick one, then inspect or freeze their
- * accounts (freeze needs a confirm - it refuses deposits and transfers).
+ * accounts (freeze needs a confirm: it refuses deposits and transfers).
  * The selected user's accounts are their own cached query, so picking a
  * different user does not refetch the search results.
  */
@@ -32,7 +32,7 @@ export function UsersSection() {
   const [freezeTarget, setFreezeTarget] = React.useState<{ account: Account; userId: string } | null>(null);
   // A failed freeze leaves the confirm dialog open: the rejection renders
   // inside it. Unfreeze is a direct row action whose failures have always
-  // been silent - that stays.
+  // been silent: that stays.
   const [freezeError, setFreezeError] = React.useState<string | null>(null);
 
   const usersQuery = useAdminUsers(submittedQuery, usersPage);

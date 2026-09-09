@@ -32,7 +32,7 @@ public class Transaction {
   private String currency = "USD";
 
   // Uniqueness is enforced in the DB as a composite index on
-  // (from_account_id, idempotency_key) - see V11. A global unique here would
+  // (from_account_id, idempotency_key): see V11. A global unique here would
   // let two unrelated users collide on the same key string.
   @Column(name = "idempotency_key", length = 64)
   private String idempotencyKey;
@@ -79,7 +79,7 @@ public class Transaction {
 
   /**
    * For a REVERSAL row (V29): the id of the POSTED transaction it reverses.
-   * The original row is untouched - its history stays as it was; the reversal
+   * The original row is untouched: its history stays as it was; the reversal
    * is a NEW linked operation that moves the money back. At most one reversal
    * per original (PostgreSQL partial unique index; checked in the service on
    * H2).
@@ -93,7 +93,7 @@ public class Transaction {
 
   // Monotonic insert sequence (DB identity, see V14). Listings tie-break equal
   // created_at values on this column so "newest first" is total: the random
-  // UUID id cannot express insertion order. Read-only - the database assigns it.
+  // UUID id cannot express insertion order. Read-only: the database assigns it.
   @Column(insertable = false, updatable = false)
   private Long seq;
 

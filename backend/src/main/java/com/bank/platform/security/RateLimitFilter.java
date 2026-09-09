@@ -131,7 +131,7 @@ public class RateLimitFilter extends OncePerRequestFilter {
       return null;
     }
     String clean = value.trim();
-    // A forwarding entry must be ONE literal - never a list, CIDR, or comment.
+    // A forwarding entry must be ONE literal: never a list, CIDR, or comment.
     if (clean.contains(",") || clean.contains("/") || clean.contains(" ")) {
       return null;
     }

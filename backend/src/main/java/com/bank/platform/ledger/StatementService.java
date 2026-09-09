@@ -25,14 +25,13 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * The statement snapshot assembler and orchestrator. It owns the ONE place a
- * statement is built - account, rows, opening/closing and IBAN labels read in
- * a single REPEATABLE_READ snapshot and copied into immutable value records -
- * and then hands that {@link Statement} to pure renderers that do no financial
+ * statement is built: account, rows, opening/closing and IBAN labels read in
+ * a single REPEATABLE_READ snapshot and copied into immutable value records: * and then hands that {@link Statement} to pure renderers that do no financial
  * queries of their own:
  *
  * <ul>
- *   <li>{@link StatementCsvRenderer} - formula-safe CSV serialization;</li>
- *   <li>{@link StatementPdfRenderer} - the A4/PDF layout engine (measured
+ *   <li>{@link StatementCsvRenderer}: formula-safe CSV serialization;</li>
+ *   <li>{@link StatementPdfRenderer}: the A4/PDF layout engine (measured
  *       wrapping, ICU-shaping + bidi RTL text, page footer and true page
  *       count).</li>
  * </ul>
@@ -75,8 +74,8 @@ public class StatementService {
    * opening-cut aggregate and one IBAN resolution, all inside one
    * REPEATABLE_READ transaction, so every figure and row on the page comes
    * from the same database snapshot. {@code opening + sum(printed rows) =
-   * closing} holds BY CONSTRUCTION - the closing is derived from the printed
-   * rows - and the opening is the projection balance minus the in-window and
+   * closing} holds BY CONSTRUCTION: the closing is derived from the printed
+   * rows: and the opening is the projection balance minus the in-window and
    * post-window net, never today's balance pasted onto a past period.
    *
    * <p>{@code asOf} names the database snapshot the figures came from and
@@ -86,7 +85,7 @@ public class StatementService {
    *
    * <p>The statement carries ONLY immutable VALUE data: account and
    * row shapes are plain records copied at snapshot time, never live JPA
-   * entities - a row that posts after the snapshot, or a memo changed later,
+   * entities: a row that posts after the snapshot, or a memo changed later,
    * can never mutate what a rendered document already holds. Renderers
    * (PDF/CSV) accept this record and perform no financial queries of their
    * own, so the bytes can never combine figures from different snapshots.
@@ -110,7 +109,7 @@ public class StatementService {
     }
   }
 
-  /** Immutable account facts a statement needs - never the mutable entity. */
+  /** Immutable account facts a statement needs: never the mutable entity. */
   public record StatementAccount(UUID id, String iban, String type, String status) {
     static StatementAccount of(Account a) {
       return new StatementAccount(
@@ -198,7 +197,7 @@ public class StatementService {
    * single REPEATABLE_READ transaction; the arithmetic below then derives
    * closing from the printed rows so the identity opening + rows = closing
    * cannot drift, while opening stays a true period-start balance (current
-   * projection minus every settled movement at/after the window start - the
+   * projection minus every settled movement at/after the window start: the
    * same +to/-from convention {@link TransactionRepository#sumSettledMovementAfter}
    * owns). A statement for a past period never prints today's balance.
    */
@@ -244,7 +243,7 @@ public class StatementService {
   }
 
   /**
-   * Renders the statement to PDF bytes - see {@link StatementPdfRenderer} for
+   * Renders the statement to PDF bytes: see {@link StatementPdfRenderer} for
    * the layout engine (measured wrapping, ICU-shaping + bidi RTL text, page
    * footer and true page count). The renderer is pure: it reads only the
    * immutable {@link Statement}, so rendering the same statement twice

@@ -17,12 +17,12 @@ import { Routes } from "../../../../lib/routes";
 /**
  * Durable, bookmarkable receipt. The URL carries only the operation id;
  * the page fetches the caller's own operation from the authorized lookup
- * (`GET /v1/transfers/{id}`), so a reload - or a HELD→POSTED transition made
- * later - shows the CURRENT authoritative status and posting time, never a
+ * (`GET /v1/transfers/{id}`), so a reload: or a HELD→POSTED transition made
+ * later: shows the CURRENT authoritative status and posting time, never a
  * component-state snapshot. Unknown or foreign ids answer the same 404.
  */
 export default function TransferReceiptPage({ params }: { params: Promise<{ id: string }> }) {
-  // Next 15+ pages receive `params` as a Promise - unwrap it before use.
+  // Next 15+ pages receive `params` as a Promise: unwrap it before use.
   const { id } = React.use(params);
   const receipt = useTransferReceipt(id);
   // A 404/410 means the operation does not exist or is not the caller's; any

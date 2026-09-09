@@ -2,8 +2,7 @@ import { authedFetch } from "./api";
 
 /**
  * Save an authenticated response as a file download. Uses authedFetch so
- * exports go through the same silent-refresh path as every other request -
- * a download after token expiry must not silently 401. Prefers the
+ * exports go through the same silent-refresh path as every other request: * a download after token expiry must not silently 401. Prefers the
  * server's Content-Disposition filename (statement-IBAN-date.csv) over the
  * caller's fallback.
  */

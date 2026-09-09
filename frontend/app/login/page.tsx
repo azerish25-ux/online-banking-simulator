@@ -24,7 +24,7 @@ export default function LoginPage() {
     try {
       // Two explicit outcomes (contract: 200 AuthResponse, 202 MfaRequired):
       // the body discriminates them, and both shapes are validated before the
-      // session is branched - an unexpected body is an error, not a guess.
+      // session is branched: an unexpected body is an error, not a guess.
       const data = await api<unknown>("/v1/auth/login", { method: "POST", body: JSON.stringify(values) });
       const mfa = mfaChallengeSchema.safeParse(data);
       if (mfa.success) {

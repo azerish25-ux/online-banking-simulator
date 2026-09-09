@@ -7,22 +7,22 @@ import java.text.DecimalFormatSymbols;
 import java.util.Locale;
 
 /**
- * Human-facing money formatting for notifications, PDFs and other copy - the
+ * Human-facing money formatting for notifications, PDFs and other copy: the
  * ledger keeps four decimals, but people read two. Audit metadata and machine
  * exports (CSV) intentionally keep the raw scale; this class only formats for
  * eyes. DecimalFormat is not thread-safe, so each call builds its own.
  *
  * Display rounding is HALF_UP, i.e. half away from zero for BOTH signs: an
  * exact-cent tie like -1.005 reads "-1.01", never silently toward zero. (The
- * settlement path rounds HALF_EVEN at the ledger's 4-decimal scale - see
- * MoneyService - which is a separate, stored-value concern.)
+ * settlement path rounds HALF_EVEN at the ledger's 4-decimal scale: see
+ * MoneyService: which is a separate, stored-value concern.)
  */
 public final class Money {
 
   private Money() {}
 
   /**
-   * "$1,234.56" (negatives "-$600.00") - for notifications, PDF headers and
+   * "$1,234.56" (negatives "-$600.00"): for notifications, PDF headers and
    * other user-facing copy. The sign goes BEFORE the symbol: DecimalFormat
    * would otherwise emit "$-600.00", which reads like a broken currency.
    */
@@ -39,7 +39,7 @@ public final class Money {
     return sign + "$" + format.format(scaled.abs());
   }
 
-  /** "1234.56" with no grouping or symbol - for aligned PDF table cells. */
+  /** "1234.56" with no grouping or symbol: for aligned PDF table cells. */
   public static String plain(BigDecimal value) {
     return value.setScale(2, RoundingMode.HALF_UP).toPlainString();
   }

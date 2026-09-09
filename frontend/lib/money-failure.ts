@@ -2,14 +2,14 @@ import { ApiError } from "./api";
 
 /**
  * The one owner of "did the server reject this, or is the outcome unknown?"
- * Every money surface - the interrupted-operation copy below, the key-lifecycle
- * rules in queries.ts, the operator reversal dialog - reads the rule from here,
+ * Every money surface: the interrupted-operation copy below, the key-lifecycle
+ * rules in queries.ts, the operator reversal dialog: reads the rule from here,
  * so the definitive-vs-ambiguous boundary can never drift between them.
  *
- * A definitive rejection (4xx except 409/429 - validation, insufficient
+ * A definitive rejection (4xx except 409/429: validation, insufficient
  * funds, ...) proves the server recorded NOTHING, so the plain server message is
- * the truth. Everything else - a network drop (no HTTP response at all), 5xx,
- * 429, or a 409 idempotency conflict - means the outcome is genuinely UNKNOWN:
+ * the truth. Everything else: a network drop (no HTTP response at all), 5xx,
+ * 429, or a 409 idempotency conflict: means the outcome is genuinely UNKNOWN:
  * the server may have committed.
  */
 export function isDefinitiveRejection(err: unknown): err is ApiError {
@@ -19,7 +19,7 @@ export function isDefinitiveRejection(err: unknown): err is ApiError {
 
 export type MoneyFailure = {
   message: string;
-  /** True when the server may have committed - a retry is the safe check. */
+  /** True when the server may have committed: a retry is the safe check. */
   ambiguous: boolean;
 };
 
@@ -80,8 +80,8 @@ export function classifyMoneyFailure(
 
 /**
  * Truthful copy for a failed operator reversal (V29). Reversal is NOT
- * idempotent like a keyed deposit/transfer - a second reversal of the same
- * transaction is refused - so an ambiguous failure must point the operator at
+ * idempotent like a keyed deposit/transfer: a second reversal of the same
+ * transaction is refused: so an ambiguous failure must point the operator at
  * the posted list to learn the true state, never at a blind retry.
  */
 export function classifyReversalFailure(err: unknown): MoneyFailure {

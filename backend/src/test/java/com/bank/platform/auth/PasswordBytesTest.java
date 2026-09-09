@@ -15,7 +15,7 @@ import org.springframework.test.web.servlet.MockMvc;
 /**
  * The 72-byte BCrypt ceiling must be enforced on bytes. An emoji is 4 UTF-8
  * bytes, so 18 emojis (72 bytes) are the exact boundary and 19 (76 bytes) must
- * be rejected - a character-based @Size would let all of them through and two
+ * be rejected: a character-based @Size would let all of them through and two
  * distinct 19-emoji passwords would silently share one truncated hash.
  */
 @SpringBootTest

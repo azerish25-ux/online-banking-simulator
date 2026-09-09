@@ -12,7 +12,7 @@ public interface LoginChallengeRepository extends JpaRepository<LoginChallenge, 
   /**
    * Atomically consumes one challenge. Returns 1 only when this caller won the
    * race on an unused, unexpired challenge; 0 when it was already consumed,
-   * never existed as usable, or expired - in which case the caller rejects the
+   * never existed as usable, or expired: in which case the caller rejects the
    * attempt and no second session is minted. Two simultaneous correct
    * submissions can therefore never both succeed.
    */

@@ -14,7 +14,7 @@ public final class TransactionMapper {
   /**
    * Customer/account surface (history, receipts, key lookups). Reversal rows
    * keep their factual linkage, but the operator's mandatory reason and the
-   * has-this-been-reversed lookup are internal notes - always null here.
+   * has-this-been-reversed lookup are internal notes: always null here.
    */
   public static TransactionResponse toResponse(Transaction tx, Map<UUID, String> ibans) {
     return new TransactionResponse(
@@ -35,7 +35,7 @@ public final class TransactionMapper {
   }
 
   /**
-   * Operator surface (admin consoles): the full reversal picture - the reason
+   * Operator surface (admin consoles): the full reversal picture: the reason
    * on a REVERSAL row and, via {@code reversalByOriginalId} (original-id → its
    * reversal row id, see TransactionRepository.reversalIndexBy), whether a
    * POSTED row has already been reversed so the console never offers a second.

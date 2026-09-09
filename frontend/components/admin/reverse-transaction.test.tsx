@@ -70,7 +70,7 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("canReverse - server eligibility mirrored for the console", () => {
+describe("canReverse: server eligibility mirrored for the console", () => {
   it("offers a posted TRANSFER/DEPOSIT that has not already been reversed", () => {
     expect(canReverse(tx())).toBe(true);
     expect(canReverse(tx({ kind: "DEPOSIT", fromIban: null, toIban: "DE11111111111111111111" }))).toBe(true);
@@ -85,7 +85,7 @@ describe("canReverse - server eligibility mirrored for the console", () => {
   });
 });
 
-describe("ReversalMark - reversed state is visible in the list", () => {
+describe("ReversalMark: reversed state is visible in the list", () => {
   it("labels a REVERSAL row and marks its (untouched) original as Reversed", () => {
     renderMark(tx({ kind: "REVERSAL", reversesTransactionId: "t0", reversalReason: "Wrong amount" }));
     expect(screen.getByText("Reversal")).toBeInTheDocument();

@@ -32,7 +32,7 @@ export default function TransfersPage() {
   const [receipt, setReceipt] = React.useState<{ id: string; toIban: string; amount: string; status: string } | null>(null);
   // Explicit state machine: the form is DRAFT until the user asks to
   // review; REVIEW freezes the payload; submitting sends exactly the reviewed
-  // snapshot - never silently re-read live form values. Editing a field exits
+  // snapshot: never silently re-read live form values. Editing a field exits
   // review back to DRAFT (and the intent-change effect resets the key).
   const [review, setReview] = React.useState<ReviewSnapshot | null>(null);
   const { register, handleSubmit, setValue, watch, reset, formState } = useForm<Form>({
@@ -57,7 +57,7 @@ export default function TransfersPage() {
 
   // Editing the transfer is a new intent: the outstanding idempotency key
   // (which exists to make retries of THIS transfer safe) no longer applies.
-  // The memo is part of the intent too - the server's dedupe hashes it, so
+  // The memo is part of the intent too: the server's dedupe hashes it, so
   // sending an edited memo under an old key would answer 409 (never a replay).
   const lastIntent = React.useRef({ from: "", to: "", amount: "", memo: "" });
   const watchMemo = watch("memo");
@@ -74,7 +74,7 @@ export default function TransfersPage() {
   // Default the source account once, when accounts first arrive. Deliberately
   // not on every refetch: invalidation-driven refetches (e.g. after a transfer
   // or deposit elsewhere) would otherwise overwrite the account the user chose
-  // - or the one kept after a successful send.
+  //: or the one kept after a successful send.
   const sourceInitialized = React.useRef(false);
   React.useEffect(() => {
     const accs = accounts.data;

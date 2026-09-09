@@ -4,7 +4,7 @@ import { cn } from "../../lib/cn";
 
 /**
  * Status notation, not a pill: square corners, a hairline bracket, monospaced
- * label - the way a booking system marks a row's state. Text travels in the
+ * label: the way a booking system marks a row's state. Text travels in the
  * tone; the surface stays the section's white so statuses read as notation
  * rather than stickers.
  */

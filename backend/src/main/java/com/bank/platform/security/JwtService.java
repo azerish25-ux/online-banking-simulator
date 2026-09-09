@@ -14,7 +14,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 /**
- * Token minting and - critically - token PURPOSE separation.
+ * Token minting and: critically: token PURPOSE separation.
  *
  * <p>Every token this service mints carries a {@code purpose} claim plus a
  * purpose-scoped audience. Validation is typed: {@link #parseAccess} and
@@ -75,7 +75,7 @@ public class JwtService {
 
   /**
    * The one access-token validation path. Everything the JwtAuthFilter trusts
-   * about a presented bearer token comes out of this typed result - a caller
+   * about a presented bearer token comes out of this typed result: a caller
    * cannot build a principal from any token that was not minted for access.
    */
   public record AccessToken(String subject, int securityVersion) {}

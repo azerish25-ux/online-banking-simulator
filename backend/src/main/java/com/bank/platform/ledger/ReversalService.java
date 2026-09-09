@@ -26,7 +26,7 @@ import org.springframework.transaction.annotation.Transactional;
  * operator reverses it by authoring a NEW {@code REVERSAL} transaction that
  * moves the money back along the original legs, and a linked {@code REVERSAL}
  * journal entry whose {@code reverses_entry_id} names the original entry. The
- * original row keeps its POSTED state and its own history - a
+ * original row keeps its POSTED state and its own history: a
  * posted-then-reversed transfer is never relabelled as if it had never
  * settled.
  *
@@ -41,7 +41,7 @@ import org.springframework.transaction.annotation.Transactional;
  *   <li><b>Current-state honesty.</b> Reversal moves real money under the
  *       same locks and rules as any transfer: if the payee has spent the
  *       funds, or a loan's current state cannot accept the repayment, the
- *       reversal is declined with the underlying reason - never forced
+ *       reversal is declined with the underlying reason: never forced
  *       through, never silently dropped.</li>
  * </ul>
  */
@@ -153,7 +153,7 @@ public class ReversalService {
     // move() takes the ID-ordered locks and enforces ACTIVE + affordability on
     // the payee: if the funds have been spent (or a loan's current state
     // cannot accept the reverse movement), the reversal is declined with the
-    // underlying validation reason - never forced through.
+    // underlying validation reason: never forced through.
     LedgerMovementService.Moved moved = movement.move(payee, payer, original.getAmount());
     Account from = moved.from();
     Account to = moved.to();
@@ -182,7 +182,7 @@ public class ReversalService {
    * A deposit reverses back to the funding rail: the credited account is
    * debited, and the balancing side is the simulator-funding counteraccount.
    * The depositor must still hold the funds (affordability), the account must
-   * be ACTIVE, and a deposit that repaid a LOAN is refused - it already
+   * be ACTIVE, and a deposit that repaid a LOAN is refused: it already
    * extinguished interest/principal under the repayment allocation, so
    * reversing it would require re-creating debt the workflow cannot prove.
    */

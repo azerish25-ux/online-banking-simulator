@@ -14,8 +14,7 @@ import org.springframework.stereotype.Service;
 /**
  * The money-movement core: everything that physically moves balances between
  * two account rows. Deadlock-safe lock ordering, the active-status rule and
- * the affordability policy (LOAN floor vs. zero) live here - and only here -
- * so an instant transfer and an approved held transfer can never drift apart
+ * the affordability policy (LOAN floor vs. zero) live here: and only here: * so an instant transfer and an approved held transfer can never drift apart
  * on what they enforce. This service never opens its own transaction: callers
  * (the services that own a flow) run inside one and call in.
  */
@@ -50,7 +49,7 @@ public class LedgerMovementService {
    * caller loaded either account first, the row would be locked through a
    * stale snapshot and {@code accounts.save} would write that stale balance
    * over a newer committed one as soon as real row-lock contention makes the
-   * lock wait - money silently created or destroyed (PostgreSQL exposes this;
+   * lock wait: money silently created or destroyed (PostgreSQL exposes this;
    * H2's weaker locking hides it). Account {@code @Version} (V16) turns any
    * such future violation into a loud conflict instead of corruption, but
    * callers must still follow the first-read discipline.
@@ -84,7 +83,7 @@ public class LedgerMovementService {
     } else {
       to.setBalance(to.getBalance().add(amount));
     }
-    // A draw from a LOAN is new principal - capped by assertAffordable above.
+    // A draw from a LOAN is new principal: capped by assertAffordable above.
     if (from.getType() == AccountType.LOAN) {
       from.setPrincipal(from.getPrincipal().add(amount));
       principalEvents.add(new PrincipalEvent(from.getId(),
@@ -104,7 +103,7 @@ public class LedgerMovementService {
   /**
    * The authoritative check that a debit stays inside the account type's
    * floor: a LOAN may only draw against PRINCIPAL headroom (the credit limit
-   * minus what is already drawn) - accrued interest never creates borrowing
+   * minus what is already drawn): accrued interest never creates borrowing
    * capacity, and a loan at its limit is not silently forgiven interest, it
    * simply cannot borrow more. Every other account type must stay
    * non-negative.
@@ -162,7 +161,7 @@ public class LedgerMovementService {
 
   /**
    * Simulated-rail credit into a LOAN (deposit): same repayment policy as a
-   * transfer credit - capped at the amount owed, interest first. Returns the
+   * transfer credit: capped at the amount owed, interest first. Returns the
    * principal component for the caller's principal-movement record.
    */
   public BigDecimal creditLoan(Account loan, BigDecimal amount) {

@@ -64,7 +64,7 @@ class StatementLayoutTest {
     try (PDDocument doc = Loader.loadPDF(bytes)) {
       assertTrue(doc.getNumberOfPages() >= 2, "60 rows must produce more than one page");
       String text = new PDFTextStripper().getText(doc);
-      // One column-heading line per page - count the literal heading token.
+      // One column-heading line per page: count the literal heading token.
       long headings = occurrences(text, "Description");
       assertEquals(doc.getNumberOfPages(), headings,
           "every page must carry its own Date/Description/Amount heading");
@@ -88,7 +88,7 @@ class StatementLayoutTest {
     LocalDate to = LocalDate.now(ZoneOffset.UTC).minusDays(1);
     String text = statementText(alice, aliceId, from, to);
 
-    // The label is the exact inclusive window - neither day shifted by the
+    // The label is the exact inclusive window: neither day shifted by the
     // exclusive end that the row query consumes.
     assertTrue(text.contains("Period " + from + " to " + to),
         "label must print the inclusive days:\n" + text);

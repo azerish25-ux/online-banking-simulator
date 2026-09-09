@@ -21,13 +21,13 @@ import org.flywaydb.core.api.migration.Context;
  * <p>Nothing is fabricated: no historical posting is invented, no balance is
  * double-counted (reconstructed history + opening), and every original row
  * and identifier is preserved untouched. Zero-balance accounts need no
- * opening entry - their projection already equals an empty journal.
+ * opening entry: their projection already equals an empty journal.
  */
 public class V22__journal_cutover extends BaseJavaMigration {
 
   @Override
   public void migrate(Context context) throws Exception {
-    // NOTE: never close context.getConnection() - Flyway owns it and will commit/rollback.
+    // NOTE: never close context.getConnection(): Flyway owns it and will commit/rollback.
     Connection connection = context.getConnection();
     Instant cutover = Instant.now();
     // setObject with a bare Instant cannot infer a SQL type on PostgreSQL;

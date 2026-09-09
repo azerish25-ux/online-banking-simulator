@@ -14,7 +14,7 @@ import java.util.UUID;
 /**
  * One immutable principal-component movement (V26): a draw, a principal
  * repayment or the legacy cutover baseline. Signed {@code amount} follows the
- * journal convention - positive increases the outstanding principal, negative
+ * journal convention: positive increases the outstanding principal, negative
  * reduces it. Written in the SAME transaction as the money movement that
  * produced it and keyed to that transaction (unique per account + source), so
  * principal history can never drift from the general journal or be recorded

@@ -5,7 +5,7 @@ import java.util.stream.Collectors;
 
 /**
  * A key-only operation lookup matched more than one of the caller's own
- * operations (one per owned originating account - the key namespace is the
+ * operations (one per owned originating account: the key namespace is the
  * account, so the same key string can legitimately name a different
  * operation on two of the caller's accounts).
  *

@@ -53,7 +53,7 @@ class DepositOperationTest {
     String first = depositBalance(alice, aliceId, "500.00", key);
     assertEquals("500.0000", first);
 
-    // An identical replay returns the account's current state - the original
+    // An identical replay returns the account's current state: the original
     // deposit already moved the money, and nothing may move twice for a key.
     String replay = depositBalance(alice, aliceId, "500.00", key);
     assertEquals("500.0000", replay, "replay must not double-credit");
@@ -88,7 +88,7 @@ class DepositOperationTest {
         .andExpect(jsonPath("$.kind").value("DEPOSIT"))
         .andExpect(jsonPath("$.amount").value("250.0000"));
 
-    // An identical replay returns the SAME operation identity - the row the
+    // An identical replay returns the SAME operation identity: the row the
     // money actually posted under, never a new one.
     MvcResult replay = mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
             .header("Authorization", "Bearer " + alice)
@@ -137,7 +137,7 @@ class DepositOperationTest {
     String key = "op-lookup-" + UUID.randomUUID();
 
     // Alice deposits under her key; Bob uses the same string for his own
-    // deposit - keys live in each account's namespace, so both post.
+    // deposit: keys live in each account's namespace, so both post.
     depositBalance(alice, aliceId, "200.00", key);
     depositBalance(bob, bobId, "9.00", key);
 

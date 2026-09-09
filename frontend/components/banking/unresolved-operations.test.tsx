@@ -102,7 +102,7 @@ describe("UnresolvedOperations recovery surface", () => {
 
   it("lists a saved operation and resolves it by re-sending the identical keyed request", async () => {
     seed();
-    // renderCard installs a default stub - install the replay stub AFTER it so
+    // renderCard installs a default stub: install the replay stub AFTER it so
     // the click sees this one (renderCard must not clobber per-test behavior).
     renderCard([]);
     vi.mocked(api).mockImplementation(async (path: string, options?: RequestInit) => {
@@ -135,7 +135,7 @@ describe("UnresolvedOperations recovery surface", () => {
 
   it("clears an operation the server already recorded (the server list ends the unknown state)", async () => {
     seed();
-    // The server recorded this keyed operation - its outcome was never really
+    // The server recorded this keyed operation: its outcome was never really
     // unknown, so it must not be offered for a retry: the record is cleared
     // and nothing renders.
     renderCard([{ ...postedTx(), idempotencyKey: "k1" }]);

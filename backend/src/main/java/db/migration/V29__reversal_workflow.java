@@ -9,7 +9,7 @@ import org.flywaydb.core.api.migration.Context;
 /**
  * V29: the authorized reversal workflow.
  *
- * <p>A posted instruction is never edited or deleted - history is history. An
+ * <p>A posted instruction is never edited or deleted: history is history. An
  * operator can REVERSE it: a NEW {@code REVERSAL} transaction row that moves
  * the money back (mirroring the original legs), a linked {@code REVERSAL}
  * journal entry whose {@code reverses_entry_id} points at the original
@@ -17,10 +17,10 @@ import org.flywaydb.core.api.migration.Context;
  * row keeps its POSTED state and its own history.
  *
  * <ul>
- *   <li>{@code transactions.reverses_transaction_id} - the original row this
+ *   <li>{@code transactions.reverses_transaction_id}: the original row this
  *       reversal undoes. PostgreSQL enforces at most one reversal per original
  *       (partial unique index); on H2 the service checks it before writing.</li>
- *   <li>{@code transactions.reversal_reason} - the mandatory operator reason,
+ *   <li>{@code transactions.reversal_reason}: the mandatory operator reason,
  *       preserved on the reversal row itself (not only in the audit log).</li>
  *   <li>The kind CHECKs on {@code transactions} and {@code journal_entries}
  *       both gain {@code REVERSAL}.</li>
@@ -48,7 +48,7 @@ public class V29__reversal_workflow extends BaseJavaMigration {
             + "CHECK (kind IN ('DEPOSIT', 'TRANSFER', 'INTEREST', 'OPENING_BALANCE', 'REVERSAL'))");
 
     // 3) PostgreSQL: one reversal per original transaction. H2 has no partial
-    //    index support - there the app-level exists-check is the guard (the
+    //    index support: there the app-level exists-check is the guard (the
     //    same division of labour as V15/V20/V26).
     String product = connection.getMetaData().getDatabaseProductName().toLowerCase();
     if (product.contains("postgres")) {

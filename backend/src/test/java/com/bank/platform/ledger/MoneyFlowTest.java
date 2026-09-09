@@ -76,7 +76,7 @@ class MoneyFlowTest {
         .get("id").asText();
 
     // Replay with the same key and the SAME intent: same row, balances
-    // untouched. A changed payload under a used key is a conflict - see
+    // untouched. A changed payload under a used key is a conflict: see
     // IdempotencyScopingTest.changedIntentUnderSameKeyIsAConflict.
     MvcResult replay = mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + aliceToken)
@@ -133,7 +133,7 @@ class MoneyFlowTest {
     String accountId = accountId(token);
     String other = client.accountIban(register("noamount-b@example.com", "No Amount Bee"));
 
-    // A body without `amount` must fail Bean Validation with a 400 - never
+    // A body without `amount` must fail Bean Validation with a 400: never
     // reach `new BigDecimal(null)` in the controller and 500.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + token)
@@ -279,7 +279,7 @@ class MoneyFlowTest {
     }
     // Keyset walk: fetch every page via nextCursor until it goes null. The
     // union of identities across the three pages must be exactly the 25
-    // deposits, each once, newest-first - an OFFSET pager would duplicate or
+    // deposits, each once, newest-first: an OFFSET pager would duplicate or
     // skip here the moment anything else touched the ledger mid-walk.
     java.util.List<String> seen = new java.util.ArrayList<>();
     String cursor = null;

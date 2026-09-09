@@ -69,8 +69,7 @@ public class TotpSecretCustody {
 
   /**
    * Decrypts a versioned payload for the owning user. A wrong master key, a
-   * tampered ciphertext, or a payload bound to another user all fail loudly -
-   * never returning a usable seed.
+   * tampered ciphertext, or a payload bound to another user all fail loudly: * never returning a usable seed.
    */
   public String decrypt(UUID userId, String payload) {
     if (payload == null || payload.isBlank()) {
@@ -94,7 +93,7 @@ public class TotpSecretCustody {
       // AEADBadTagException (wrong key / tampering) must surface as a loud
       // configuration failure, not as an absent secret.
       throw new IllegalStateException(
-          "TOTP secret decryption failed - is APP_TOTP_MASTER_KEY correct?", ex);
+          "TOTP secret decryption failed: is APP_TOTP_MASTER_KEY correct?", ex);
     }
   }
 

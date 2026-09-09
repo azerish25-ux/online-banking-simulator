@@ -3,7 +3,7 @@ const backend = process.env.BACKEND_URL || "http://localhost:8080";
 /**
  * Baseline security headers for EVERY response. These can be static:
  * they carry no per-request state. The nonce-based Content-Security-Policy is
- * deliberately NOT here - a nonce must be unique per request, so the CSP
+ * deliberately NOT here: a nonce must be unique per request, so the CSP
  * lives in middleware.ts where the HTML document is actually produced.
  */
 const SECURITY_HEADERS = [
@@ -21,7 +21,7 @@ const nextConfig = {
   async headers() {
     return [
       {
-        // All routes - including _next/static assets the middleware matcher
+        // All routes: including _next/static assets the middleware matcher
         // skips, so they still get nosniff and friends.
         source: "/(.*)",
         headers: SECURITY_HEADERS

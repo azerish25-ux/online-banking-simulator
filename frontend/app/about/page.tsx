@@ -7,7 +7,7 @@ import { Badge } from "../../components/ui/badge";
 
 /**
  * The demo seam: what the product surfaces show, and the machinery behind
- * them - written for people curious enough to click "About this demo", so the
+ * them: written for people curious enough to click "About this demo", so the
  * product pages themselves can stay in bank voice.
  */
 export default function AboutPage() {

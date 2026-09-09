@@ -30,20 +30,20 @@ public interface TransactionRepository
   List<Transaction> findByAccountSince(UUID accountId, Instant since);
 
   /**
-   * Settled rows only - HELD intents and CANCELLED transfers never moved
+   * Settled rows only: HELD intents and CANCELLED transfers never moved
    * money, so summaries and other money-movement reads must exclude them.
    */
   @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
       + "and t.status = :status and t.postedAt >= :since order by t.postedAt asc")
   List<Transaction> findSettledByAccountSince(UUID accountId, TxStatus status, Instant since);
 
-  // Statements read oldest-first like a paper bank statement (history - the
-  // interactive feed - stays newest-first). Rows persisted in one flush share
+  // Statements read oldest-first like a paper bank statement (history: the
+  // interactive feed: stays newest-first). Rows persisted in one flush share
   // created_at; the monotonic seq tiebreak keeps them in real insertion order
-  // (the UUID id is random and cannot express it - see V14).
+  // (the UUID id is random and cannot express it: see V14).
   //
   // The half-open instant pair is the SQL floor; the day-window rule lives in
-  // Period - statementRows/historyPage/historyCount take an inclusive-day
+  // Period: statementRows/historyPage/historyCount take an inclusive-day
   // Period and derive the bounds, so callers cannot drift "to is inclusive"
   // from the query bound again. Statements are always closed windows (the
   // service defaults either side), so statementRowsBetween stays strict;
@@ -52,7 +52,7 @@ public interface TransactionRepository
   // IS NULL comparison alone (SQLState 42P18) when the bound is a bare null.
   //
   // a statement is a window of money that MOVED, so the bounds and the
-  // ordering cut on posted_at - never created_at, which is the request time
+  // ordering cut on posted_at: never created_at, which is the request time
   // and can precede settlement across a month boundary. Rows that never
   // posted (HELD/CANCELLED) have no posted_at and can never match.
   @Query("select t from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
@@ -65,7 +65,7 @@ public interface TransactionRepository
     return postedRowsBetween(accountId, TxStatus.POSTED, period.start(), period.endExclusive());
   }
 
-  /** Count of settled rows in the window - the statement size guard. */
+  /** Count of settled rows in the window: the statement size guard. */
   @Query("select count(t) from Transaction t where (t.fromAccountId = :accountId or t.toAccountId = :accountId) "
       + "and t.status = :status and t.postedAt >= :from and t.postedAt < :to")
   long countPostedBetween(UUID accountId, TxStatus status, Instant from, Instant to);
@@ -76,9 +76,9 @@ public interface TransactionRepository
   }
 
   // Rows tied on created_at resolve newest-inserted-first via the DB-assigned
-  // seq column (the random UUID id cannot express insertion order - V14).
+  // seq column (the random UUID id cannot express insertion order: V14).
   // history pages with a KEYSET cursor over the immutable seq identity,
-  // never an OFFSET - an offset re-scans from the newest row every time, so a
+  // never an OFFSET: an offset re-scans from the newest row every time, so a
   // row committed between two reads shifts everything and the reader
   // duplicates or skips it. A null cursorSeq means the first page (no bound);
   // the keyset predicate is seq < cursor, so the fetched page is exactly the
@@ -119,7 +119,7 @@ public interface TransactionRepository
   List<Transaction> findSince(Instant since);
 
 
-  /** Columns the daily-totals report actually buckets on - no full entities. */
+  /** Columns the daily-totals report actually buckets on: no full entities. */
   interface PostedRow {
     // The posting instant (JPQL alias postedAt below). Named for what it IS,
     // never after request time: a settled row can post long after it was
@@ -144,10 +144,10 @@ public interface TransactionRepository
 
   /**
    * Signed net movement with createdAt at/after {@code after} (credits
-   * positive, debits negative) - the ONE owner of the +to/-from sign
+   * positive, debits negative): the ONE owner of the +to/-from sign
    * convention. The statement renderer derives both balance figures from it:
    * current balance minus this sum at the window's start instant is the
-   * true opening, and at the window's exclusive end it is the closing - a
+   * true opening, and at the window's exclusive end it is the closing: a
    * statement for a past period never prints today's balance as its closing.
    */
   @Query("select coalesce(sum(case when t.toAccountId = :accountId then t.amount else -t.amount end), 0) "
@@ -160,7 +160,7 @@ public interface TransactionRepository
    * Atomically resolves a held transfer: moves it out of HELD into {@code to}
    * (POSTED on approval, CANCELLED on decline), marks it reviewed and stamps
    * the posting time. Returns 1 for the operator who won the race,
-   * 0 when someone already resolved it - so two concurrent approvals can
+   * 0 when someone already resolved it: so two concurrent approvals can
    * never both settle the same money. {@code postedAt} is set only when
    * {@code to == POSTED} (null for a decline, leaving the column null); the
    * CHECK requires every POSTED row to carry one, so the flip and the stamp
@@ -174,7 +174,7 @@ public interface TransactionRepository
 
   /**
    * Deposit idempotency keys are scoped to the account they fund (unique on
-   * (to_account_id, idempotency_key) for rows with no originator - V20), so a
+   * (to_account_id, idempotency_key) for rows with no originator: V20), so a
    * foreign key can never surface another user's deposit.
    */
   Optional<Transaction> findFirstByIdempotencyKeyAndToAccountIdAndFromAccountIdIsNull(
@@ -196,7 +196,7 @@ public interface TransactionRepository
    * the database uniqueness lives on (from_account_id, key) for transfers and
    * (to_account_id, key) for deposits, so restricting the lookup to the
    * originating account makes the replay/lookup namespace exactly the
-   * uniqueness namespace - at most one row can ever match.
+   * uniqueness namespace: at most one row can ever match.
    */
   @Query("select t from Transaction t where t.idempotencyKey = :key "
       + "and ((t.fromAccountId is not null and t.fromAccountId = :accountId) "
@@ -206,7 +206,7 @@ public interface TransactionRepository
 
   /**
    * Bounded, newest-first recovery list of the originator's own keyed
-   * operations (transfers + deposits only - the engine never keys its own
+   * operations (transfers + deposits only: the engine never keys its own
    * rows) created since {@code since}. Completed-but-unacknowledged postings
    * are deliberately included: losing the response must not lose the
    * financial record, so an owner can always rediscover what a key did even
@@ -224,7 +224,7 @@ public interface TransactionRepository
   /**
    * Raw DB-assigned seq of one row, read straight from the table. The paging
    * query maps entities, and an entity that is already in the persistence
-   * context keeps its in-memory state - where {@code seq} is still null
+   * context keeps its in-memory state: where {@code seq} is still null
    * because the identity value is assigned by the database, never written
    * back to the object. The keyset cursor must carry the real ordering key,
    * so the boundary row's seq comes from this column read instead.
@@ -233,7 +233,7 @@ public interface TransactionRepository
   Optional<Long> rawSeqOf(UUID id);
 
   /**
-   * public transfer numbers classify by KIND and posted status - never
+   * public transfer numbers classify by KIND and posted status: never
    * by "has a from side". The interest engine posts loan charges with a from
    * side and no to side; counting {@code from_account_id IS NOT NULL} rows
    * would present engine interest as user transfers. A public transfer is a
@@ -253,7 +253,7 @@ public interface TransactionRepository
   /**
    * original-id → its reversal row id, for the given rows (empty when none
    * have been reversed). The operator surface uses this so a console never
-   * offers a second reversal of a row that already has one - the original row
+   * offers a second reversal of a row that already has one: the original row
    * itself is untouched (history stays as it was), so only the reversal index
    * can say "this has been reversed".
    */

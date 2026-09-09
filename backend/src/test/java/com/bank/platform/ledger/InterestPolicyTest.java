@@ -35,24 +35,23 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Interest policy, asserted from first principles against an INDEPENDENT
- * reference - the expected amounts are computed here, day by day, from the
+ * reference: the expected amounts are computed here, day by day, from the
  * documented policy, never by calling the production calculation:
  *
  * <ul>
  *   <li>Savings earn daily interest on the closing balance of each eligible
  *       day (fixed-365): a mid-month deposit earns from its own day;</li>
  *   <li>Loans charge daily interest on the HISTORICAL closing principal of
- *       each eligible day (fixed-365) - never on today's principal, never on
+ *       each eligible day (fixed-365): never on today's principal, never on
  *       accrued interest (no compounding), never capped at the credit limit.
  *       A period is priced from the principal movements that actually
  *       occurred in it: a later draw cannot create interest for an earlier
  *       period and a later repayment cannot erase an earlier period's
  *       already-posted charge;</li>
- *   <li>Frozen days are never eligible - including when the account is
+ *   <li>Frozen days are never eligible: including when the account is
  *       re-activated and the job catches up the skipped months;</li>
  *   <li>Missed periods are processed in order on the next run (resumable),
- *       every account-period is recorded - including legitimately zero ones -
- *       and a second run never re-argues or re-posts a committed period.</li>
+ *       every account-period is recorded: including legitimately zero ones: *       and a second run never re-argues or re-posts a committed period.</li>
  * </ul>
  */
 @SpringBootTest
@@ -128,7 +127,7 @@ class InterestPolicyTest {
   /**
    * The headline historical-eligibility defect: a loan that is opened in June
    * but first drawn in July must have ZERO June principal exposure. The later
-   * draw must never be back-dated into June - the June period is a recorded
+   * draw must never be back-dated into June: the June period is a recorded
    * zero, and July is charged only from the draw's own day.
    */
   @Test
@@ -159,7 +158,7 @@ class InterestPolicyTest {
     assertEquals(new BigDecimal("800.0000"), loan.getPrincipal());
     assertEquals(expectedDebt("800.00", julyCharge), loan.getBalance(),
         "July charge covers only the 12 days principal existed");
-    // June's zero is untouched by the later draw - never retroactively priced.
+    // June's zero is untouched by the later draw: never retroactively priced.
     assertEquals(0, accruals.findByAccountIdAndPeriod(UUID.fromString(loanId), "2026-06")
         .orElseThrow().getAmount().compareTo(BigDecimal.ZERO));
   }
@@ -189,7 +188,7 @@ class InterestPolicyTest {
         .orElseThrow().getAmount(), "the accrual row preserves the posted evidence");
 
     // Repayment on July 5: $100 extinguishes the $2.63 June interest first,
-    // then $97.37 of principal - June's charge is not erased by the payment.
+    // then $97.37 of principal: June's charge is not erased by the payment.
     CLOCK.set(Instant.parse("2026-07-05T10:00:00Z"));
     transfer(owner, loanIban, "100.00", null);
     Account repaid = account(loanId);
@@ -201,7 +200,7 @@ class InterestPolicyTest {
         "after the payment the only remaining debt is principal");
 
     // August 1 prices July: $500 for July 1..4, then $402.63 for July 5..31.
-    // Interest is charged on PRINCIPAL only - the July charge is the same
+    // Interest is charged on PRINCIPAL only: the July charge is the same
     // whether or not June's interest was still unpaid.
     CLOCK.set(Instant.parse("2026-08-01T03:00:00Z"));
     assertEquals(1, interestService.accrueMonthly().get("accrued"));
@@ -228,7 +227,7 @@ class InterestPolicyTest {
   /**
    * Resumption: if a run never happens for July (the account's July period is
    * outstanding), the next run in September must recover BOTH July and August
-   * in order - not merely process August and forget July.
+   * in order: not merely process August and forget July.
    */
   @Test
   void missedPeriodsAreRecoveredInOrderOnTheNextRun() throws Exception {
@@ -263,7 +262,7 @@ class InterestPolicyTest {
 
   /**
    * Every posted period records the rate/policy version and the priced basis
-   * as evidence. A later "rate change" is a new version - it must never be
+   * as evidence. A later "rate change" is a new version: it must never be
    * able to post the same account-period again: the (account, period)
    * uniqueness binds the obligation to ONE charge regardless of version.
    */
@@ -297,7 +296,7 @@ class InterestPolicyTest {
 
   // ------------------------------------------------------------------
   // Independent reference: the documented policy, computed here from the
-  // scenario's own day-by-day principal schedule - not via the service.
+  // scenario's own day-by-day principal schedule: not via the service.
   // ------------------------------------------------------------------
 
   /** One calendar-day range (inclusive) over which principal was constant. */

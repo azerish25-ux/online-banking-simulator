@@ -4,7 +4,7 @@ import { ACCESS_TOKEN_COOKIE_MAX_AGE, ApiError, SESSION_EXPIRED_EVENT, api, auth
 /**
  * jsdom has no BroadcastChannel, so two "tabs" are simulated with a tiny
  * in-memory bus that delivers postMessage to every other open instance with
- * the same channel name - exactly the browser contract api.ts relies on for
+ * the same channel name: exactly the browser contract api.ts relies on for
  * cross-tab session coordination.
  */
 type FakeMessageEvent = { data: unknown };
@@ -61,7 +61,7 @@ describe("token cookie", () => {
     const cookie = tokenCookie("abc.123");
     // Fallback Max-Age mirrors the 15-minute access-token TTL, not the old
     // 7-day value (the AUTHORITATIVE lifetime comes from the auth response's
-    // expiresInSeconds - see the cookie-lifetime tests below).
+    // expiresInSeconds: see the cookie-lifetime tests below).
     expect(cookie).toContain("max-age=" + ACCESS_TOKEN_COOKIE_MAX_AGE);
     expect(cookie.includes("max-age=604800")).toBe(false);
     expect(cookie).toContain("samesite=lax");
@@ -71,7 +71,7 @@ describe("token cookie", () => {
   });
 
   it("mirrors the VALIDATED access-token lifetime when one is provided", () => {
-    // The cookie dies exactly when the JWT does - the auth response's
+    // The cookie dies exactly when the JWT does: the auth response's
     // expiresInSeconds, not a client-side guess.
     expect(tokenCookie("abc.123", 900)).toContain("max-age=900");
     expect(tokenCookie("abc.123", 30)).toContain("max-age=30");
@@ -117,8 +117,7 @@ describe("credential adoption", () => {
 
   it("never adopts an accessToken from a resource response", async () => {
     setToken("old");
-    // A (misbehaving or malicious) account endpoint echoes an accessToken -
-    // the client must not install it: only validated auth responses may
+    // A (misbehaving or malicious) account endpoint echoes an accessToken: // the client must not install it: only validated auth responses may
     // plant credentials.
     mockFetchOnce({ id: "acc-1", balance: "10.00", accessToken: "injected" });
     await api("/v1/accounts");
@@ -229,7 +228,7 @@ describe("silent refresh", () => {
 
   it("adopts the rotated token with its validated lifetime when refresh is malformed it expires", async () => {
     // A refresh body without a VALIDATED AuthResponse (no expiresInSeconds) is
-    // a failed rotation - credentials must never be installed from a partial
+    // a failed rotation: credentials must never be installed from a partial
     // body, so the session expires instead of limping along.
     setToken("expired-token");
     (global.fetch as ReturnType<typeof vi.fn>) = vi.fn()
@@ -310,7 +309,7 @@ describe("TOTP credential rejections keep the session", () => {
     expect(err).toBeInstanceOf(ApiError);
     expect((err as ApiError).status).toBe(401);
     expect((err as ApiError).message).toBe("Invalid code");
-    // The rotated session is alive - never expired on a credential rejection.
+    // The rotated session is alive: never expired on a credential rejection.
     expect(getToken()).toBe("fresh");
     expect(listener).not.toHaveBeenCalled();
     window.removeEventListener(SESSION_EXPIRED_EVENT, listener);

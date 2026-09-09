@@ -21,8 +21,7 @@ import org.springframework.stereotype.Service;
  *
  * <p>Delivery is at-least-once: the provider is called AFTER the claim
  * commits, and a provider that fails after accepting (delivery-before-ack
- * failure) leaves the row to retry - with backoff up to a bounded budget -
- * because the stub cannot promise provider-side idempotency. Rows that
+ * failure) leaves the row to retry: with backoff up to a bounded budget: * because the stub cannot promise provider-side idempotency. Rows that
  * exhaust the budget dead-letter to FAILED for an operator. Simulated
  * delivery stays clearly labelled by the {@link NotificationService.EmailSender}.
  */

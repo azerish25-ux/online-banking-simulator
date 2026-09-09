@@ -13,7 +13,7 @@ import org.springframework.context.annotation.Configuration;
  * The one place the read-model caches are constructed.
  *
  * <p>Previously the policy lived as an unread string under {@code
- * app.cache.caffeine.spec} - Spring's cache auto-configuration only reads
+ * app.cache.caffeine.spec}: Spring's cache auto-configuration only reads
  * {@code spring.cache.caffeine.spec}, so the summary/public-stats caches were
  * running unbounded and immortal while the YAML claimed a 5-minute TTL and a
  * 2000-entry cap. This config binds {@code app.cache.*} through a typed

@@ -21,7 +21,7 @@ public class V11__idempotency_scoping extends BaseJavaMigration {
 
   @Override
   public void migrate(Context context) throws Exception {
-    // NOTE: never close context.getConnection() - Flyway owns it and will commit/rollback.
+    // NOTE: never close context.getConnection(): Flyway owns it and will commit/rollback.
     Connection connection = context.getConnection();
 
     List<String> uniqueConstraints = new ArrayList<>();

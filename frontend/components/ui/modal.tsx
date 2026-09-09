@@ -8,7 +8,7 @@ const FOCUSABLE =
 
 /**
  * Accessible modal dialog: initial focus lands on the close button, Tab /
- * Shift+Tab cycles inside the dialog (a true focus trap - background content
+ * Shift+Tab cycles inside the dialog (a true focus trap: background content
  * can never receive keyboard focus), Escape closes, and focus returns to the
  * element that opened it.
  */
@@ -35,7 +35,7 @@ export function Modal({
   const onCloseRef = React.useRef(onClose);
   onCloseRef.current = onClose;
 
-  // Focus + scroll lifecycle is governed by `open` ALONE - never by the
+  // Focus + scroll lifecycle is governed by `open` ALONE: never by the
   // identity of onClose. A dialog that owns a controlled input whose state
   // lives in the page re-renders the parent on each keystroke, which re-
   // creates the inline onClose; if that identity restarted this effect the

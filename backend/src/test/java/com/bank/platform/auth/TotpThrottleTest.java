@@ -32,7 +32,7 @@ class TotpThrottleTest {
   @Test
   void successResetsTheBudget() {
     String email = "fumbler@example.com";
-    // Fumble twice, then succeed - the success must clear the count so the
+    // Fumble twice, then succeed: the success must clear the count so the
     // next window does not inherit the earlier mistakes.
     throttle.recordFailure(email);
     throttle.recordFailure(email);

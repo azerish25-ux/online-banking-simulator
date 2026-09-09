@@ -13,7 +13,7 @@ import { depositSchema } from "../../lib/validation";
 import type { Account } from "../../lib/api-types";
 
 /**
- * The deposit rail dialog - where simulated funding lands. Owns everything
+ * The deposit rail dialog: where simulated funding lands. Owns everything
  * about a deposit: the destination picker (defaulting to the first ACTIVE
  * account, frozen ones disabled), the amount with its inline validation, the
  * submit state, and the success/error toasts. The page only says whether it
@@ -35,7 +35,7 @@ export function DepositDialog({
   const [amount, setAmount] = React.useState("100.00");
   // One inline slot under the amount field for both shapes of rejection:
   // client-schema errors (set at submit) and server rejections (a deposit
-  // over the cap fails with the bad amount still in the field - the message
+  // over the cap fails with the bad amount still in the field: the message
   // belongs beside it, not in a corner toast behind the scrim).
   const [error, setError] = React.useState<string | undefined>(undefined);
   // Where a deposit lands. Defaults to the first ACTIVE account when the list
@@ -62,11 +62,11 @@ export function DepositDialog({
   // Result → feedback wiring lives in the shared owner. Failures render
   // inline under the amount field (above); success closes the dialog via the
   // latest `onClose`, and its copy reads the amount through a ref (set at
-  // submit time) - the owner fires exactly once, so a refetch after the
+  // submit time): the owner fires exactly once, so a refetch after the
   // deposit can never replay this toast.
   const lastAmount = React.useRef("0");
   // Editing a deposit that was already attempted is a NEW intent: the
-  // outstanding idempotency key made retries of THAT deposit safe - it must
+  // outstanding idempotency key made retries of THAT deposit safe: it must
   // not silently carry an edited amount to the server. Track the attempted
   // intent and reset the key only when the user moves away from it, so a
   // reload-recovered key survives the dialog reopening untouched.

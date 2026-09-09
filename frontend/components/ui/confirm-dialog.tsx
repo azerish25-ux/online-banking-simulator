@@ -9,7 +9,7 @@ import { InlineAlert } from "./inline-alert";
  * Consequence dialog for destructive or hard-to-reverse actions. The confirm
  * button is danger-toned; Escape/backdrop/Cancel all abort. When the action
  * fails on the server the rejection renders here, beside the buttons that
- * caused it - never as a corner toast behind the scrim.
+ * caused it: never as a corner toast behind the scrim.
  */
 export function ConfirmDialog({
   open,

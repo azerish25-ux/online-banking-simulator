@@ -57,7 +57,7 @@ public class MonthlySummaryCache {
       buckets.put(current.minusMonths(i), new BigDecimal[] {BigDecimal.ZERO, BigDecimal.ZERO});
     }
     // Settled rows only: a HELD transfer is an intent and a CANCELLED row was
-    // declined - neither moved money, so neither may appear as a flow. Every
+    // declined: neither moved money, so neither may appear as a flow. Every
     // other money-movement read (statements, daily totals, public stats)
     // applies the same POSTED filter; the summary must not be the outlier.
     for (Transaction tx : transactions.findSettledByAccountSince(accountId, TxStatus.POSTED, since)) {

@@ -40,7 +40,7 @@ public class AdminSeeder implements ApplicationRunner {
     }
     users.save(new User(email, passwords.encode(password), "Bank Operator", Role.ADMIN));
     if (password.equals("change-me-admin-123")) {
-      log.warn("ADMIN SEEDED with DEFAULT password for {} - set APP_ADMIN_PASSWORD in real environments!", email);
+      log.warn("ADMIN SEEDED with DEFAULT password for {}: set APP_ADMIN_PASSWORD in real environments!", email);
     } else {
       log.info("Admin account ensured for {}", email);
     }

@@ -12,8 +12,8 @@ import java.util.UUID;
 
 /**
  * One balanced group of posted accounting entries. Immutable by
- * construction - the DB forbids UPDATE/DELETE on PostgreSQL (V21) and this
- * class exposes no setters - so a correction must be a NEW authorized entry
+ * construction: the DB forbids UPDATE/DELETE on PostgreSQL (V21) and this
+ * class exposes no setters: so a correction must be a NEW authorized entry
  * linked through {@link #reversesEntryId}, never an edit of history.
  */
 @Entity
@@ -35,7 +35,7 @@ public class JournalEntry {
   @Column(nullable = false, length = 3)
   private String currency = "USD";
 
-  /** When money moved - the journal's authoritative posting timestamp. */
+  /** When money moved: the journal's authoritative posting timestamp. */
   @Column(name = "posted_at", nullable = false)
   private Instant postedAt;
 
@@ -46,7 +46,7 @@ public class JournalEntry {
   @Column(name = "reverses_entry_id")
   private UUID reversesEntryId;
 
-  /** Monotonic insert sequence (DB identity) - the deterministic ordering key. */
+  /** Monotonic insert sequence (DB identity): the deterministic ordering key. */
   @Column(insertable = false, updatable = false)
   private Long seq;
 

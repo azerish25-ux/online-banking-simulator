@@ -32,7 +32,7 @@ export default function SettingsPage() {
   const disable = useTotpDisable();
 
   // The pending-enrollment pane. `isReplacement` is captured when the
-  // setup STARTS - the factor is replaced only if one was active then - and
+  // setup STARTS: the factor is replaced only if one was active then: and
   // drives whether the password + existing-factor proof fields appear.
   const [pendingSetup, setPendingSetup] = React.useState<{ secret: string; qrDataUri: string } | null>(null);
   const [isReplacement, setIsReplacement] = React.useState(false);

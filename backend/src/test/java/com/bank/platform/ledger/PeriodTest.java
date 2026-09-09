@@ -36,7 +36,7 @@ class PeriodTest {
     assertEquals(Instant.parse("2026-01-01T00:00:00Z"), yearEnd.endExclusive());
 
     // Leap February: the window opens on 28 February and closes AFTER 29
-    // February - the 29th is in it, and the exclusive end lands on 1 March.
+    // February: the 29th is in it, and the exclusive end lands on 1 March.
     Period leapEnd = new Period(LocalDate.of(2028, 2, 28), LocalDate.of(2028, 2, 29));
     assertEquals(Instant.parse("2028-02-28T00:00:00Z"), leapEnd.start());
     assertEquals(Instant.parse("2028-03-01T00:00:00Z"), leapEnd.endExclusive());

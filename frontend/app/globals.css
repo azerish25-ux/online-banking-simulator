@@ -47,7 +47,7 @@ h1, h2, h3 {
 }
 
 @layer components {
-  /* A surface with its boundary line - not a floating card. Panels are
+  /* A surface with its boundary line, not a floating card. Panels are
      square-cornered and shadowless; the divider is the whole elevation
      story, the way ledger and booking screens read. */
   .panel {

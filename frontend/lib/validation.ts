@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-/** Single source of truth for form rules - mirrors the API validation. */
-// Mirrors the API rules - including the 72-character ceiling: BCrypt silently
+/** Single source of truth for form rules: mirrors the API validation. */
+// Mirrors the API rules: including the 72-character ceiling: BCrypt silently
 // truncates longer passwords, so capping here keeps the client and the hash
 // function in agreement.
 export const loginSchema = z.object({
@@ -18,7 +18,7 @@ export const registerSchema = z.object({
 export type RegisterForm = z.infer<typeof registerSchema>;
 
 // Cents-only entry: a USD customer types dollars and cents, and the UI shows
-// balances rounded to cents - an entered 4-decimal amount (the ledger's
+// balances rounded to cents: an entered 4-decimal amount (the ledger's
 // internal scale) would toast "Deposited $1.23" for $1.2345 and strand
 // sub-cent dust no screen ever shows. Zero is rejected here, not by the
 // server a round-trip later (the modal would sit open with no inline error).

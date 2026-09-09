@@ -64,7 +64,7 @@ export function proxy(request: NextRequest) {
   // - bank_token (access, 15m) is readable here FOR ROUTING ONLY. Its cookie
   //   Max-Age mirrors the JWT TTL (lib/api.ts), so an idle session past the
   //   token lifetime may bounce to login even though the HttpOnly refresh
-  //   cookie could still repair it - accepted: routing is UX-only.
+  //   cookie could still repair it: accepted: routing is UX-only.
   // - refresh_token is HttpOnly: invisible to JS and to this middleware.
   // The API re-verifies signature + role on every call; a stolen access
   // token is therefore blast-radius-limited to 15 minutes. A full BFF
@@ -112,7 +112,7 @@ export function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     // All document routes except the API proxy, Next internals, and static
-    // files - and prefetches (next/link), whose cached payloads must not
+    // files: and prefetches (next/link), whose cached payloads must not
     // carry (or consume) a nonce meant for a real navigation.
     {
       source: "/((?!backend|_next/static|_next/image|favicon\\.ico|.*\\.(?:png|jpg|jpeg|svg|webp|gif|ico|txt|xml|css|js|woff2?)$).*)",

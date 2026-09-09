@@ -45,7 +45,7 @@ import org.springframework.transaction.support.TransactionTemplate;
 @ActiveProfiles("test")
 class TransferConcurrencyIT {
 
-  /** Shared mutable business clock - the accrual test advances it to July 1st. */
+  /** Shared mutable business clock: the accrual test advances it to July 1st. */
   private static final SettableClock CLOCK = new SettableClock();
 
   @TestConfiguration
@@ -114,7 +114,7 @@ class TransferConcurrencyIT {
 
     // no "at least one success" oracle. Every one of the 24 transfers is
     // valid and fully funded ($10 each, balances $1,000, under the review
-    // threshold), so ALL must settle - the ID-ordered locking must serialize
+    // threshold), so ALL must settle: the ID-ordered locking must serialize
     // opposite directions without deadlock, starvation, or spurious rejection.
     assertEquals(24, succeeded, "all 24 funded $10 transfers settle under contention");
     assertTrue(failures.isEmpty(), () -> "expected zero rejections: " + String.join(" | ", failures));
@@ -130,7 +130,7 @@ class TransferConcurrencyIT {
     assertEquals(new BigDecimal("2000.0000"), aliceFinal.add(bobFinal), "total money must be conserved");
 
     // Exact operation count: 24 TRANSFER postings involving Alice, one per
-    // settled call - no dupes, no partials (Alice's own deposit row excluded
+    // settled call: no dupes, no partials (Alice's own deposit row excluded
     // by kind).
     long transferRows = transactions
         .findByAccountSince(UUID.fromString(aliceId), java.time.Instant.EPOCH)
@@ -174,7 +174,7 @@ class TransferConcurrencyIT {
   /**
    * Two overlapping accrual runs (the scheduler at 03:00 colliding with an
    * admin trigger, or two instances) must post interest exactly once per
-   * account-month - never twice. The candidate rows are locked FOR UPDATE and
+   * account-month: never twice. The candidate rows are locked FOR UPDATE and
    * re-checked, so the loser of the race skips what the winner already accrued.
    * Against real PostgreSQL this is the authoritative proof; on H2 the timing
    * is best-effort, which is why CI runs this file on the Postgres service.

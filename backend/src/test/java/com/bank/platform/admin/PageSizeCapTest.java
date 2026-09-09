@@ -18,7 +18,7 @@ import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
- * Paginated listings must never honor an unbounded size parameter - a caller
+ * Paginated listings must never honor an unbounded size parameter: a caller
  * asking for size=1000000 would otherwise force the server to assemble and
  * serialize a whole table in one response. Every listing caps at 100.
  */

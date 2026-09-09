@@ -13,18 +13,18 @@ import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 
 /**
- * V28 - audit provenance consulted FIRST, independently of the current kind
+ * V28: audit provenance consulted FIRST, independently of the current kind
  * label. V24's blind spot: it only searched the INTEREST_POSTED audit trail
  * on rows ALREADY labelled INTEREST, so an audit-proven engine posting whose
- * memo did not match V8's substring fell into a structural bucket - a
+ * memo did not match V8's substring fell into a structural bucket: a
  * savings-interest credit became a DEPOSIT and a loan-interest charge stayed
  * a TRANSFER.
  *
  * <p>This test reproduces the full chain exactly like TransactionKindMigrationIT:
  * migrate a fresh database only to V7, seed realistic pre-kind rows (with and
  * without the engine's INTEREST audit), then migrate to the head. V8 guesses
- * by memo, V24 reclassifies from its (label-dependent) evidence - reproducing
- * the flawed outcomes - and V28 must correct both mislabels from the audit
+ * by memo, V24 reclassifies from its (label-dependent) evidence: reproducing
+ * the flawed outcomes: and V28 must correct both mislabels from the audit
  * trail, quarantine a contradictory two-sided audit row, and touch nothing
  * else.
  */
@@ -56,14 +56,13 @@ class KindAuditProvenanceMigrationIT {
       account(c, loan, user, "DE20000000000000000003", "LOAN");
 
       // Savings-interest credit with an INTEREST audit but a memo that does NOT
-      // match V8's substring: V8 leaves it TRANSFER, V24 makes it a DEPOSIT -
-      // V28 must restore it to INTEREST from the audit trail.
+      // match V8's substring: V8 leaves it TRANSFER, V24 makes it a DEPOSIT: // V28 must restore it to INTEREST from the audit trail.
       UUID payout = UUID.randomUUID();
       tx(c, payout, null, savings, "Payout July");
       audit(c, user, payout);
 
       // Loan-interest charge with an INTEREST audit and a non-matching memo:
-      // V24 never re-examines it, so it stays labelled TRANSFER - V28 must
+      // V24 never re-examines it, so it stays labelled TRANSFER: V28 must
       // promote it to INTEREST.
       UUID charge = UUID.randomUUID();
       tx(c, charge, loan, null, "September charge");
@@ -76,7 +75,7 @@ class KindAuditProvenanceMigrationIT {
       tx(c, household, checking, savings, "Household interest transfer");
       audit(c, user, household);
 
-      // Innocent rows - untouched by V28.
+      // Innocent rows: untouched by V28.
       tx(c, UUID.randomUUID(), checking, savings, "Split the dinner bill");
       tx(c, UUID.randomUUID(), null, checking, "Refund from marketplace");
     }

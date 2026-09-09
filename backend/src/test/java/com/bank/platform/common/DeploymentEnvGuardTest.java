@@ -45,7 +45,7 @@ class DeploymentEnvGuardTest {
 
   @Test
   void productionRefusesMissingOrPlaceholderTotpMasterKey() {
-    // Missing key: fail-closed - seeds must never silently fall back to
+    // Missing key: fail-closed: seeds must never silently fall back to
     // plaintext at rest in a production deployment.
     DeploymentEnvGuard missing = new DeploymentEnvGuard("production", REAL_JWT, "real-admin-pass", "real-db-pass", "");
     assertThrows(IllegalStateException.class, () -> missing.run(noArgs()));

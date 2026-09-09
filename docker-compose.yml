@@ -1,4 +1,4 @@
-# Production-like full stack (CI builds this; local dev stays Docker-free - see start-all.ps1).
+# Production-like full stack (CI builds this; local dev stays Docker-free, see start-all.ps1).
 #
 # Hardening notes:
 # - No service publishes to 0.0.0.0. The database is reachable ONLY on the
@@ -8,7 +8,7 @@
 #   AND real secrets in the environment; DeploymentEnvGuard then refuses to
 #   start on any documented dev/placeholder default (JWT, admin password, DB
 #   password, TOTP master key). Without production mode the backend runs with
-#   the compose placeholders and logs a loud warning - demo posture only.
+#   the compose placeholders and logs a loud warning; demo posture only.
 # - Rate limiting buckets by socket address because no sanitizing edge is
 #   deployed here. RATE_LIMIT_TRUSTED_PROXIES stays empty: enabling it before
 #   a proxy that strips client-supplied X-Forwarded-For is verified would let
@@ -24,7 +24,7 @@ services:
       POSTGRES_DB: bankdb
       POSTGRES_USER: bankapp
       POSTGRES_PASSWORD: ${PG_PASSWORD:-bankapp_secret_change_me}
-    # Host-tooling convenience only (loopback - never exposed to the LAN).
+    # Host-tooling convenience only (loopback, never exposed to the LAN).
     # Remove entirely if nothing on the host needs direct SQL access.
     ports:
       - "127.0.0.1:5432:5432"
@@ -47,7 +47,7 @@ services:
       - ALL
     environment:
       # APP_DEPLOYMENT_ENV=production makes DeploymentEnvGuard refuse every
-      # placeholder below - real deployments set it plus all the secrets.
+      # placeholder below; real deployments set it plus all the secrets.
       APP_DEPLOYMENT_ENV: ${APP_DEPLOYMENT_ENV:-dev}
       PG_URL: jdbc:postgresql://db:5432/bankdb
       PG_USER: bankapp
@@ -59,7 +59,7 @@ services:
       # in production mode).
       APP_TOTP_MASTER_KEY: ${APP_TOTP_MASTER_KEY:-dev-totp-master-key-change-me}
       # The cookie is HttpOnly and SameSite=Lax but gains Secure only over
-      # HTTPS - set true once TLS terminates in front of the stack.
+      # HTTPS: set true once TLS terminates in front of the stack.
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       # Auth rate-limit buckets must key on the real client IP, never on the
       # Next proxy's own address. Forwarding headers are honored ONLY for

@@ -60,7 +60,7 @@ describe("unresolved-operation resolution", () => {
   it("a changed memo is a NEW intent: it mints a fresh key and keeps the old record", async () => {
     // Guard for the recovery premise: a replay must be byte-identical, so a
     // transfer edited to a different memo must never inherit the old key (the
-    // server would answer 409) - and the older record must stay recoverable.
+    // server would answer 409): and the older record must stay recoverable.
     const user = userEvent.setup();
     setToken("tok");
     vi.mocked(api).mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"));
@@ -87,7 +87,7 @@ describe("unresolved-operation resolution", () => {
     await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
     const keys = keysSent();
     expect(keys[1]).not.toBe(oldKey);
-    // The old intent's record is untouched - still resolvable by its key.
+    // The old intent's record is untouched: still resolvable by its key.
     expect(listPendingOperations("u1").map((o) => o.key)).toContain(oldKey);
   });
 
@@ -172,7 +172,7 @@ describe("unresolved-operation resolution", () => {
     // The first attempt could have posted with a token that expired after
     // commit; this replay is refused by the auth filter before the server can
     // say what happened. The record must survive so the user can check again
-    // after re-authentication - never silently erase it as a
+    // after re-authentication: never silently erase it as a
     // definitive rejection.
     setToken("tok");
     upsertPendingOperation({

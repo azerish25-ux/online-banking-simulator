@@ -39,13 +39,13 @@ public class OpenApiConfig {
         .info(new Info()
             .title(Brand.NAME + " API")
             // One version source: application.yml's info.app.version, which the
-            // health endpoint reports - a pom bump can no longer drift the two.
+            // health endpoint reports: a pom bump can no longer drift the two.
             .version(version)
             .description("Full-stack online banking demo. Errors are RFC-7807 "
                 + "(ApiProblem); money travels as JSON strings."))
         // Pin the servers list (app.api.server-url, default the documented
         // dev origin). Without it springdoc derives the URL from the incoming
-        // request - a MockMvc-regenerated contract says "http://localhost"
+        // request: a MockMvc-regenerated contract says "http://localhost"
         // while a live backend on :8080 emits "http://localhost:8080", so the
         // same spec drifted between the two generation paths.
         .servers(List.of(new Server().url(serverUrl)))
@@ -61,15 +61,15 @@ public class OpenApiConfig {
    * Contract repairs that no single annotation can express:
    *
    * <ol>
-   *   <li><b>Required fields</b> - springdoc derives schema property lists
+   *   <li><b>Required fields</b>: springdoc derives schema property lists
    *       from records but marks every property optional because the DTOs
    *       carry no per-field validation. The wire always sends every field of
    *       every RESPONSE record, so response-only schemas get an explicit
-   *       {@code required} list - the generated types then describe reality
+   *       {@code required} list: the generated types then describe reality
    *       without a blanket {@code Required<...>} repair on the client.
    *       Request schemas are left alone: which request fields are optional
    *       is real information.</li>
-   *   <li><b>Public routes</b> - the global bearer requirement must not
+   *   <li><b>Public routes</b>: the global bearer requirement must not
    *       advertise authentication on the one anonymous endpoint
    *       (/api/public/**); its security is cleared so the contract says it
    *       is callable without a token.</li>

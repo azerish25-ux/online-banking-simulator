@@ -37,7 +37,7 @@ public interface EmailOutboxRepository extends JpaRepository<EmailOutbox, UUID> 
   List<UUID> findStaleDeliveringIds(Instant staleBefore, Pageable pageable);
 
   /**
-   * Atomic claim: the conditional status flip is the concurrency guard - two
+   * Atomic claim: the conditional status flip is the concurrency guard: two
    * workers can both read the same candidate id, but exactly one UPDATE wins.
    * Returns 1 for the winner, 0 for everyone else. Fresh rows (attempts = 0)
    * are always claimable (see {@link #findPendingIds}); retries wait for

@@ -23,11 +23,11 @@ import org.apache.pdfbox.pdmodel.common.PDRectangle;
 import org.apache.pdfbox.pdmodel.font.PDType0Font;
 
 /**
- * The PDF statement renderer - the byte-level layout engine, in a file of its
+ * The PDF statement renderer: the byte-level layout engine, in a file of its
  * own so the snapshot assembler never does glyph work.
  *
  * <p>Pure: it reads ONLY the immutable {@link StatementService.Statement} it
- * is handed - no repository, no clock, no transaction - so the rendered
+ * is handed: no repository, no clock, no transaction: so the rendered
  * document can never combine figures from a different database snapshot than
  * the rows between them. Rendering the same Statement twice produces
  * identical bytes, even after money moves in the database.
@@ -35,8 +35,8 @@ import org.apache.pdfbox.pdmodel.font.PDType0Font;
 * <p>the body is set in an embedded Unicode TrueType font (DejaVu
  * Sans, bundled under src/main/resources/fonts with its license), so
  * accented names and non-Latin memos are never substituted with '?' or
- * dropped. Columns are positioned from MEASURED string widths - no
- * space-padding in a proportional font - amounts are right-aligned, long
+ * dropped. Columns are positioned from MEASURED string widths: no
+ * space-padding in a proportional font: amounts are right-aligned, long
  * descriptions wrap onto continuation lines, the column heading repeats on
  * every page, and each page carries a page number.
  *
@@ -54,7 +54,7 @@ public final class StatementPdfRenderer {
 
   /**
    * ICU ArabicShaping (UAX #11): joins Arabic/Persian letters into contextual
-   * presentation forms. Reused across render calls - the shaper is stateless.
+   * presentation forms. Reused across render calls: the shaper is stateless.
    */
   private static final ArabicShaping ARABIC_SHAPER =
       new ArabicShaping(ArabicShaping.LETTERS_SHAPE);
@@ -101,7 +101,7 @@ public final class StatementPdfRenderer {
           "Statement as of " + asOf + " (UTC) · version " + statement.version()};
 
       // Pre-lay every row into measured, wrapped display lines. A line carries
-      // {date, amount, description, measuredAmountWidth} - date and amount are
+      // {date, amount, description, measuredAmountWidth}: date and amount are
       // printed only on the first line of their row. Logical text is wrapped
       // first; each wrapped line is then shaped + reordered into display order
       // (toDisplayOrder) right before it is drawn.
@@ -130,8 +130,8 @@ public final class StatementPdfRenderer {
         }
       }
 
-      // Paginate the display lines first - the SAME arithmetic the draw pass
-      // uses - so every page's "Page X of N" is the true, final total and no
+      // Paginate the display lines first: the SAME arithmetic the draw pass
+      // uses: so every page's "Page X of N" is the true, final total and no
       // page can silently gain or lose a line between counting and drawing.
       List<List<String[]>> pages = new ArrayList<>();
       {
@@ -202,7 +202,7 @@ public final class StatementPdfRenderer {
 
   /**
    * Wraps on word boundaries to fit {@code maxWidth} points (measured), and
-   * never silently truncates a name or description - anything too long to
+   * never silently truncates a name or description: anything too long to
    * fit one line continues on the next. Widths are measured on the line's
    * DISPLAY order (the string the pen draws), so RTL shaping never makes a
    * wrapped line overflow the amount column.
@@ -218,8 +218,7 @@ public final class StatementPdfRenderer {
     String[] words = text.split(" ");
     StringBuilder current = new StringBuilder();
     for (String word : words) {
-      // A word that would overflow the CURRENT line ends that line first -
-      // the word itself starts the next one, never a space-straddling
+      // A word that would overflow the CURRENT line ends that line first: // the word itself starts the next one, never a space-straddling
       // fragment.
       if (!current.isEmpty()
           && displayWidth(font, size, current + " " + word) > maxWidth) {
@@ -245,7 +244,7 @@ public final class StatementPdfRenderer {
 
   /**
    * Splits one unbreakable token into the fewest measured chunks that each
-   * fit {@code maxWidth}, breaking ONLY between grapheme clusters - never
+   * fit {@code maxWidth}, breaking ONLY between grapheme clusters: never
    * inside a cluster (combining marks stay with their base letter).
    */
   private static List<String> graphemeChunks(PDType0Font font, float size, String token,
@@ -282,14 +281,14 @@ public final class StatementPdfRenderer {
   /**
    * Replace the old character-run reversal with a
    * supported bidirectional + shaping pipeline. Each logical line is (1)
-   * SHAPED with ICU ArabicShaping - Arabic/Persian letters become joined
+   * SHAPED with ICU ArabicShaping: Arabic/Persian letters become joined
    * presentation forms, so a Persian memo renders as connected script, not
-   * isolated letterforms - then (2) REORDERED with ICU {@code Bidi} into the
+   * isolated letterforms: then (2) REORDERED with ICU {@code Bidi} into the
    * glyph order the pen draws (left to right across the page).
    *
    * The visual map (UAX #9, character by character) directly yields that
    * order: appending the shaped character at each visual position produces
-   * the string the pen draws - RTL runs come out reversed so the joining
+   * the string the pen draws: RTL runs come out reversed so the joining
    * computed for logical neighbors lands on the glyphs that ARE neighbors on
    * the page, LTR runs (IBANs, digits, punctuation) stay in order, and
    * nested runs are handled by the engine. A pure-LTR line is untouched
@@ -304,7 +303,7 @@ public final class StatementPdfRenderer {
     try {
       shaped = ARABIC_SHAPER.shape(logical);
     } catch (ArabicShapingException ex) {
-      // Never let a shaping anomaly drop the row - render unshaped rather
+      // Never let a shaping anomaly drop the row: render unshaped rather
       // than losing content (the text layer stays faithful either way).
       shaped = logical;
     }
@@ -325,7 +324,7 @@ public final class StatementPdfRenderer {
     }
     // One run per resolved level (logical order); every run CARRIES its own
     // level because Bidi.reorderVisually permutes the objects but leaves a
-    // separate level array untouched - so the RTL decision must travel with
+    // separate level array untouched: so the RTL decision must travel with
     // the text, not sit in an array that ends up paired with the wrong run.
     int count = bidi.getRunCount();
     Object[] runs = new Object[count];
@@ -348,7 +347,7 @@ public final class StatementPdfRenderer {
 
   /**
    * The label for a memo-less row whose counterpart is the ledger's EXTERNAL
-   * side - no second account exists to name. Deposits (and their V29
+   * side: no second account exists to name. Deposits (and their V29
    * reversals) settle against the simulator-funding rail; interest posts
    * against the engine's INTEREST counteraccount. The statement row does not
    * carry the kind, so one engine-side name serves every such leg.
@@ -362,11 +361,11 @@ public final class StatementPdfRenderer {
   /**
    * The display label for a row's counterpart leg when the row has no memo.
    * A REAL account leg resolves through the statement's IBAN map to a short
-   * IBAN. A NULL leg - money arriving from, or returning to, the funding rail
+   * IBAN. A NULL leg: money arriving from, or returning to, the funding rail
    * (a deposit or its reversal), or an engine interest row settling against
-   * its counteraccount - is NAMED instead of looked up: there is no account
+   * its counteraccount: is NAMED instead of looked up: there is no account
    * to label, and the immutable IBAN map must never be probed with a null
-   * key (an ImmutableCollections map throws NPE on {@code get(null)} - the
+   * key (an ImmutableCollections map throws NPE on {@code get(null)}: the
    * defect that 500'd a statement containing a deposit-reversal row). A real
    * leg somehow absent from the map (cannot happen for a statement built
    * from its own rows) still degrades to "external" via {@link #shortIban}.

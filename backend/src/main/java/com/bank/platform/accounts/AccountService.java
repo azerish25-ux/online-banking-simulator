@@ -15,7 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Account identity and lifecycle: which accounts a caller owns, reading one
- * account (foreign accounts are indistinguishable from missing ones - 404,
+ * account (foreign accounts are indistinguishable from missing ones: 404,
  * no existence oracle), and opening new accounts. Money movement lives in the
  * ledger; this service only decides who may touch what and creates accounts.
  */
@@ -76,8 +76,8 @@ public class AccountService {
     if (accountType == AccountType.LOAN && accounts.countByUserIdAndType(user.getId(), AccountType.LOAN) > 0) {
       // Without the cap a user could mint unbounded $1,000 credit by opening
       // loan after loan and transferring the proceeds out (PostgreSQL enforces
-      // the same rule with a partial unique index - see V15; H2 covers it here).
-      throw new IllegalArgumentException("You already have a loan - settle it before opening another.");
+      // the same rule with a partial unique index: see V15; H2 covers it here).
+      throw new IllegalArgumentException("You already have a loan: settle it before opening another.");
     }
     Account account = new Account(user.getId(), Iban.uniqueOrThrow(accounts::existsByIban, 5), accountType);
     if (accountType == AccountType.LOAN) {

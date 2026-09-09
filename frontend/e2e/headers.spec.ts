@@ -3,12 +3,12 @@ import { expect, test } from "@playwright/test";
 /**
  * Real-browser witness. An earlier prod smoke curled headers and grepped
  * for nonces; this spec walks the LIVE pages in a real browser against the
- * ephemeral production build (next start, NOT next dev - dev relaxes the CSP
+ * ephemeral production build (next start, NOT next dev: dev relaxes the CSP
  * with unsafe-eval/unsafe-inline):
  *
  *   1. Every HTML response carries the full security header set.
  *   2. The CSP nonce on the response header is the very nonce applied to the
- *      document's own scripts - extract it from the header and require it in
+ *      document's own scripts: extract it from the header and require it in
  *      the served HTML.
  *   3. Production CSP allows no unsafe-eval / unsafe-inline for scripts.
  *   4. Static _next assets carry the static header set too (the middleware

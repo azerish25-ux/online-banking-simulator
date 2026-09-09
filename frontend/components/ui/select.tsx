@@ -5,12 +5,12 @@ import { cn } from "../../lib/cn";
 // native arrow is removed with appearance-none so every select in the app
 // shares one arrow, size and focus treatment instead of three ad-hoc styles.
 // The stroke hex must mirror tailwind's `content.faint` (a data-URI SVG
-// cannot read CSS variables) - keep the two in sync.
+// cannot read CSS variables): keep the two in sync.
 const chevron =
   "url(\"data:image/svg+xml;charset=utf-8,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E\")";
 
 /**
- * Native select styled like Input - same height, control border, focus ring.
+ * Native select styled like Input: same height, control border, focus ring.
  * Forwarding the ref and spreading props keeps react-hook-form
  * register() and Field's label wiring (id injection) on the real element.
  */

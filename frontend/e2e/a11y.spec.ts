@@ -7,11 +7,11 @@ import { auditTextContrast } from "./contrast";
  * These tests are hermetic: they seed their own data through the backend API
  * before running, so they pass on a fresh CI database (where the seeded demo
  * user has no accounts yet) and stay idempotent against a long-lived local
- * demo database. No mocks anywhere - same real stack as production.
+ * demo database. No mocks anywhere: same real stack as production.
  */
 /**
  * Seed target (N02 identity rule): the seed must write where the BROWSER
- * actually talks - the same frontend proxy the specs exercise - never a
+ * actually talks: the same frontend proxy the specs exercise: never a
  * hard-coded backend that can drift from the app under test. The proxy path
  * /backend/* rewrites to the backend's /api/*, so an ephemeral sweep
  * (E2E_BASE_URL set) seeds its own ephemeral backend and a default run seeds
@@ -63,7 +63,7 @@ async function seedAccountActivity(token: string): Promise<void> {
     ).json()) as { id: string }[];
   }
 
-  // Deposits require an Idempotency-Key header - without it the seed
+  // Deposits require an Idempotency-Key header: without it the seed
   // would 400 and the dashboard feed would stay empty for the whole file.
   const deposit = await fetch(BASE + "/v1/accounts/" + accounts[0].id + "/deposit", {
     method: "POST",
@@ -144,7 +144,7 @@ test("public pages meet WCAG 2.2 AA text contrast", async ({ page }) => {
     const r = await auditTextContrast(page);
     counts.push(label + ": " + r.sampled + " text nodes");
     if (r.sampled < minNodes) {
-      failures.push(label + ": only " + r.sampled + " text nodes sampled (needs >= " + minNodes + ") - did the page render?");
+      failures.push(label + ": only " + r.sampled + " text nodes sampled (needs >= " + minNodes + "): did the page render?");
     }
     failures.push(...r.failures.map((f) => "[" + label + "] " + f));
   }
@@ -163,7 +163,7 @@ test("authed surfaces and overlays meet WCAG 2.2 AA text contrast", async ({ pag
     const r = await auditTextContrast(page, scope);
     counts.push(label + ": " + r.sampled + " text nodes");
     if (r.sampled < minNodes) {
-      failures.push(label + ": only " + r.sampled + " text nodes sampled (needs >= " + minNodes + ") - did the surface render?");
+      failures.push(label + ": only " + r.sampled + " text nodes sampled (needs >= " + minNodes + "): did the surface render?");
     }
     failures.push(...r.failures.map((f) => "[" + label + "] " + f));
   }

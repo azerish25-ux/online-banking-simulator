@@ -119,7 +119,7 @@ public class AuthService {
   public User verifyMfaChallenge(UUID challengeId, String code) {
     // Reserve the attempt FIRST (may throw TooMany when the budget is spent,
     // or BadCredentials when the challenge is gone/consumed/expired). No row
-    // lock is held across this call - the reservation commits on its own.
+    // lock is held across this call: the reservation commits on its own.
     challengeService.reserveAttempt(challengeId);
     LoginChallenge challenge = challenges.findById(challengeId)
         .orElseThrow(() -> new BadCredentialsException("Invalid MFA token"));
@@ -144,7 +144,7 @@ public class AuthService {
   // the TOTP lifecycle. Starting a setup NEVER touches the active factor:
   // a fresh secret lives in a pending enrollment and is promoted only after
   // the new authenticator verifies. Replacing or disabling an ACTIVE factor
-  // requires a recent password plus a code from the EXISTING factor - never
+  // requires a recent password plus a code from the EXISTING factor: never
   // mere possession of a bearer token. Promotion/disabling bumps the security
   // version and revokes refresh tokens, so old credentials die immediately.
   // -------------------------------------------------------------------------
@@ -168,7 +168,7 @@ public class AuthService {
   /**
    * Verifies the pending enrollment and promotes it. When an active factor
    * exists this is a REPLACEMENT and additionally requires the current
-   * password plus a valid code from the EXISTING authenticator - an ordinary
+   * password plus a valid code from the EXISTING authenticator: an ordinary
    * session alone can never swap a victim's factor.
    */
   @Transactional

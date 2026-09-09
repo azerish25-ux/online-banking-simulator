@@ -4,15 +4,15 @@ import { useToast } from "./toast";
 /**
  * The one owner for react-query result → toast feedback. Every mutation that
  * must speak when it settles (and the one query whose load failure toasts)
- * wires through here, so changing how an error surfaces - copy, tone, or
- * where it renders - is one edit, not seven features.
+ * wires through here, so changing how an error surfaces: copy, tone, or
+ * where it renders: is one edit, not seven features.
  *
  * Firing is transition-based: an effect observes the result's status and
  * reacts only when it *changes* to success/error, so a re-render that swaps
  * `data` or `error` identities (a refetch, a fresh callback closure) can
  * never re-fire a toast. The latest result, feedback config and `push` are
  * kept in refs refreshed every render, and the observer keys on the status
- * transition alone - the same discipline the dialog extraction had to learn
+ * transition alone: the same discipline the dialog extraction had to learn
  * the hard way when a post-deposit refetch replayed a success toast.
  *
  * Errors render two ways from the same settle: a corner toast (page-level
@@ -29,7 +29,7 @@ export type ResultToastSpec = { message: string; tone?: ResultToastTone };
 export type ResultToastFeedback<TData, TError extends Error> = {
   /**
    * What to toast when the result fails. Defaults to the error's message in
-   * "error" tone. Pass `false` to suppress the corner toast - for dialog
+   * "error" tone. Pass `false` to suppress the corner toast: for dialog
    * surfaces that render the rejection inline instead.
    */
   error?: ResultToastSpec | ((error: TError) => ResultToastSpec) | false;
@@ -76,12 +76,12 @@ export function useResultToast<TData, TError extends Error = Error>(
     const { result: settled, feedback: fb, push: toast } = latest.current;
     const prev = prevStatus.current;
     prevStatus.current = settled.status;
-    if (prev === settled.status) return; // not a settle - nothing new to say
+    if (prev === settled.status) return; // not a settle: nothing new to say
 
     if (settled.status === "error") {
       const err = fb?.error;
       const failed = settled.error;
-      // The message the surface would have toasted - inline surfaces hear the
+      // The message the surface would have toasted: inline surfaces hear the
       // same words through onFailure, so copy never drifts between the two.
       let message: string | undefined;
       if (err === undefined || err === false) {

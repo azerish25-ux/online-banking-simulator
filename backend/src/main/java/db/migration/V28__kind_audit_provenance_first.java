@@ -25,7 +25,7 @@ import org.flywaydb.core.api.migration.Context;
  *
  * <ol>
  *   <li><b>One-sided rows with an {@code INTEREST_POSTED} audit entry are
- *       engine interest</b> - the engine only ever writes one-sided postings
+ *       engine interest</b>: the engine only ever writes one-sided postings
  *       (savings credits are to-only, loan charges are from-only) and it
  *       audited every posting by transaction id. Whatever structural label
  *       (TRANSFER or DEPOSIT) an earlier migration guessed, the audit is the
@@ -33,7 +33,7 @@ import org.flywaydb.core.api.migration.Context;
  *       {@code kind_evidence = 'AUDIT'}.</li>
  *   <li><b>Two-sided rows carrying an {@code INTEREST_POSTED} audit are
  *       contradictory evidence</b> (the engine never writes two sides): they
- *       are quarantined as {@code kind_evidence = 'UNCERTAIN'} - never
+ *       are quarantined as {@code kind_evidence = 'UNCERTAIN'}: never
  *       silently re-tagged to whichever classification is easier to process.</li>
  * </ol>
  *
@@ -57,7 +57,7 @@ public class V28__kind_audit_provenance_first extends BaseJavaMigration {
     Connection connection = context.getConnection();
 
     // 1) Audit-proven engine postings the current label got wrong. One-sided
-    //    rows whose audit says the interest engine posted them - whatever the
+    //    rows whose audit says the interest engine posted them: whatever the
     //    current kind/evidence claims.
     List<Object[]> promote = select(connection,
         "SELECT t.id, t.kind FROM transactions t "
@@ -85,7 +85,7 @@ public class V28__kind_audit_provenance_first extends BaseJavaMigration {
     }
     for (Object[] row : contradict) {
       archive(connection, row,
-          "V28: INTEREST_POSTED audit on a two-sided row - contradictory evidence, quarantined");
+          "V28: INTEREST_POSTED audit on a two-sided row: contradictory evidence, quarantined");
       exec(connection, "UPDATE transactions t SET kind_evidence = 'UNCERTAIN' "
           + "WHERE t.kind_evidence <> 'UNCERTAIN' AND CAST(t.id AS VARCHAR) = '"
           + escape(String.valueOf(row[0])) + "'");
@@ -95,7 +95,7 @@ public class V28__kind_audit_provenance_first extends BaseJavaMigration {
   /** Inserts a new archive decision, or appends to V24's existing one. */
   private void archive(Connection connection, Object[] row, String reason) throws Exception {
     // H2 (PostgreSQL mode) has no ON CONFLICT for INSERT..SELECT, so the
-    // insert is guarded with NOT EXISTS - the review row is keyed to the
+    // insert is guarded with NOT EXISTS: the review row is keyed to the
     // transaction, so at most one insert can ever land.
     try (PreparedStatement ps = connection.prepareStatement(
         "INSERT INTO transaction_kind_review (transaction_id, prior_kind, reason, memo_snippet) "
@@ -109,7 +109,7 @@ public class V28__kind_audit_provenance_first extends BaseJavaMigration {
     }
     // V24 may already hold a decision for this transaction (e.g. its structural
     // DEPOSIT guess). Append the audit-backed correction so the audit history
-    // shows BOTH opinions - never erase the first.
+    // shows BOTH opinions: never erase the first.
     try (PreparedStatement ps = connection.prepareStatement(
         "UPDATE transaction_kind_review SET reason = reason || '; ' || ? "
             + "WHERE CAST(transaction_id AS VARCHAR) = ? AND reason NOT LIKE ?")) {

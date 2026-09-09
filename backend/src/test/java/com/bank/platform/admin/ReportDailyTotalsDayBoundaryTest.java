@@ -25,7 +25,7 @@ import tools.jackson.databind.ObjectMapper;
 
 /**
  * N03 regression: the admin daily-totals report cuts each row into the UTC
- * day the money POSTED - never the request day - and derives its own \"today\"
+ * day the money POSTED: never the request day: and derives its own \"today\"
  * from the injected business clock, so the report is deterministic at a day
  * boundary. A review-threshold transfer is requested on June 1 at 23:59 and
  * approved on June 2 just after UTC midnight: it must land in the June 2
@@ -77,7 +77,7 @@ class ReportDailyTotalsDayBoundaryTest {
     String heldId = client.transferWithKey(alice, bobIban, "12000.00", "n03-boundary-wire");
 
     // June 2, five seconds after UTC midnight: the operator approves the wire,
-    // so the money moved - and the row posted - on June 2. A small deposit
+    // so the money moved: and the row posted: on June 2. A small deposit
     // also posts on June 2.
     CLOCK.set(Instant.parse("2026-06-02T00:00:05Z"));
     mvc.perform(post("/api/v1/admin/transactions/{id}/review", heldId)
@@ -86,7 +86,7 @@ class ReportDailyTotalsDayBoundaryTest {
     client.deposit(alice, aliceId, "5.00");
 
     // Run the report from a clock on June 3: the 30-day window covers both
-    // days. The buckets must follow posting day - June 1 shows only the first
+    // days. The buckets must follow posting day: June 1 shows only the first
     // deposit, June 2 shows the approved wire plus the second deposit, and
     // June 3 is genuinely empty (no fake zero-day rows, no leakage).
     CLOCK.set(Instant.parse("2026-06-03T12:00:00Z"));
@@ -116,7 +116,7 @@ class ReportDailyTotalsDayBoundaryTest {
         .orElseThrow(() -> new AssertionError("No daily-totals bucket for " + date));
   }
 
-  /** A clock a test can wind forward - reset in @BeforeEach, never frozen across tests. */
+  /** A clock a test can wind forward: reset in @BeforeEach, never frozen across tests. */
   private static final class SettableClock extends Clock {
     private Instant instant = Instant.parse("2026-06-01T23:59:40Z");
 

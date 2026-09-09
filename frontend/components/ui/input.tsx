@@ -30,7 +30,7 @@ export function Field({
   /**
    * Explicit control-ID contract: when the caller already owns the
    * control's id (e.g. it renders a non-element composition or needs the id
-   * elsewhere), pass it here and Field will NOT clone the child - the label,
+   * elsewhere), pass it here and Field will NOT clone the child: the label,
    * hint and error are all wired to that id.
    */
   controlId?: string;
@@ -47,7 +47,7 @@ export function Field({
   // Wiring the label needs exactly one element child that accepts an id.
   // JSX turns `oneControl + siblingText` into an ARRAY child, so the first
   // element child is located anywhere among siblings (e.g. a Select followed
-  // by a conditionally-rendered hint paragraph) - never assume a single
+  // by a conditionally-rendered hint paragraph): never assume a single
   // child. With controlId the caller owns the id and children render
   // untouched.
   let control = children;

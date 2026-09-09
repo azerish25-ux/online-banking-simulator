@@ -93,7 +93,7 @@ public class AdminController {
    * Dead-lettered (or any-status) external mail, for the operator's retry
    * path. Only PENDING rows are in flight; FAILED rows have exhausted
    * their delivery budget and need a decision. Recipient addresses are the
-   * operator's business - this is the internal ops tool, not a public feed.
+   * operator's business: this is the internal ops tool, not a public feed.
    */
   @GetMapping("/email-outbox")
   public org.springframework.data.domain.Page<EmailOutboxRow> emailOutbox(
@@ -113,7 +113,7 @@ public class AdminController {
     }
   }
 
-  /** Operator-facing view of one outbox row - errors stay redacted. */
+  /** Operator-facing view of one outbox row: errors stay redacted. */
   public record EmailOutboxRow(
       UUID id, String email, String subject, String status, int attempts,
       String lastError, String createdAt, String nextAttemptAt) {
@@ -138,7 +138,7 @@ public class AdminController {
 
   /**
    * Audit rows carry JSON metadata (amounts, counterparty IBANs, emails,
-   * account numbers) that made the log auditable in the first place - the
+   * account numbers) that made the log auditable in the first place: the
    * viewer surfaces it instead of hiding the trail's substance.
    */
   public record AuditResponse(
@@ -215,7 +215,7 @@ public class AdminController {
    * The kind-review quarantine: every legacy transaction whose kind was
    * corrected from structural/audit evidence, or labelled UNCERTAIN because no
    * evidence proved it, is listed here with its original classification and
-   * the reason. Operators see exactly what was decided - nothing was silently
+   * the reason. Operators see exactly what was decided: nothing was silently
    * re-tagged or rebalanced to make reports fit.
    */
   @GetMapping("/kind-review")
@@ -317,7 +317,7 @@ public class AdminController {
 
   /**
    * No admin listing may stream unbounded rows because a caller asked for
-   * size=9999999 - cap the page size (and never page backwards off the start).
+   * size=9999999: cap the page size (and never page backwards off the start).
    */
   private static Pageable capped(Pageable pageable) {
     int size = Math.min(Math.max(pageable.getPageSize(), 1), 100);

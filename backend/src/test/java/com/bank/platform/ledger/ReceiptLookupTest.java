@@ -92,8 +92,7 @@ class ReceiptLookupTest {
     client.deposit(alice, aliceId, "50.00");
     String txId = client.transferId(alice, client.accountIban(bob), "5.00", "private");
 
-    // Both LEGS may read the operation (Alice the sender, Bob the recipient -
-    // the receipt is the same object for both), but an unrelated third party
+    // Both LEGS may read the operation (Alice the sender, Bob the recipient: // the receipt is the same object for both), but an unrelated third party
     // must not: Carol gets the same 404 as an unknown id, disclosing nothing.
     mvc.perform(get("/api/v1/transfers/" + txId)
             .header("Authorization", "Bearer " + carol))

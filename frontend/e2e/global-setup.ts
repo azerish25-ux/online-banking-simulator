@@ -9,8 +9,8 @@ import { request } from "@playwright/test";
  * (`/api/e2e/identity`), which also names the live database connection.
  *
  * The backend must be booted with the SAME `E2E_MARKER` value this run uses
- * (CI sets one per job). A leftover server from an earlier run - the
- * documented two-deposit incident - carries an older or absent marker and is
+ * (CI sets one per job). A leftover server from an earlier run: the
+ * documented two-deposit incident: carries an older or absent marker and is
  * REFUSED here, before the first write.
  *
  * Two stack shapes:
@@ -22,10 +22,10 @@ import { request } from "@playwright/test";
  *    identity).
  *
  * 2. E2E_BASE_URL is unset: playwright.config.ts starts a FRESH frontend on
- *    :3000 from this checkout's build (`reuseExistingServer: false` - an
+ *    :3000 from this checkout's build (`reuseExistingServer: false`: an
  *    occupied port is a loud startup error, never silent reuse), so the
  *    frontend is this build by construction. The backend probe goes DIRECTLY
- *    to the backend origin (BACKEND_URL, default :8080 - the same default the
+ *    to the backend origin (BACKEND_URL, default :8080: the same default the
  *    frontend proxy rewrites to).
  */
 export default async function globalSetup(): Promise<void> {
@@ -70,7 +70,7 @@ export default async function globalSetup(): Promise<void> {
         "E2E identity preflight REFUSED at " + identityUrl + " (HTTP " + probe.status()
           + "): the backend there was not booted with E2E_MARKER=" + marker
           + ". A stale or foreign server (e.g. a leftover from an earlier run) must never "
-          + "receive this suite's seeds - boot the intended backend with the current marker."
+          + "receive this suite's seeds: boot the intended backend with the current marker."
       );
     }
     if (!probe.ok()) {
@@ -114,7 +114,7 @@ export default async function globalSetup(): Promise<void> {
       if (!login.ok()) {
         throw new Error(
           "E2E identity preflight failed: " + base + "/login answered HTTP "
-            + login.status() + " - expected a live document route."
+            + login.status() + ": expected a live document route."
         );
       }
       const csp = login.headers()["content-security-policy"] ?? "";

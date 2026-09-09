@@ -13,7 +13,7 @@ import { TD, TH, THead, TRow, Table } from "../../components/ui/table";
 import { usd } from "../../lib/format";
 
 /**
- * The design system - the same primitives the app is built from, shown on a
+ * The design system: the same primitives the app is built from, shown on a
  * public page so anonymous visitors can browse it (it needs no session, so
  * it deliberately renders outside the authenticated shell).
  *
@@ -62,7 +62,7 @@ export default function DesignPage() {
               </div>
               <p className="muted mt-2 text-xs">
                 A settled state is plain text; only states needing attention get a
-                token. A ledger marks exceptions - it does not decorate every row.
+                token. A ledger marks exceptions: it does not decorate every row.
               </p>
             </CardBody>
           </Card>
@@ -90,7 +90,7 @@ export default function DesignPage() {
             </CardHead>
             <CardBody>
               <p className="nums text-[28px] leading-9 font-semibold">{usd("1234.5")}</p>
-              <p className="mono muted mt-1 text-xs">.nums - tabular numerals on every money figure</p>
+              <p className="mono muted mt-1 text-xs">.nums: tabular numerals on every money figure</p>
             </CardBody>
           </Card>
         </div>

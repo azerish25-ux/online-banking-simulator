@@ -20,9 +20,9 @@ import org.springframework.test.context.ActiveProfiles;
  *
  * <p>Each login starts a family of one; every rotation consumes the presented
  * token and mints its child, so a device chain is gen0 → gen1 → gen2 ... . Reuse
- * detection must treat a replay of ANY family member - an ancestor whose row
+ * detection must treat a replay of ANY family member: an ancestor whose row
  * was consumed by a legitimate rotation, a logged-out device, or a stolen
- * copy - as theft and burn the WHOLE lineage, including tokens that were never
+ * copy: as theft and burn the WHOLE lineage, including tokens that were never
  * replayed. Logging out one device, by contrast, revokes only that device's
  * row and must leave a sibling device fully usable. A burn never bricks the
  * account: a fresh login starts a new, working family.
@@ -49,14 +49,14 @@ class RefreshFamilyLifecycleTest {
     assertNotEquals(gen2.refreshToken(), check.refreshToken());
 
     // The thief replays a deep ancestor (gen0), which a legitimate rotation
-    // consumed long ago. Reuse detection must burn the ENTIRE family - the
+    // consumed long ago. Reuse detection must burn the ENTIRE family: the
     // descendant rows that were never replayed die with it.
     assertThrows(BadCredentialsException.class,
         () -> refreshService.rotate(gen0.refreshToken()),
         "replaying an ancestor is theft and must be refused");
 
     // A sibling that never left this user's control is dead too, because its
-    // family was burned - no silent successor can be minted from it.
+    // family was burned: no silent successor can be minted from it.
     assertThrows(BadCredentialsException.class,
         () -> refreshService.rotate(check.refreshToken()),
         "the burned family must not mint further sessions from any member");

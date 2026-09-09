@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { SpendingChart, type MonthPoint } from "../spending-chart";
 
 /**
- * the chart must expose its EXACT values - tooltip/title-only figures
+ * the chart must expose its EXACT values: tooltip/title-only figures
  * are not enough. The data table is a real <table> that a visible toggle
  * expands; while collapsed it stays sr-only so assistive technology reads the
  * same figures the geometry approximates. Rows = months, cells = exact usd()
@@ -47,7 +47,7 @@ describe("SpendingChart accessible data table", () => {
     // Month 1 inflow/outflow formatted exactly from the decimal strings.
     expect(cells).toContain("$1,250.00");
     expect(cells).toContain("$480.25");
-    // Month 2 is genuinely zero - it must be PRESENT as $0.00 rows, not
+    // Month 2 is genuinely zero: it must be PRESENT as $0.00 rows, not
     // represented by a fake nonzero bar and not dropped.
     expect(cells).toContain("$0.00");
     expect(table.querySelectorAll("tbody tr").length).toBe(SAMPLE.length);
@@ -62,7 +62,7 @@ describe("SpendingChart accessible data table", () => {
     const table = document.querySelector("table") as HTMLTableElement;
     const cells = Array.from(table.querySelectorAll("td")).map((td) => td.textContent);
     // The chart table shows the same figures usd() would show elsewhere:
-    // 0.0049 rounds HALF_UP to a cent (0.00), 12.3456 → 12.35 - never raw
+    // 0.0049 rounds HALF_UP to a cent (0.00), 12.3456 → 12.35: never raw
     // float debris like 12.3456000001.
     expect(cells).toContain("$0.00");
     expect(cells).toContain("$12.35");

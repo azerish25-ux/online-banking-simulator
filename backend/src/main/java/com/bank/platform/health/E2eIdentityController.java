@@ -25,8 +25,8 @@ import org.springframework.web.bind.annotation.RestController;
  * <p>The endpoint is NOT a public production control: it answers only when
  * the process was booted with a non-empty {@code E2E_MARKER} environment
  * value AND the probe presents that exact value in {@code X-E2E-Marker}.
- * Production (no marker) gets 404 - the route is indistinguishable from a
- * missing control - and a probe carrying a stale or foreign marker gets 403
+ * Production (no marker) gets 404: the route is indistinguishable from a
+ * missing control: and a probe carrying a stale or foreign marker gets 403
  * before it can learn anything about the database. Each run boots its backend
  * with its own marker, so a leftover server from an earlier run (the
  * documented two-deposit incident) is refused BEFORE the first write instead
@@ -34,7 +34,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
  * <p>The body names the build (backend version) and the ACTUAL database
  * connection (product, product version, JDBC URL and role) read from live
- * JDBC metadata - never from an environment variable named TEST. The suite
+ * JDBC metadata: never from an environment variable named TEST. The suite
  * asserts the marker round-trips and, when configured, that the database is
  * the disposable one it expects.
  */
@@ -91,7 +91,7 @@ public class E2eIdentityController {
           "url", String.valueOf(meta.getURL()),
           "user", String.valueOf(meta.getUserName())));
     } catch (Exception ex) {
-      // Never let an identity probe 500 - name the failure so the suite can
+      // Never let an identity probe 500: name the failure so the suite can
       // refuse the target, but no internals leak to the response.
       log.error("E2E identity probe could not read database metadata", ex);
       body.put("db", Map.of("unavailable", "metadata read failed"));

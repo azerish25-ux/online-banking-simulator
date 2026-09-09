@@ -69,14 +69,14 @@ class SummaryCacheAsOfTest {
     assertEquals("2026-01", january.month());
     assertEquals("500.0000", january.inflow());
 
-    // Re-request with the SAME anchor - cache hit, same answer.
+    // Re-request with the SAME anchor: cache hit, same answer.
     TransferDtos.MonthSummary again =
         money.summary("sum-cache@example.com", UUID.fromString(aliceId), 1).get(0);
     assertEquals("2026-01", again.month());
     assertEquals("500.0000", again.inflow());
 
     // Advance the clock two months. NO money moved. The window must now be a
-    // March window with no inflow - the key includes the as-of month, so the
+    // March window with no inflow: the key includes the as-of month, so the
     // January cache entry cannot be served for March.
     CLOCK.set(Instant.parse("2026-03-15T12:00:00Z"));
     TransferDtos.MonthSummary march =

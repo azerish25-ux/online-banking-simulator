@@ -28,7 +28,7 @@ export function getToken(): string | null {
  * the silent-refresh path rewrites the cookie on every rotation, so active
  * sessions never notice. Trade-off: after that lifetime a fresh navigation
  * may land on login even though the HttpOnly refresh cookie could still
- * repair the session - routing here is UX-only, the API is the authority.
+ * repair the session: routing here is UX-only, the API is the authority.
  */
 
 /**
@@ -36,14 +36,14 @@ export function getToken(): string | null {
  * has been seen yet. The authoritative value always comes from an
  * authentication response's expiresInSeconds ("derive
  * access-cookie lifetime from validated session configuration rather than
- * the hard-coded lifetime") - this constant only sizes a cookie set by test
+ * the hard-coded lifetime"): this constant only sizes a cookie set by test
  * helpers or defensive paths that lack a validated number.
  */
 export const ACCESS_TOKEN_COOKIE_MAX_AGE = 15 * 60;
 
 /**
  * The full Set-Cookie value; split out so tests can pin the exact attributes.
- * {@code maxAgeSeconds} is the ACCESS TOKEN's validated lifetime - callers
+ * {@code maxAgeSeconds} is the ACCESS TOKEN's validated lifetime: callers
  * that hold an AuthResponse pass expiresInSeconds; everyone else falls back
  * to the constant.
  */
@@ -98,7 +98,7 @@ function safeJson(
 export const SESSION_EXPIRED_EVENT = "simulator:session-expired";
 
 // Cross-tab session announcements. The browser cookie jar is shared, so
-// a successful refresh in ONE tab already fixes the others - but tabs must
+// a successful refresh in ONE tab already fixes the others: but tabs must
 // not ROTATE THE SAME refresh token simultaneously (double-use burns the
 // whole family server-side), and a logout/expiry in one tab must evict the
 // others' cached data. BroadcastChannel is a progressive enhancement: tabs
@@ -157,7 +157,7 @@ const NO_RETRY = new Set(["/v1/auth/login", "/v1/auth/register", "/v1/auth/refre
  * Endpoints whose controller answers 401 for WRONG CREDENTIALS on a perfectly
  * valid session (TOTP enable/disable reject a bad password or code with
  * BadCredentials). After the silent-refresh retry such a 401 is a definitive
- * business rejection - surfacing it must NOT nuke the session the way an
+ * business rejection: surfacing it must NOT nuke the session the way an
  * unrecoverable "token revoked" 401 does. Endpoints outside this set keep the
  * strict rule: a 401 on a freshly rotated token means the credentials were
  * revoked, so the session is expired.
@@ -179,7 +179,7 @@ async function withRefreshLock(task: () => Promise<void>): Promise<void> {
     return task();
   }
   // Bounded wait: a crashed lock-holder or pathological contention must not
-  // wedge every tab forever - beyond the timeout the session is treated as
+  // wedge every tab forever: beyond the timeout the session is treated as
   // expired and the user is asked to log in again (an unresolved refresh is
   // an unknown outcome, never a silently dead screen). The Web Locks spec
   // bounds a WAIT via the request's abort signal (LockOptions has no
@@ -195,7 +195,7 @@ async function withRefreshLock(task: () => Promise<void>): Promise<void> {
  * The endpoints whose 2xx body IS an AuthResponse (access token + validated
  * expiresInSeconds): login/register, MFA verification, and the factor
  * changes that reissue credentials under a new security version. ONLY these
- * may install credentials - a resource endpoint must never be able to plant
+ * may install credentials: a resource endpoint must never be able to plant
  * an arbitrary accessToken into the cookie jar.
  */
 const AUTH_SESSION_PATHS = new Set([
@@ -209,7 +209,7 @@ const AUTH_SESSION_PATHS = new Set([
 /**
  * Rotate the refresh cookie once and persist the new access token.
  * Returns true when THIS caller performed a rotation; false when another tab
- * already did (nothing left to do - the retried request will carry the fresh
+ * already did (nothing left to do: the retried request will carry the fresh
  * cookie/token automatically because the cookie jar is shared).
  */
 async function rotateSession(): Promise<void> {
@@ -227,7 +227,7 @@ async function rotateSession(): Promise<void> {
       if (!res.ok) throw new Error("refresh failed: " + res.status);
       const data = safeJson(await res.text());
       // A refresh body is an AuthResponse: only a validated access token AND
-      // its positive lifetime may be installed - a malformed body is a failed
+      // its positive lifetime may be installed: a malformed body is a failed
       // rotation (expire the session), never a partial cookie.
       if (!isValidAuthBody(data)) {
         throw new Error("refresh returned no validated access token");
@@ -283,7 +283,7 @@ async function request(path: string, options: RequestInit = {}, retried = false)
     }
     // Rotation succeeded but the server still rejects us. For the credential-
     // check endpoints a second 401 is a business rejection (wrong code or
-    // password - the session is healthy, only the submission was refused), so
+    // password: the session is healthy, only the submission was refused), so
     // it surfaces as an ordinary ApiError instead of ending the session.
     if (DEFINITIVE_401.has(path)) {
       const parts = problemParts(safeJson(await res.text()));

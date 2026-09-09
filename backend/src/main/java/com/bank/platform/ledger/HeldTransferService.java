@@ -15,8 +15,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The HELD-transfer lifecycle. A review-threshold transfer is recorded as an
- * intent (no money moves); an operator then either settles it - money moves
- * under the same locks as an instant transfer - or cancels it. Everything
+ * intent (no money moves); an operator then either settles it: money moves
+ * under the same locks as an instant transfer: or cancels it. Everything
  * about a held row's journey lives here so the transfer entry point only has
  * to decide whether a transfer is held or not.
  */
@@ -72,7 +72,7 @@ public class HeldTransferService {
     tx.setRequestHash(requestHash);
     tx.setFlagged(true);
     tx.setStatus(TxStatus.HELD);
-    // Request time only - a HELD row has no posting time until an operator
+    // Request time only: a HELD row has no posting time until an operator
     // settles it (possibly after a month boundary); createdAt is submission.
     tx.setCreatedAt(clock.instant());
     try {
@@ -91,7 +91,7 @@ public class HeldTransferService {
    * same ID-ordered locks as an instant transfer and marks the row POSTED.
    * The HELD → POSTED flip is atomic (see TransactionRepository), so two
    * operators approving at once cannot double-settle. The transfer-lifecycle
-   * audit and notifications live here with the settlement they describe - one
+   * audit and notifications live here with the settlement they describe: one
    * owner for the whole held-transfer flow.
    */
   @Transactional
@@ -101,12 +101,12 @@ public class HeldTransferService {
         .orElseThrow(() -> new TransactionNotFoundException(transactionId));
     if (tx.getStatus() != TxStatus.HELD || tx.getFromAccountId() == null || tx.getToAccountId() == null) {
       // Not a settleable case: another operator already decided it (POSTED /
-      // CANCELLED) or the row is malformed. A decided row is a 409 - the
+      // CANCELLED) or the row is malformed. A decided row is a 409: the
       // losing operator must see the winning outcome, not an error toast.
       throw new DecisionConflictException(transactionId, tx.getStatus().name(), tx.isReviewed());
     }
     // Settlement time: reported/statement months cut here, and this is
-    // the moment the money actually moved - approval can land well after the
+    // the moment the money actually moved: approval can land well after the
     // request, across a month or year boundary. The stamp rides the atomic
     // HELD→POSTED flip so the transition and its time cannot diverge.
     Instant postedAt = clock.instant();
@@ -126,7 +126,7 @@ public class HeldTransferService {
     transactions.save(tx);
 
     // Approval is when money actually moves, so THIS is where the journal is
-    // written - a HELD intent created no entry, and the losing operator in an
+    // written: a HELD intent created no entry, and the losing operator in an
     // approval race rolls back before ever reaching here. The posting
     // time stamped on the row and the journal's are one instant. A draw or a
     // principal repayment in a settled transfer also leaves its immutable
@@ -141,7 +141,7 @@ public class HeldTransferService {
         JournalService.Posting.account(tx.getToAccountId(), tx.getAmount()));
 
     events.transferApproved(actor, tx, moved.from(), moved.to(), decisionReason);
-    // Evict only after this settlement commits - a rollback must not
+    // Evict only after this settlement commits: a rollback must not
     // clear caches for an approval that never happened.
     invalidation.clearSynchronized("summaries", "public-stats");
     return tx;
@@ -168,7 +168,7 @@ public class HeldTransferService {
     tx.setStatus(TxStatus.CANCELLED);
     tx.setReviewed(true);
     transactions.save(tx);
-    // No money moved, but the request-history view changed - clear after
+    // No money moved, but the request-history view changed: clear after
     // commit so the same transaction never observes a half-declined row.
     invalidation.clearSynchronized("summaries", "public-stats");
 

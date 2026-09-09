@@ -36,14 +36,14 @@ import org.springframework.transaction.annotation.Transactional;
  * it belongs to, and orchestrates. The physical balance movement (locks,
  * affordability) lives in {@link LedgerMovementService}, the HELD-transfer
  * lifecycle in {@link HeldTransferService}, and every audit/notification
- * side effect in {@link LedgerEventsService} - so a change to one behavior
+ * side effect in {@link LedgerEventsService}: so a change to one behavior
  * lands in one place instead of a single ~430-line god service.
  *
  * <p>Operation identity: every user-submitted funding or transfer must
  * carry an idempotency key scoped to the originator's account. The key names
  * one logical intent, and the row stores a canonical payload hash, so an
  * identical replay returns the original operation and money moves once, while
- * reusing the key for a different intent is a 409 conflict - never a silent
+ * reusing the key for a different intent is a 409 conflict: never a silent
  * replay of older money and never a second posting.
  */
 @Service
@@ -97,7 +97,7 @@ public class MoneyService {
 
   /**
    * The result of a funding attempt: the (possibly unchanged) account plus
-   * the operation row that carries this deposit's recoverable identity - the
+   * the operation row that carries this deposit's recoverable identity: the
    * transaction id, its idempotency key and status. A replay returns the
    * ORIGINAL operation row, never a second credit, so the caller always has
    * something durable to point a receipt at.
@@ -114,7 +114,7 @@ public class MoneyService {
   public DepositOutcome deposit(String email, UUID accountId, BigDecimal amount, String idempotencyKey) {
     // Validate the *settled* amount first: values that round to zero at the
     // ledger's 4-decimal scale would violate the DB amount > 0 check and
-    // surface as a 500. The key is enforced after - direct service callers
+    // surface as a 500. The key is enforced after: direct service callers
     // testing boundary amounts still see the amount error, not a key error.
     BigDecimal scaled = requireSettleable(amount);
     String key = requireKey(idempotencyKey, "deposit");
@@ -122,7 +122,7 @@ public class MoneyService {
     movement.requireActive(account);
 
     // Replay check before the limit applies: an identical replay returns the
-    // account's current state - the original deposit already moved the money.
+    // account's current state: the original deposit already moved the money.
     String hash = fingerprint(TxKind.DEPOSIT, null, account.getId(), scaled, "USD",
         "Simulated deposit");
     Optional<Transaction> existing = transactions
@@ -176,7 +176,7 @@ public class MoneyService {
       transactions.saveAndFlush(tx);
     } catch (DataIntegrityViolationException race) {
       // A simultaneous identical deposit won the (to, key) uniqueness race
-      // (enforced by a partial index on PostgreSQL - V20). This transaction
+      // (enforced by a partial index on PostgreSQL: V20). This transaction
       // is aborted, so surface a conflict and let the caller retry the
       // identical request: the replay check then returns the winner's result.
       throw new IdempotencyConflictException(
@@ -210,14 +210,14 @@ public class MoneyService {
    * Transfer entry point. Amounts at or above the review threshold do NOT
    * settle here: a HELD intent is recorded (no money moves) and an operator
    * approves it later under locks in {@link HeldTransferService#settleHeldTransfer}.
-   * Smaller transfers settle atomically below - both account rows locked in
+   * Smaller transfers settle atomically below: both account rows locked in
    * stable ID order (deadlock-safe), debited and credited in one transaction.
    * An idempotent replay returns the original row: money never moves twice
    * for one key, held or not.
    *
    * <p>The accounts are resolved to IDs only (never loaded as managed
    * entities) before the instant path, so {@link #post} is the first reader
-   * of the two rows - move()'s lock must not sit on a stale snapshot (the
+   * of the two rows: move()'s lock must not sit on a stale snapshot (the
    * first-read discipline is documented at {@link LedgerMovementService}).
    * The HELD path loads the entities afterwards, safely: nothing writes
    * those rows in this transaction.
@@ -235,7 +235,7 @@ public class MoneyService {
     String key = requireKey(idempotencyKey, "transfer");
 
     User sender = userOf(email);
-    // Scalar resolution only - no managed Account enters this transaction yet.
+    // Scalar resolution only: no managed Account enters this transaction yet.
     // A foreign account stays indistinguishable from a missing one (404), so
     // account existence is never disclosed to outsiders (same as before). The
     // owner id returned here is a check, NOT the source id: fromAccountId is.
@@ -248,7 +248,7 @@ public class MoneyService {
     UUID toId = accounts.findIdByIban(toIbanClean)
         .orElseThrow(() -> new AccountNotFoundException(toIbanClean,
             "No account with IBAN " + toIbanClean
-                + " exists in this simulator - you can only transfer to accounts opened here."));
+                + " exists in this simulator: you can only transfer to accounts opened here."));
     if (fromId.equals(toId)) {
       throw new TransferValidationException("Cannot transfer to the same account");
     }
@@ -260,14 +260,14 @@ public class MoneyService {
     String hash = fingerprint(TxKind.TRANSFER, fromId, toId, scaled, currencyNorm, memoNorm);
 
     // Keys live in the sender's own namespace (DB unique on from + key), so
-    // a foreign key can never surface another user's row - the lookup below
+    // a foreign key can never surface another user's row: the lookup below
     // simply finds nothing and the request proceeds as its own transfer.
     Optional<Transaction> stored = transactions.findByFromAccountIdAndIdempotencyKey(fromId, key);
     if (stored.isPresent()) {
       Transaction existing = stored.get();
       if (existing.getRequestHash() == null) {
         // Legacy rows (pre-V20) carry no canonical intent hash. Reconstructing
-        // the intent from the destination alone is not proof - a changed
+        // the intent from the destination alone is not proof: a changed
         // amount under the same key must never replay silently. Surface a
         // conflict that points at review, never a second posting.
         throw new IdempotencyConflictException(
@@ -287,14 +287,13 @@ public class MoneyService {
     }
 
     if (scaled.compareTo(reviewThreshold) >= 0) {
-      // HELD intent: no money moves, so loading the entities here is safe -
-      // nothing writes these rows later in this transaction.
+      // HELD intent: no money moves, so loading the entities here is safe: // nothing writes these rows later in this transaction.
       Account fromRef = accounts.findById(fromAccountId)
           .orElseThrow(() -> new AccountNotFoundException(fromAccountId));
       Account toRef = accounts.findByIban(toIbanClean)
           .orElseThrow(() -> new AccountNotFoundException(toIbanClean,
               "No account with IBAN " + toIbanClean
-                  + " exists in this simulator - you can only transfer to accounts opened here."));
+                  + " exists in this simulator: you can only transfer to accounts opened here."));
       return heldTransfers.holdForReview(sender, fromRef, toRef, scaled, currencyNorm,
           memoNorm, key, hash);
     }
@@ -304,7 +303,7 @@ public class MoneyService {
   /**
    * Instant settlement for below-threshold transfers. The caller resolved
    * both accounts to IDs only, so move()'s locking read is the first (and
-   * only) read of the two rows - the state it locks is the state it loads
+   * only) read of the two rows: the state it locks is the state it loads
    * (first-read discipline, see {@link LedgerMovementService}).
    */
   private Transaction post(User sender, UUID fromId, UUID toId, BigDecimal scaled,
@@ -338,14 +337,14 @@ public class MoneyService {
       // identical request (the row did not exist when we pre-checked). After a
       // constraint violation this transaction can no longer read or write
       // reliably, so do not query again in here: surface a conflict and let
-      // the caller retry the identical request - the pre-check above then
+      // the caller retry the identical request: the pre-check above then
       // returns the winner's original row.
       throw new IdempotencyConflictException(
           "This transfer is already being processed; retry the identical request to fetch it");
     }
 
     // Principal movements (draws / principal repayments) are immutable rows
-    // keyed to this transaction (V26) - written in the same transaction, so
+    // keyed to this transaction (V26): written in the same transaction, so
     // rolled-back money never leaves a phantom principal history.
     for (LedgerMovementService.PrincipalEvent event : moved.principalEvents()) {
       principalMovements.save(new PrincipalMovement(event.accountId(), event.kind(),
@@ -367,16 +366,15 @@ public class MoneyService {
 
   /**
    * Authenticated operation-status lookup: resolves the caller's own
-   * operation by its idempotency key. Ownership is originator-scoped - a
-   * deposit's key lives on the funded account, a transfer's on the sender's -
-   * so probing a key that belongs to someone else simply finds nothing.
+   * operation by its idempotency key. Ownership is originator-scoped: a
+   * deposit's key lives on the funded account, a transfer's on the sender's: * so probing a key that belongs to someone else simply finds nothing.
    *
    * <p>The key namespace is the originating ACCOUNT (unique on (from, key)
    * for transfers and (to, key) for deposits), so a key-only lookup over
    * every account the caller owns can legitimately match several DIFFERENT
    * operations (one per owned account). Recovery therefore prefers the
    * account-scoped variant: pass the originating account to make the lookup
-   * namespace identical to the uniqueness namespace - at most one row. When
+   * namespace identical to the uniqueness namespace: at most one row. When
    * no account is supplied and the key matches several distinct operations,
    * that is a genuine ambiguity and is surfaced as such, never resolved by
    * picking an arbitrary row.
@@ -397,7 +395,7 @@ public class MoneyService {
     }
     if (accountId != null) {
       // The originating account must belong to the caller, and the row must
-      // live in that account's key namespace - foreign or unknown resolves
+      // live in that account's key namespace: foreign or unknown resolves
       // to nothing (404), never to another user's operation.
       if (!owned.contains(accountId)) {
         return Optional.empty();
@@ -418,7 +416,7 @@ public class MoneyService {
    * Authorized recovery list (namespace fix): the caller's own keyed
    * operations over the last week, newest first, bounded. Completed-but-
    * unacknowledged postings are included, so an operation whose response was
-   * lost - even one whose browser record was cleared at logout - stays
+   * lost: even one whose browser record was cleared at logout: stays
    * discoverable after reauthentication.
    */
   @Transactional(readOnly = true)
@@ -439,7 +437,7 @@ public class MoneyService {
   /**
    * Reads one of the caller's own transactions by id for a durable receipt
    *. Scoping mirrors {@link #operationStatus}: a caller may fetch a row
-   * only if they own one of its legs (from or to account) - a foreign or
+   * only if they own one of its legs (from or to account): a foreign or
    * unknown id is indistinguishable (empty, surfaced as 404). Engine rows
    * journaled against the caller's account stay visible because their
    * customer leg is the caller's own account.
@@ -465,12 +463,12 @@ public class MoneyService {
 
   /**
    * Monthly inflow/outflow (oldest first, zero-filled). Authorization runs
-   * HERE, before the cache is consulted - the cached computation below never
+   * HERE, before the cache is consulted: the cached computation below never
    * sees a caller identity, so a cache hit can never leak another user's data.
    */
   @Transactional(readOnly = true)
   public List<MonthSummary> summary(String email, UUID accountId, int months) {
-    // Authorization runs HERE, before the cache is consulted - the cached
+    // Authorization runs HERE, before the cache is consulted: the cached
     // computation below never sees a caller identity, so a cache hit can
     // never leak another user's data. The as-of month anchors the cached
     // window: advancing the business clock across a month end changes
@@ -511,8 +509,8 @@ public class MoneyService {
 
   /**
    * The canonical intent fingerprint. Every field that distinguishes one
-   * operation from another under the same key - source, destination, exact
-   * normalized amount, currency and normalized memo - feeds the hash, so a
+   * operation from another under the same key: source, destination, exact
+   * normalized amount, currency and normalized memo: feeds the hash, so a
    * replay that changed any of them is detected as a conflict.
    */
   private String fingerprint(TxKind kind, UUID fromId, UUID toId, BigDecimal scaled,

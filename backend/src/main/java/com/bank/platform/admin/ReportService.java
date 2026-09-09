@@ -46,8 +46,8 @@ public class ReportService {
     }
     // The status + window filters already ran in SQL; only settled rows can
     // arrive, so the loop just buckets them. (The `bucket == null` guard stays:
-    // a row whose UTC day falls outside the requested window - impossible with
-    // the SQL bound, but cheap insurance - must not distort totals.)
+    // a row whose UTC day falls outside the requested window: impossible with
+    // the SQL bound, but cheap insurance: must not distort totals.)
     for (TransactionRepository.PostedRow row : transactions.findPostedSince(since, TxStatus.POSTED)) {
       LocalDate day = row.getPostedAt().atZone(ZoneOffset.UTC).toLocalDate();
       Bucket bucket = buckets.get(day);

@@ -42,7 +42,7 @@ function validDate(value: string | undefined): string {
 }
 
 /** An amount filter is only trusted when it is a non-negative decimal with at
- *  most four fraction digits - exactly what the ledger stores. */
+ *  most four fraction digits: exactly what the ledger stores. */
 function validAmount(value: string | undefined): string {
   const v = (value ?? "").trim();
   return v && /^\d+(\.\d{1,4})?$/.test(v) ? v : "";
@@ -108,7 +108,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
   const [cursors, setCursors] = React.useState<Record<number, string>>({ 0: "" });
   const cursor = cursors[index] ?? "";
   // Server-backed filters: every predicate is a SQL
-  // clause over the whole account history - the page never filters what a
+  // clause over the whole account history: the page never filters what a
   // loaded page already returned. An empty applied set is a normal browse.
   const filters: HistoryFilters | undefined = applied.min || applied.max || applied.kind || applied.status || applied.q
     ? {
@@ -279,7 +279,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
           resolve it, never left guessing). */}
       <UnresolvedOperations />
 
-      {/* Filters sit in a labelled band - a real fieldset, not another panel
+      {/* Filters sit in a labelled band: a real fieldset, not another panel
           floating between the toolbar and the ledger. */}
       <fieldset className="well mb-4 px-4 py-3">
         <legend className="px-1 text-sm font-medium text-content-secondary">Filter history</legend>
@@ -314,7 +314,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
           )}
         </form>
         <p className="muted mt-2 text-xs">
-          Filters run against the whole account history on the server - never just the rows already on screen.
+          Filters run against the whole account history on the server: never just the rows already on screen.
         </p>
       </fieldset>
 
@@ -398,7 +398,7 @@ export default function ActivityPage({
     q?: string | string[];
   }>;
 }) {
-  // Next 15+ delivers searchParams as a Promise - unwrap it, mirroring the
+  // Next 15+ delivers searchParams as a Promise: unwrap it, mirroring the
   // account-detail/dashboard page pattern (kept optional for tests).
   const params = searchParams ? React.use(searchParams) : null;
   const one = (v: string | string[] | undefined) => (typeof v === "string" ? v : "");

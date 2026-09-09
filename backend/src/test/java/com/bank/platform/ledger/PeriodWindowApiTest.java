@@ -21,8 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The inverted-range rule Period owns must be the SAME answer on every read
- * surface - history, the statement exports, and the operator console filter -
- * because before Period owned it, each returned a silent empty 200 (the
+ * surface: history, the statement exports, and the operator console filter: * because before Period owned it, each returned a silent empty 200 (the
  * caller cannot tell "no rows match" from "your range is impossible"). The
  * 400 arrives through the RFC-7807 handler; open and one-sided windows stay
  * valid reads on the same endpoints.
@@ -114,7 +113,7 @@ class PeriodWindowApiTest {
     return req;
   }
 
-  /** Tomorrow and yesterday - an inverted pair whatever day the suite runs. */
+  /** Tomorrow and yesterday: an inverted pair whatever day the suite runs. */
   private static String later() {
     return LocalDate.now(UTC).plusDays(1).toString();
   }

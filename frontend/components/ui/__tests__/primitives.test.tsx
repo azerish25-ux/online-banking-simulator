@@ -275,7 +275,7 @@ describe("SpendingChart", () => {
     // Two bars per month + two legend swatches.
     expect(container.querySelectorAll("rect")).toHaveLength(data.length * 2 + 2);
     // Month labels appear once in the chart AND once in its sr-only data table
-    // - so assert inside the svg for the geometry, then confirm the
+    //: so assert inside the svg for the geometry, then confirm the
     // table exists as the accessible equivalent.
     expect(svg?.textContent).toContain("Apr");
     expect(svg?.textContent).toContain("May");

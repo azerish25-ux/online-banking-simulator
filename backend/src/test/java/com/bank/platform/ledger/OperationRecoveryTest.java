@@ -22,7 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Operation recovery semantics (namespace fix): the key namespace is the
- * originating account, so recovery must be unambiguous - an owner with the
+ * originating account, so recovery must be unambiguous: an owner with the
  * same key string on two of their own accounts gets a typed 409 from a
  * key-only lookup (never an arbitrary row), the account-scoped lookup
  * resolves each operation exactly, a bounded recent-operations list makes
@@ -123,14 +123,14 @@ class OperationRecoveryTest {
     String txId = client.transferWithKey(alice, bobIban, "40.00", key);
 
     // Simulate a pre-V20 row: the canonical intent hash column is null, so
-    // the only retained evidence is the destination - which is not proof that
+    // the only retained evidence is the destination: which is not proof that
     // a replayed amount/memo is the original intent.
     Transaction row = transactions.findById(UUID.fromString(txId)).orElseThrow();
     row.setRequestHash(null);
     transactions.saveAndFlush(row);
 
     // The same key replayed (even with the identical destination) must not
-    // silently replay on destination alone - a conflict points at review and
+    // silently replay on destination alone: a conflict points at review and
     // money never moves twice.
     mvc.perform(post("/api/v1/transfers")
             .header("Authorization", "Bearer " + alice)

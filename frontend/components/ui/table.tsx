@@ -2,7 +2,7 @@ import * as React from "react";
 import { cn } from "../../lib/cn";
 
 /**
- * A ledger block, not a floating data-grid: no outer border of its own - the
+ * A ledger block, not a floating data-grid: no outer border of its own: the
  * row and header rules inside a bordered section carry the structure. Amount
  * columns add `.nums` for tabular figures.
  */

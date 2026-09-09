@@ -57,7 +57,7 @@ public class LoginChallengeService {
    * commits in its own REQUIRES_NEW transaction so the rejection rollback
    * that follows a wrong code can never erase the booking. Concurrent
    * submissions serialize on the row update, so the budget can never be
-   * overshot by parallel guesses - and the caller never holds a lock on the
+   * overshot by parallel guesses: and the caller never holds a lock on the
    * challenge row while this waits for it (no outer read lock exists).
    *
    * <p>Throws {@link TooManyTotpAttemptsException} when the challenge is
@@ -71,7 +71,7 @@ public class LoginChallengeService {
     if (reserved > 0) {
       return;
     }
-    // The update refused us - read the row to distinguish "budget spent on a
+    // The update refused us: read the row to distinguish "budget spent on a
     // live challenge" (429, never verify again) from "gone/consumed/expired"
     // (a plain rejection).
     LoginChallenge current = challenges.findById(challengeId).orElse(null);

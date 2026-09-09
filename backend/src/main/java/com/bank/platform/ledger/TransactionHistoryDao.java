@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
  * currently loaded ten rows and describe it as searching account history").
  * The customer feed's date window already ran in SQL; this DAO extends the
  * SAME native keyset query with amount range, kind(s), state(s) and a
- * reference/counterparty search - every filter is a SQL predicate over the
+ * reference/counterparty search: every filter is a SQL predicate over the
  * whole account history, so a page never answers a question the database was
  * not asked.
  *

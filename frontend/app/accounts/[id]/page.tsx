@@ -22,14 +22,14 @@ import { signedUsd, usd, usdReview } from "../../../lib/format";
 import { Routes } from "../../../lib/routes";
 import { cn } from "../../../lib/cn";
 
-/** "CHECKING" → "Checking", "LOAN" → "Loan" - the account's readable name. */
+/** "CHECKING" → "Checking", "LOAN" → "Loan": the account's readable name. */
 function typeName(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase();
 }
 
 
 
-/** One labelled loan figure - authoritative, policy-derived (never a
+/** One labelled loan figure: authoritative, policy-derived (never a
  *  client-side balance subtraction). */
 function LoanFigure({ label, value, danger = false }: { label: string; value: string; danger?: boolean }) {
   return (
@@ -44,7 +44,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
   const { push } = useToast();
   const account = useAccount(id);
   // 404/410 mean the account truly does not exist or was closed; any other
-  // failure (offline, 429, 500) is a load problem with a retry - it must NOT
+  // failure (offline, 429, 500) is a load problem with a retry: it must NOT
   // masquerade as "Account not found".
   const accountNotFound = account.isError && (account.error?.status === 404 || account.error?.status === 410);
   const recent = useTransactions(id, "", 8);
@@ -96,7 +96,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
       setCopied(true);
       window.setTimeout(() => setCopied(false), 1500);
     } catch {
-      push("Copy failed - select the identifier and copy it manually.", "error");
+      push("Copy failed: select the identifier and copy it manually.", "error");
     }
   }
 
@@ -130,7 +130,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
               {frozen ? <Badge tone="warning">Frozen</Badge> : <span className="muted text-sm">Active</span>}
             </div>
             {/* The identifier sits under the recognizable title with a copy
-                control - never the page's giant heading. */}
+                control: never the page's giant heading. */}
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <p className="mono muted break-all text-sm">{account.data.iban}</p>
               <Button type="button" variant="ghost" size="sm" onClick={() => void copyIban()}>
@@ -160,7 +160,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
                 <p className="muted border-t border-divider px-4 py-2.5 text-xs">
                   Simulator loan, USD. Borrow by sending money from this account to another of yours;
                   repay by sending money back to this account. Interest is posted monthly on each
-                  day&apos;s outstanding principal. {frozen ? "This loan is frozen - repayments and new draws are disabled." : ""}
+                  day&apos;s outstanding principal. {frozen ? "This loan is frozen: repayments and new draws are disabled." : ""}
                 </p>
               </>
             ) : (
@@ -175,7 +175,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
                   <p className="nums text-[28px] leading-9 font-semibold">{usd(account.data.balance)}</p>
                 </div>
                 <p className="muted px-4 pb-3 text-xs">
-                  {frozen ? "This account is frozen - money cannot be sent from it until an operator unfreezes it." : "Available to spend."}
+                  {frozen ? "This account is frozen: money cannot be sent from it until an operator unfreezes it." : "Available to spend."}
                 </p>
               </>
             )}
@@ -303,7 +303,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
 
 
 export default function AccountDetailPage({ params: paramsPromise }: { params: Promise<{ id: string }> }) {
-  // Next 15+ pages receive `params` as a Promise - unwrap it, then hand the
+  // Next 15+ pages receive `params` as a Promise: unwrap it, then hand the
   // id to the content component (kept separate so tests can render it
   // directly without a Suspense boundary).
   const { id } = React.use(paramsPromise);

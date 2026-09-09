@@ -14,8 +14,7 @@ import type { Tx } from "../../lib/api-types";
 
 /**
  * Server-enforced eligibility mirrored for the console (V29): only a POSTED
- * TRANSFER or DEPOSIT that has not already been reversed can be reversed -
- * HELD/CANCELLED never moved money, a REVERSAL row cannot itself be reversed,
+ * TRANSFER or DEPOSIT that has not already been reversed can be reversed: * HELD/CANCELLED never moved money, a REVERSAL row cannot itself be reversed,
  * and INTEREST corrections happen through the loan workflow, not here.
  */
 export function canReverse(tx: Tx): boolean {
@@ -34,7 +33,7 @@ export function ReversalAction({ tx }: { tx: Tx }) {
   // Rejection copy renders INLINE in the dialog that stayed open (never a
   // corner toast behind the scrim), classified truthfully: a definitive 4xx
   // is the server's words; anything ambiguous says the state is unknown and
-  // the posted list - not a blind retry - is the check, because a second
+  // the posted list: not a blind retry: is the check, because a second
   // reversal of the same transaction is refused.
   useResultToast(reverse, {
     error: false,
@@ -126,7 +125,7 @@ export function ReversalAction({ tx }: { tx: Tx }) {
 /**
  * Row markers so reversal state is visible where operators act: a REVERSAL row
  * is labelled (its reason and parent live beside it), and a POSTED row whose
- * original is untouched but already reversed carries a small mark - its own
+ * original is untouched but already reversed carries a small mark: its own
  * row never changes, so only the index can say so.
  */
 export function ReversalMark({ tx }: { tx: Tx }) {

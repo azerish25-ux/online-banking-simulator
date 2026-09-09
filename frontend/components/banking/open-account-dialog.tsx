@@ -13,7 +13,7 @@ import { useOpenAccount } from "../../lib/queries";
  * The open-account dialog. Owns the chosen type (re-defaulted to SAVINGS on
  * every open, exactly as the dashboard button used to reset it), the submit
  * state and the success/error toasts. The page supplies only open state and
- * whether a loan already exists (one loan at a time - the backend refuses a
+ * whether a loan already exists (one loan at a time: the backend refuses a
  * second, and the option must say why).
  */
 export function OpenAccountDialog({
@@ -28,7 +28,7 @@ export function OpenAccountDialog({
   const openAccount = useOpenAccount();
   const [type, setType] = React.useState("SAVINGS");
   // A server rejection (the one loan-per-customer rule, a race) belongs in
-  // the dialog that stayed open - a general failure with no single field.
+  // the dialog that stayed open: a general failure with no single field.
   const [failure, setFailure] = React.useState<string | null>(null);
 
   // Reset synchronously while opening: re-rendering before paint means the

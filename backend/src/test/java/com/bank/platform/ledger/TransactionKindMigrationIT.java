@@ -17,9 +17,9 @@ import org.junit.jupiter.api.Test;
  *
  * <p>The V8 migration (checksummed, never edited) classified legacy rows by
  * memo substrings. This test migrates a fresh database only to V7, seeds
- * realistic pre-kind rows - engine interest WITH and WITHOUT an audit trail, a
+ * realistic pre-kind rows: engine interest WITH and WITHOUT an audit trail, a
  * genuine user transfer whose memo merely says \"interest\", deposits whose
- * memos do and do not match V8's pattern - then migrates to the head. V24
+ * memos do and do not match V8's pattern: then migrates to the head. V24
  * must correct from AUDIT/STRUCTURE evidence, archive every decision in
  * {@code transaction_kind_review}, label unprovable rows UNCERTAIN, and never
  * change a balance, amount, memo, or identifier.
@@ -54,7 +54,7 @@ class TransactionKindMigrationIT {
           + loan + "', '" + user + "', 'DE10000000000000000003', 'LOAN', 0)");
 
       // A: engine loan interest WITH the INTEREST_POSTED audit trail. (V7 has
-      // no kind column - V8's memo classifier will label it INTEREST.)
+      // no kind column: V8's memo classifier will label it INTEREST.)
       UUID a = UUID.randomUUID();
       tx(c, a, loan, null, "Loan interest May");
       exec(c, "INSERT INTO audit_logs (actor_id, action, entity, entity_id) VALUES ('"
@@ -141,7 +141,7 @@ class TransactionKindMigrationIT {
       assertEquals(3L, scalar(c, "SELECT COUNT(*) FROM transaction_kind_review"));
 
       // B's archive keeps the ORIGINAL V8 classification (INTEREST) with the
-      // memo - evidence preserved, never erased to make reports fit.
+      // memo: evidence preserved, never erased to make reports fit.
       assertEquals(1L, scalar(c,
           "SELECT COUNT(*) FROM transaction_kind_review r JOIN transactions t "
               + "ON CAST(r.transaction_id AS VARCHAR) = CAST(t.id AS VARCHAR) "

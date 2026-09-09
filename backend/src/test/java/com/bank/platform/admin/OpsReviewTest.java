@@ -157,7 +157,7 @@ class OpsReviewTest {
 
     // A second decision on the same row is a stale-decision CONFLICT (409):
     // the losing operator is told the case already moved so the queue
-    // refreshes to the winning outcome - never an optimistic second toast.
+    // refreshes to the winning outcome: never an optimistic second toast.
     mvc.perform(post("/api/v1/admin/transactions/" + heldId + "/decline")
             .header("Authorization", "Bearer " + admin))
         .andExpect(status().isConflict());
@@ -208,7 +208,7 @@ class OpsReviewTest {
                 {"reason":"Late decline","expectedStatus":"HELD","expectedReviewed":false}"""))
         .andExpect(status().isConflict());
 
-    // A decision reason is recorded on the audit trail - bounded and plain,
+    // A decision reason is recorded on the audit trail: bounded and plain,
     // never a sensitive payload dump.
     mvc.perform(get("/api/v1/admin/audit-logs").header("Authorization", "Bearer " + admin)
             .param("action", "TRANSFER_APPROVED"))

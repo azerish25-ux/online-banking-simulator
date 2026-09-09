@@ -1045,7 +1045,7 @@
             "type" : [ "string", "null" ]
           },
           "postedAt" : {
-            "description" : "null while HELD or when CANCELLED - money has not moved",
+            "description" : "null while HELD or when CANCELLED: money has not moved",
             "type" : [ "string", "null" ]
           },
           "reversalId" : {
@@ -1054,7 +1054,7 @@
             "type" : [ "string", "null" ]
           },
           "reversalReason" : {
-            "description" : "Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds - it is the operator's internal note.",
+            "description" : "Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds: it is the operator's internal note.",
             "type" : [ "string", "null" ]
           },
           "reversesTransactionId" : {
@@ -1130,7 +1130,7 @@
             "type" : [ "string", "null" ]
           },
           "postedAt" : {
-            "description" : "null while HELD or when CANCELLED - money has not moved",
+            "description" : "null while HELD or when CANCELLED: money has not moved",
             "type" : [ "string", "null" ]
           },
           "status" : {
@@ -2101,7 +2101,7 @@
                 }
               }
             },
-            "description" : "Authenticated - session tokens issued"
+            "description" : "Authenticated: session tokens issued"
           },
           "202" : {
             "content" : {
@@ -2111,7 +2111,7 @@
                 }
               }
             },
-            "description" : "MFA required - verify the returned mfaToken"
+            "description" : "MFA required: verify the returned mfaToken"
           },
           "400" : {
             "content" : {

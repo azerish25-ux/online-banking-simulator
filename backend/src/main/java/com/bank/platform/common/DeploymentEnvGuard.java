@@ -11,8 +11,7 @@ import org.springframework.stereotype.Component;
 
 /**
  * Deployment guard: local demos run on the built-in dev-only defaults (loudly
- * warned about), but a production deployment must override every credential -
- * the JWT signing secret, the seeded admin password, and the database
+ * warned about), but a production deployment must override every credential: * the JWT signing secret, the seeded admin password, and the database
  * password. When {@code app.deployment-env=production} is set and any of the
  * known dev defaults is still in effect, refuse to start instead of shipping
  * a bank with publicly documented credentials.

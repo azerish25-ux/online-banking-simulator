@@ -75,7 +75,7 @@ public class RefreshService {
   /**
    * The 401 is signalled by throwing BadCredentialsException, but the state
    * changes made before it (consuming the token, burning the family) are
-   * deliberate and must commit - otherwise a RuntimeException would roll them
+   * deliberate and must commit: otherwise a RuntimeException would roll them
    * back and a burned family would resurrect on the next replay.
    */
   @Transactional(noRollbackFor = BadCredentialsException.class)
@@ -104,7 +104,7 @@ public class RefreshService {
         .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     // Check-and-consume in one UPDATE: two parallel rotations presenting the
     // same token cannot both pass an in-Java revoked check and mint separate
-    // sessions - the loser is treated as a replay and the family is burned.
+    // sessions: the loser is treated as a replay and the family is burned.
     if (refreshTokens.consume(hash) == 0) {
       refreshTokens.revokeAllByUserId(found.getUserId());
       throw new BadCredentialsException("Invalid refresh token");

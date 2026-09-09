@@ -136,7 +136,7 @@ class JournalPostingTest {
             .content("{\"amount\":\"250.00\"}"))
         .andExpect(status().isOk());
     // Identical replay with the same key: the business row replays (no double
-    // credit) - and the journal must stay at one entry.
+    // credit): and the journal must stay at one entry.
     mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
             .header("Authorization", "Bearer " + alice)
             .header("Idempotency-Key", key)

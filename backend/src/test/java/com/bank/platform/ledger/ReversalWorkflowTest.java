@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * The authorized reversal workflow (V29): a posted instruction is reversed by
- * a NEW linked operation that moves the money back - the original row is never
+ * a NEW linked operation that moves the money back: the original row is never
  * edited or relabelled. One reversal per original, a mandatory reason and an
  * audited actor, duplicate-reversal protection, and honest refusal when the
  * current account state cannot absorb the reverse movement.
@@ -101,7 +101,7 @@ class ReversalWorkflowTest {
     assertEquals(aliceId, reversal.getToAccountId());
 
     // The ORIGINAL row keeps its history: still POSTED, still $100, still the
-    // same posting instant - a reversed transfer is not relabelled as if it
+    // same posting instant: a reversed transfer is not relabelled as if it
     // had never settled.
     Transaction after = transactions.findById(transferUuid).orElseThrow();
     assertEquals(TxStatus.POSTED, after.getStatus());
@@ -244,8 +244,8 @@ class ReversalWorkflowTest {
     assertEquals("Wrong amount entered", body.get("reversalReason").asText());
     assertEquals(transferId, body.get("reversesTransactionId").asText());
 
-    // The operator list marks the ORIGINAL as reversed - its row is untouched,
-    // so only the reversal index can say so - and shows the reason on the row.
+    // The operator list marks the ORIGINAL as reversed: its row is untouched,
+    // so only the reversal index can say so: and shows the reason on the row.
     MvcResult list = mvc.perform(get("/api/v1/admin/transactions?size=50")
             .header("Authorization", "Bearer " + client.adminToken()))
         .andExpect(status().isOk())

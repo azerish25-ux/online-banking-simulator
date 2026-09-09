@@ -68,7 +68,7 @@ class AuthFlowTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.email").value("ada@example.com"));
 
-    // No credentials on a protected endpoint is 401 (RFC-7807) - the browser
+    // No credentials on a protected endpoint is 401 (RFC-7807): the browser
     // silent-refresh path only fires on 401, so 403 here would kill sessions
     // at expiry instead of repairing them.
     mvc.perform(get("/api/v1/auth/me"))

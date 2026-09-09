@@ -117,7 +117,7 @@ it("hears each failure through onFailure without corner-toasting (error: false)"
 
   rerender({ result: { status: "pending", error: null, data: undefined } });
   rerender({ result: fail("Deposit exceeds the per-transaction limit") });
-  expect(pushMock).not.toHaveBeenCalled(); // no corner toast - rendered inline instead
+  expect(pushMock).not.toHaveBeenCalled(); // no corner toast: rendered inline instead
   expect(hear).toHaveBeenCalledTimes(1);
   // The settled error rides along so the inline surface can re-classify the
   // failure (e.g. interrupted money operation) instead of trusting raw copy.

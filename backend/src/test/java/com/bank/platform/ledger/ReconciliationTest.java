@@ -88,7 +88,7 @@ class ReconciliationTest {
         .setParameter("id", id)
         .executeUpdate();
     entityManager.flush();
-    // The native UPDATE bypassed the persistence context - drop the cached
+    // The native UPDATE bypassed the persistence context: drop the cached
     // entities so the balance check below reads what the DB really holds.
     entityManager.clear();
 

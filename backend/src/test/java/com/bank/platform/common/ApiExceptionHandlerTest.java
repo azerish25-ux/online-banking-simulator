@@ -13,8 +13,8 @@ import org.springframework.http.ResponseEntity;
 /**
  * The API promises RFC-7807 errors on every path. These handlers cannot be
  * reached through MockMvc easily (nothing throws them on purpose), so pin the
- * contract directly: status codes, the problem fields, and - for the catch-all
- * - that internals never leak into the body.
+ * contract directly: status codes, the problem fields, and: for the catch-all
+ *: that internals never leak into the body.
  */
 class ApiExceptionHandlerTest {
 

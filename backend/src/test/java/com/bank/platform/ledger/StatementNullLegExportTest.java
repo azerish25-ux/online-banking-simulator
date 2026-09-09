@@ -36,7 +36,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 /**
  * Regression (customer + operator statement surfaces): a statement whose rows
- * contain a deposit REVERSAL (NULL destination leg, no memo - V29) and an
+ * contain a deposit REVERSAL (NULL destination leg, no memo: V29) and an
  * engine INTEREST row (NULL funding leg) must export through BOTH the CSV and
  * the PDF endpoints without error. Before the fix the PDF description
  * fallback probed the immutable IBAN map with the null leg and threw NPE on
@@ -92,7 +92,7 @@ class StatementNullLegExportTest {
         "the funded savings account must post a nonzero June interest row");
 
     // An operator then reverses the deposit: the REVERSAL row has a NULL
-    // destination (back to the funding rail) and - unlike interest - no memo,
+    // destination (back to the funding rail) and: unlike interest: no memo,
     // which is the exact shape that crashed the PDF description fallback.
     UUID depositId = transactions.findByAccountSince(savingsUuid, Instant.EPOCH).stream()
         .filter(tx -> tx.getKind() == TxKind.DEPOSIT)
@@ -109,10 +109,10 @@ class StatementNullLegExportTest {
         .findFirst().orElseThrow();
     assertEquals(savingsUuid, reversal.getFromAccountId());
     assertNull(reversal.getToAccountId(), "a deposit reversal returns to the funding rail");
-    assertNull(reversal.getMemo(), "the reversal row is memo-less - the PDF fallback labels it");
+    assertNull(reversal.getMemo(), "the reversal row is memo-less: the PDF fallback labels it");
 
     // Both exporter endpoints must return 200 over a window holding the
-    // deposit, the INTEREST row and the REVERSAL row - and the PDF must carry
+    // deposit, the INTEREST row and the REVERSAL row: and the PDF must carry
     // the graceful fallback label, not a 500.
     MvcResult csv = mvc.perform(get("/api/v1/accounts/" + savingsId + "/statement.csv")
             .header("Authorization", "Bearer " + alice)
@@ -134,7 +134,7 @@ class StatementNullLegExportTest {
         || text.contains("Simulateddeposit"), "the inbound deposit row is present:\n" + text);
 
     // The operator surface renders the same statement through the same
-    // renderer - the admin PDF must return 200 too.
+    // renderer: the admin PDF must return 200 too.
     mvc.perform(get("/api/v1/admin/accounts/" + savingsId + "/statement.pdf")
             .header("Authorization", "Bearer " + client.adminToken())
             .param("from", "2026-06-01").param("to", "2026-07-01"))

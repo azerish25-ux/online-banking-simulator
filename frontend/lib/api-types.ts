@@ -40,6 +40,6 @@ export type HistoryPage<T> = {
   nextCursor: string | null;
 };
 
-// Public landing numbers - intentionally outside the OpenAPI spec (marketing
+// Public landing numbers: intentionally outside the OpenAPI spec (marketing
 // data, not part of the authenticated banking contract).
 export type PublicStats = { users: number; accounts: number; transfers: number; volume: string };

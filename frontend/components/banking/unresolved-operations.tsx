@@ -14,7 +14,7 @@ import {
 } from "../../lib/queries";
 import type { Deposit, Tx } from "../../lib/api-types";
 
-/** One row's stable id (user + kind + key - the store's own namespace). */
+/** One row's stable id (user + kind + key: the store's own namespace). */
 function rowId(op: UnresolvedOperation): string {
   return op.userId + ":" + op.kind + ":" + op.key;
 }
@@ -72,7 +72,7 @@ export function UnresolvedOperations() {
       if (outcome.kind === "resolved") {
         push(resolvedMessage(op, outcome.status, outcome.data), "success");
       } else if (outcome.kind === "rejected") {
-        // The server recorded nothing, so the record is gone - the rejection
+        // The server recorded nothing, so the record is gone: the rejection
         // must be heard as a toast, not left inline on a disappearing row.
         push(outcome.message, "error");
       } else {

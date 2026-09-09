@@ -42,7 +42,7 @@ import tools.jackson.databind.ObjectMapper;
 @Transactional
 class StatementSnapshotTest {
 
-  /** Fixed clock: April 15th, then May 15th - two distinct posting months. */
+  /** Fixed clock: April 15th, then May 15th: two distinct posting months. */
   private static final SettableClock CLOCK = new SettableClock(
       Instant.parse("2026-04-15T12:00:00Z"));
 
@@ -90,7 +90,7 @@ class StatementSnapshotTest {
             LocalDate.of(2026, 4, 1), LocalDate.of(2026, 4, 30));
     assertEquals(LocalDate.of(2026, 4, 1), april.period().from());
     assertEquals(LocalDate.of(2026, 4, 30), april.period().to());
-    // Exactly the April movement - May's money is not part of this document.
+    // Exactly the April movement: May's money is not part of this document.
     assertEquals(1, april.rows().size(), "only the April deposit is on an April statement");
     assertEquals(new BigDecimal("0.0000"), april.openingBalance(),
         "nothing moved before April 1st");
@@ -111,7 +111,7 @@ class StatementSnapshotTest {
     assertEquals(StatementService.Statement.CURRENT_VERSION, april.version());
 
     // The renderer is pure: it must not re-read the database. Deposit MORE
-    // money, then render the SAME April snapshot again - the rendered CONTENT
+    // money, then render the SAME April snapshot again: the rendered CONTENT
     // (what the reader sees: figures, rows, as-of) is identical, even though
     // the database now shows a $1,129 balance. Byte-level identity is not
     // asserted: PDF containers may embed per-write machine metadata, but the

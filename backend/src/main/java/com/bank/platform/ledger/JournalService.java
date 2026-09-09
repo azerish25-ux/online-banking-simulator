@@ -17,7 +17,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  *
  * <p>Sign convention: a line's {@code amount} is a signed delta added to the
  * named side. For a customer account the balance projection is
- * {@code balance + amount} - deposits and savings interest are positive,
+ * {@code balance + amount}: deposits and savings interest are positive,
  * transfers out and loan interest charges are negative. Every entry carries
  * at least two postings whose signed amounts sum to zero per currency; the
  * single-currency ledger is USD, so a customer credit is always balanced by a
@@ -25,7 +25,7 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * interest postings, MIGRATION_OPENING for cutover entries). Money can never
  * appear in a customer balance without a balancing posting on the other side.
  *
- * <p>HELD and CANCELLED instructions create NO entry - they never settled and
+ * <p>HELD and CANCELLED instructions create NO entry: they never settled and
  * no money moved. A correction is a new authorized entry linked via
  * {@code reversesEntryId}, never an edit of an existing posting.
  */
@@ -68,7 +68,7 @@ public class JournalService {
    * Books a journal entry that is a linked correction of an earlier entry
    * (V29): {@code reversesEntryId} names the original, immutable posting this
    * new entry undoes. The reference must exist and must not already be
-   * reversed (one reversal per original entry - the DB also allows only one
+   * reversed (one reversal per original entry: the DB also allows only one
    * reversal per original transaction).
    */
   public JournalEntry post(JournalKind kind, String operationRef, Instant postedAt,

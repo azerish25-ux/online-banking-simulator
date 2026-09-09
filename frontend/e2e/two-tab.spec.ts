@@ -9,7 +9,7 @@ import { expect, test, type Page } from "@playwright/test";
  *   1. Two tabs hold the same session (register in tab A, open tab B).
  *   2. Idle past the access-token lifetime (backend boots with
  *      APP_JWT_ACCESS_SECONDS=3; E2E_ACCESS_TTL_SECONDS mirrors it).
- *   3. A full reload in EACH tab must land authed - the expired token is
+ *   3. A full reload in EACH tab must land authed: the expired token is
  *      repaired under the Web Lock exactly once, never a redirect to login
  *      and never an infinite refresh loop.
  *   4. Logging out in tab A must evict tab B too: the logout broadcast
@@ -47,13 +47,12 @@ test("two real tabs share one session: concurrent refresh after expiry, peer log
   // Idle past the access-token lifetime in both tabs.
   await page.waitForTimeout((ttlSeconds + 1.5) * 1000);
 
-  // Tab B: a full page load must be repaired by the silent refresh path -
-  // no redirect to login (the exact regression this guarded against).
+  // Tab B: a full page load must be repaired by the silent refresh path: // no redirect to login (the exact regression this guarded against).
   await tabB.goto("/transfers");
   await expect(tabB.getByRole("heading", { name: "Send money" })).toBeVisible({ timeout: 15_000 });
   await expect(tabB).not.toHaveURL(/\/login/);
 
-  // Tab A: reload its own data concurrently - both tabs live past the expiry.
+  // Tab A: reload its own data concurrently: both tabs live past the expiry.
   await page.goto("/dashboard");
   await page.locator("main p.mono").first().waitFor({ timeout: 15_000 });
   await expect(page).not.toHaveURL(/\/login/);

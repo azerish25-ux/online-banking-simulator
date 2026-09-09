@@ -19,7 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Regression proof that authorization lives OUTSIDE the summary cache. The
  * cached computation is deliberately free of caller identity, so an ownership
  * check placed inside the cacheable method (as it once was) would be skipped
- * on every cache hit - letting any authenticated user who knows a foreign
+ * on every cache hit: letting any authenticated user who knows a foreign
  * account UUID read that account's month-by-month flows.
  */
 @SpringBootTest
@@ -53,8 +53,7 @@ class SummaryAuthorizationTest {
         .andExpect(status().isOk())
         .andExpect(jsonPath("$[1].inflow").value("1000.0000"));
 
-    // Bob, who knows Alice's account UUID, must never see the cached figures -
-    // even though the row is sitting in the cache, authorization runs first.
+    // Bob, who knows Alice's account UUID, must never see the cached figures: // even though the row is sitting in the cache, authorization runs first.
     mvc.perform(get("/api/v1/accounts/" + aliceId + "/summary")
             .header("Authorization", "Bearer " + bob)
             .param("months", "2"))

@@ -2,24 +2,24 @@
 
 A full-stack demo of a banking core: **Next.js + TypeScript** frontend,
 **Java 17 + Spring Boot 4** backend, **PostgreSQL 16** database. It simulates
-real money-movement semantics - atomic transfers, idempotency keys, interest
-accrual, an operator review queue, audit trails - without inventing a fake
+real money-movement semantics (atomic transfers, idempotency keys, interest
+accrual, an operator review queue, audit trails) without inventing a fake
 bank brand or touching real money.
 
 
 ## What it does
 
-- **Accounts** - open CHECKING / SAVINGS / LOAN, simulated deposit rail, pessimistic-lock transfers
-- **Money movement** - idempotent transfers (keys scoped per sender account), beneficiaries address book, paged history, CSV + PDF statements
-- **Review queue** - transfers at/above the threshold never settle on submit: they stay HELD until an operator approves (money moves) or declines (nothing ever moved); flagged deposits credit on arrival and just need acknowledging
-- **Interest engine** - deterministic, resumable per account/period job: savings earn actual/365 interest on each day's closing principal, loans are charged simple monthly interest on tracked principal only - never capped at the credit limit, so a maxed loan is charged, not forgiven; scheduler and admin share one implementation
-- **Virtual cards** - Luhn-valid issuance, show-once PAN, freeze/unfreeze (tokenization-lite: hashes + last4)
-- **Auth** - purpose-separated JWT tokens (access vs MFA challenge; pinned HS256, iss/aud/purpose), rotating refresh tokens with atomic rotation + reuse/family-burn detection, TOTP two-factor end to end (Security page setup + `/login/mfa` challenge) with persisted single-use challenges + per-account verification throttling, login rate limiting (socket-IP keys unless a trusted proxy is configured), BCrypt(12)
-- **Notifications** - in-app center + unread badge, email stub wired into every money event
-- **Ops console** - user search, freeze/unfreeze, review queue with Approve/Decline, daily totals, audit viewer
-- **Security posture** - RBAC, security headers, locked CORS, RFC-7807 errors on every path, `X-Request-Id` correlation, documented residual risks
-- **Design system** - a public [gallery](/design) of the shared primitives; the palette is enforced by `frontend/scripts/check-design-tokens.mjs`, so default Tailwind hues and raw hex literals cannot leak back in
-- **About this demo** - a public [/about](/about) page that explains what is simulated and what is real, in plain words
+- **Accounts**: open CHECKING / SAVINGS / LOAN, simulated deposit rail, pessimistic-lock transfers
+- **Money movement**: idempotent transfers (keys scoped per sender account), beneficiaries address book, paged history, CSV + PDF statements
+- **Review queue**: transfers at/above the threshold never settle on submit; they stay HELD until an operator approves (money moves) or declines (nothing ever moved). Flagged deposits credit on arrival and just need acknowledging.
+- **Interest engine**: deterministic, resumable per account/period job. Savings earn actual/365 interest on each day's closing principal; loans are charged simple monthly interest on tracked principal only, never capped at the credit limit, so a maxed loan is charged, not forgiven. Scheduler and admin share one implementation.
+- **Virtual cards**: Luhn-valid issuance, show-once PAN, freeze/unfreeze (tokenization-lite: hashes + last4)
+- **Auth**: purpose-separated JWT tokens (access vs MFA challenge; pinned HS256, iss/aud/purpose), rotating refresh tokens with atomic rotation + reuse/family-burn detection, TOTP two-factor end to end (Security page setup + `/login/mfa` challenge) with persisted single-use challenges + per-account verification throttling, login rate limiting (socket-IP keys unless a trusted proxy is configured), BCrypt(12)
+- **Notifications**: in-app center + unread badge, email stub wired into every money event
+- **Ops console**: user search, freeze/unfreeze, review queue with Approve/Decline, daily totals, audit viewer
+- **Security posture**: RBAC, security headers, locked CORS, RFC-7807 errors on every path, `X-Request-Id` correlation, documented residual risks
+- **Design system**: a public [gallery](/design) of the shared primitives; the palette is enforced by `frontend/scripts/check-design-tokens.mjs`, so default Tailwind hues and raw hex literals cannot leak back in
+- **About this demo**: a public [/about](/about) page that explains what is simulated and what is real, in plain words
 
 ## Architecture
 
@@ -32,7 +32,7 @@ flowchart LR
 ```
 
 Money is `NUMERIC(19,4)` in Postgres, `BigDecimal` in Java, and **strings** in
-JSON - floats never touch currency. Every mutation writes an `audit_logs` row.
+JSON; floats never touch currency. Every mutation writes an `audit_logs` row.
 
 ## Run it locally (no Docker)
 
@@ -41,7 +41,7 @@ JSON - floats never touch currency. Every mutation writes an `audit_logs` row.
 .\seed-demo.ps1     # alice/bob users, funded accounts, a HELD $12,500 wire for the review queue
 ```
 
-Open http://localhost:3000 - register, or log in with the seeded users
+Open http://localhost:3000 and register, or log in with the seeded users
 (`alice@bank.local` / `bob@bank.local`, password `secret123`).
 Operators: `admin@bank.local` / `change-me-admin-123` → **Operations** in the sidebar.
 
@@ -76,7 +76,7 @@ Operators: `admin@bank.local` / `change-me-admin-123` → **Operations** in the 
 | `GET/POST /api/v1/admin/email-outbox` | ADMIN | List / requeue dead-lettered outbox rows |
 | `GET /api/v1/admin/kind-review` | ADMIN | Quarantine of migrations' uncertain kind classifications |
 
-Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
+Errors follow RFC-7807 (`type/title/status/detail`) and every response carries
 `X-Request-Id` for log correlation. The contract lives at `frontend/openapi.json`
 (CI fails if code and spec drift apart) and drives the generated TS types.
 
@@ -85,7 +85,7 @@ Errors follow RFC-7807 (`type/title/status/detail`), and every response carries
 ```powershell
 Set-Location backend; .\mvnw.cmd verify     # 176 tests + JaCoCo gate (H2 in PG mode)
 # Real-PostgreSQL ITs (CI runs them against job-scoped Postgres services;
-# locally, create a throwaway database first - never run these against your
+# locally, create a throwaway database first; never run these against your
 # working bankdb):
 #   psql -U postgres -c "CREATE DATABASE pf_it"
 .\mvnw.cmd test "-Dtest=TransferConcurrencyIT" `
@@ -110,18 +110,19 @@ service → **concurrency-postgres** (the 24-transfer proof against a real
 PostgreSQL service) → **cutover-postgres** (JournalCutoverIT: the V22
 reconciled-journal cutover over a fresh PG schema) → **journal-postgres**
 (JournalReconciliationIT: append-only triggers, duplicate-journal rejection,
-corruption reporting on real PG) → **banking-e2e**: boots the real backend +
-PostgreSQL and drives register → deposit → transfer → receipt through a real
-browser. Dependabot watches npm, maven, docker, and the actions themselves.
+corruption reporting on real PG) → **banking-e2e**, which boots the real
+backend + PostgreSQL and drives register → deposit → transfer → receipt
+through a real browser. Dependabot watches npm, maven, docker, and the
+actions themselves.
 
 Production-like stack (CI / servers): `docker compose up --build` → :3000; the
 backend publishes no host port and is reached only through the Next.js proxy.
 
 ## How it was built
 
-Ten parts, each independently runnable and verified live against real Postgres -
-see [docs/roadmap-10-parts.md](docs/roadmap-10-parts.md), plus the 1.1.0-1.3.0
-audit passes ([changelog](CHANGELOG.md)). Supporting docs:
+Ten parts, each independently runnable and verified live against real Postgres;
+see [docs/roadmap-10-parts.md](docs/roadmap-10-parts.md), plus the 1.1.0 to
+1.3.0 audit passes ([changelog](CHANGELOG.md)). Supporting docs:
 [architecture](docs/architecture.md), [security review](docs/security-review.md),
 [testing & CI](docs/devops-ci.md), [2-minute demo](docs/DEMO.md).
 
@@ -129,7 +130,7 @@ audit passes ([changelog](CHANGELOG.md)). Supporting docs:
 
 - A banking monolith (Next.js 16 + Spring Boot 4 + PostgreSQL 16) with atomic,
   idempotent money movement, an operator review queue, and full audit trails
-- A 25-version Flyway schema (V1-V25: seven Java migrations - unnamed-CHECK
+- A 25-version Flyway schema (V1-V25, seven of them Java migrations: unnamed-CHECK
   retirement, loan-balance checks, idempotency-key scoping, the one-loan
   partial index, operation identity, the reconciled journal + cutover, loan
   principal/interest accruals, and evidence-backed kind classification)
@@ -141,5 +142,7 @@ audit passes ([changelog](CHANGELOG.md)). Supporting docs:
   Playwright job against real PostgreSQL, and JaCoCo coverage gates
 - Ledger integrity proven under load: a 24-way parallel-transfer test on real
   PostgreSQL conserves every cent, with idempotent replays posting exactly once
-- A bespoke "private-bank ink" interface (custom ink/brass palette, serif
-  display type, statement-style tables) instead of a stock dashboard theme
+- A restrained corporate banking interface: flush white sections divided by
+  rules instead of floating cards, tabular numerals on every figure, status
+  notation only where attention is needed, and a palette enforced by a
+  design-token gate instead of a stock dashboard theme

@@ -9,13 +9,13 @@ import org.flywaydb.core.api.migration.Context;
  * accrual bookkeeping.
  *
  * <ul>
- *   <li>{@code accounts.principal} - outstanding drawn principal on a LOAN
+ *   <li>{@code accounts.principal}: outstanding drawn principal on a LOAN
  *       (0..credit_limit), independent of the interest that has accrued on it.
  *       Draws consume principal headroom; interest deepens the balance without
  *       touching principal, so a loan at its limit is NEVER silently forgiven
  *       interest. Repayments extinguish interest first, then principal, and
  *       are capped at the amount owed (a loan balance never goes positive).</li>
- *   <li>{@code interest_accruals} - one row per account/accrual-period, unique
+ *   <li>{@code interest_accruals}: one row per account/accrual-period, unique
  *       at the database level, so a scheduler run and an admin trigger can
  *       never post the same account-month twice. A failed batch resumes: the
  *       accounts that committed keep their rows, the next run only takes the
@@ -30,7 +30,7 @@ public class V23__loan_principal_and_interest_accruals extends BaseJavaMigration
 
   @Override
   public void migrate(Context context) throws Exception {
-    // NOTE: never close context.getConnection() - Flyway owns it and will commit/rollback.
+    // NOTE: never close context.getConnection(): Flyway owns it and will commit/rollback.
     Connection connection = context.getConnection();
     try (var stmt = connection.createStatement()) {
       stmt.execute("ALTER TABLE accounts ADD COLUMN IF NOT EXISTS principal NUMERIC(19,4) "

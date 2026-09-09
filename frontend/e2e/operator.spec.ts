@@ -2,11 +2,11 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * The operator console, end to end: a customer submits a review-threshold
- * transfer (HELD - no money moves), an operator approves one and declines
+ * transfer (HELD: no money moves), an operator approves one and declines
  * another, and both outcomes are reflected where a human would look: the
  * review queue clears, the customer's feed shows POSTED / CANCELLED with the
  * balances moving only on approval, and the audit log records the operator's
- * decision. The only fixed identity is the seeded operator - customers are
+ * decision. The only fixed identity is the seeded operator: customers are
  * self-registered fresh users, like the rest of the suite.
  *
  * The queue can hold rows from other activity (parallel specs, earlier runs),
@@ -63,7 +63,7 @@ async function login(page: Page, email: string, password: string): Promise<void>
 }
 
 /** The operator has no customer accounts, so the dashboard never renders
- *  account cards - go straight to the console and wait for its heading. */
+ *  account cards: go straight to the console and wait for its heading. */
 async function loginOperator(page: Page): Promise<void> {
   await page.goto("/login");
   await page.getByLabel("Email").fill(ADMIN_EMAIL);
@@ -75,7 +75,7 @@ async function loginOperator(page: Page): Promise<void> {
 }
 
 /** Open account row `row` (1-based creation order: Checking, then Savings)
- *  and read its full simulator identifier from the detail page - the only
+ *  and read its full simulator identifier from the detail page: the only
  *  place the dashboard shows it in full (the account list is masked). */
 async function accountIban(page: Page, row: number): Promise<string> {
   const links = page.locator("main table a[href*='/accounts/']");
@@ -88,8 +88,7 @@ async function accountIban(page: Page, row: number): Promise<string> {
   return iban;
 }
 
-/** The dashboard account row for one named account and its balance cell -
- *  desktop table rows only; the narrow stacked list is hidden at this
+/** The dashboard account row for one named account and its balance cell: *  desktop table rows only; the narrow stacked list is hidden at this
  *  viewport and recent-activity rows carry no account-name links. */
 function accountBalance(page: Page, name: string) {
   return page

@@ -37,7 +37,7 @@ public final class TransferDtos {
       String amount, String currency,
       @Schema(nullable = true) String memo,
       TxStatus status, String createdAt,
-      @Schema(nullable = true, description = "null while HELD or when CANCELLED - money has not moved") String postedAt,
+      @Schema(nullable = true, description = "null while HELD or when CANCELLED: money has not moved") String postedAt,
       boolean flagged) {}
 
   public record MonthSummary(String month, String inflow, String outflow) {}
@@ -55,16 +55,15 @@ public final class TransferDtos {
       String amount, String currency,
       @Schema(nullable = true) String memo,
       TxKind kind, TxStatus status, String createdAt,
-      @Schema(nullable = true, description = "null while HELD or when CANCELLED - money has not moved") String postedAt,
+      @Schema(nullable = true, description = "null while HELD or when CANCELLED: money has not moved") String postedAt,
       boolean flagged, boolean reviewed,
       @Schema(nullable = true, description = "On a REVERSAL row: the posted transaction it reverses (V29)") UUID reversesTransactionId,
-      @Schema(nullable = true, description = "Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds - it is the operator's internal note.") String reversalReason,
+      @Schema(nullable = true, description = "Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds: it is the operator's internal note.") String reversalReason,
       @Schema(nullable = true, description = "Operator surfaces only: id of the REVERSAL row when this posted transaction has been reversed. Always null on customer-facing feeds.") UUID reversalId) {}
 
   /**
    * History feed envelope. {@code items} are newest-first and
-   * {@code nextCursor} is the opaque keyset position after the last item -
-   * pass it back as {@code cursor} to fetch the next page, or omit it to
+   * {@code nextCursor} is the opaque keyset position after the last item: * pass it back as {@code cursor} to fetch the next page, or omit it to
    * start at the newest page again. {@code null} {@code nextCursor} means the
    * final page. The cursor is bound to the account and date window that
    * produced it; changing either resets paging.

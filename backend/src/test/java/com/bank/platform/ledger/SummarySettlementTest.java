@@ -23,7 +23,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The monthly money-flow summary is a money-movement read: it must count only
  * rows that actually settled (POSTED). A transfer HELD for operator review has
- * not moved money, and a CANCELLED transfer never will - neither may appear as
+ * not moved money, and a CANCELLED transfer never will: neither may appear as
  * an outflow on the sender's dashboard, or a declined wire would show forever
  * as money that left the account.
  */

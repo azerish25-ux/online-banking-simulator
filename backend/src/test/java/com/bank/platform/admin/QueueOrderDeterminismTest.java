@@ -24,7 +24,7 @@ import org.springframework.transaction.annotation.Transactional;
 /**
  * The admin transactions listing must have a total order. Two rows can share a
  * created_at (rows persisted in one flush get identical timestamps) and the
- * UUID primary key is random, so neither key can break the tie - the listing
+ * UUID primary key is random, so neither key can break the tie: the listing
  * tie-breaks on the database insert sequence instead. This test pins that
  * contract: rows sharing a timestamp come back newest-inserted-first, every
  * run, so page boundaries can never duplicate or skip a row.

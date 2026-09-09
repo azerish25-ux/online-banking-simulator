@@ -17,7 +17,7 @@ import org.springframework.web.bind.annotation.RestController;
  *
 * <p>the transfer figure is a KIND + posted-status classification, never
  * a "has a from side" test. The interest engine posts loan charges that DO
- * carry a from side and deposits/credits that do not - counting rows by their
+ * carry a from side and deposits/credits that do not: counting rows by their
  * shape presented engine interest as user transfers. Only rows the rail
  * labelled TRANSFER that actually posted count; HELD/CANCELLED intents never
  * moved money and INTEREST/DEPOSIT rows are engine rail, not user transfers.

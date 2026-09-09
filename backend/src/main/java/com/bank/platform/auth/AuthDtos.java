@@ -10,7 +10,7 @@ public final class AuthDtos {
   private AuthDtos() {}
 
   // BCrypt truncates at 72 bytes, so the cap is enforced on UTF-8 byte length
-  // (see PasswordBytes) rather than on characters - a multibyte password that
+  // (see PasswordBytes) rather than on characters: a multibyte password that
   // fits in 72 characters can still exceed 72 bytes.
   private static final int PASSWORD_MAX_BYTES = 72;
 

@@ -5,7 +5,7 @@
  * the ledger never rounded.
  *
  * EXACT SCALE: the ledger keeps 4 decimals, so every amount is parsed into an
- * exact integer count of ten-thousandths (BigInt) - no floating point, no
+ * exact integer count of ten-thousandths (BigInt): no floating point, no
  * premature rounding. A SINGLE value is rounded once, only when formatted for
  * the user; any SUM is accumulated at the ten-thousandths scale and
  * rounded once at the end, so per-item rounding can never skew a total.
@@ -25,7 +25,7 @@ export function usd(amount: string): string {
 
 /**
  * Sums ledger amounts EXACTLY (ten-thousandths scale) and formats the total
- * once - per-item cent rounding is a display decision, not an arithmetic one.
+ * once: per-item cent rounding is a display decision, not an arithmetic one.
  * Use this for every money total built from more than one amount.
  */
 export function totalUsd(amounts: string[]): string {
@@ -54,7 +54,7 @@ export function usdReview(amount: string): string {
 /**
  * Exact decimal-string → integer ten-thousandths (BigInt). Returns null when
  * the string is not a ledger decimal (optional sign, digits, up to 4 fraction
- * digits) - the caller decides how to surface malformed data.
+ * digits): the caller decides how to surface malformed data.
  */
 export function toTenThousandths(value: string): bigint | null {
   const raw = (value ?? "").trim();
@@ -74,8 +74,7 @@ export function toTenThousandths(value: string): bigint | null {
 }
 
 /**
- * Exact integer cents from a decimal string (single-value convenience -
- * exact, then rounded once HALF_UP). For SUMS use totalUsd so components are
+ * Exact integer cents from a decimal string (single-value convenience: * exact, then rounded once HALF_UP). For SUMS use totalUsd so components are
  * not rounded before they meet; sign checks should use toTenThousandths.
  */
 export function decimalToCents(value: string): bigint {
@@ -138,7 +137,7 @@ export function fmtDate(iso: string): string {
     hour: "numeric",
     minute: "2-digit"
   };
-  // A row from a previous year must say so - December's activity otherwise
+  // A row from a previous year must say so: December's activity otherwise
   // reads as if it happened this year forever (activity and notifications
   // both span years).
   if (d.getFullYear() !== new Date().getFullYear()) {
@@ -158,8 +157,8 @@ export function maskIban(iban: string | null | undefined): string | null {
 
 /**
  * How an account reads in a chooser ("CHECKING ...017984", plus the balance
- * when the selector shows funds). Every account picker - the deposit
- * destination, the transfer source, the activity filter - composes the same
+ * when the selector shows funds). Every account picker: the deposit
+ * destination, the transfer source, the activity filter: composes the same
  * name; renaming accounts is a one-file edit. Pass balance only where the
  * current option shows it, so the caller keeps its exact rendering.
  */

@@ -24,7 +24,7 @@ import { accountLabel, maskIban, signedUsd, toTenThousandths, totalUsd, usd, usd
 import { cn } from "../../lib/cn";
 import type { Account } from "../../lib/api-types";
 
-/** "CHECKING" → "Checking", "LOAN" → "Loan" - the account's readable name. */
+/** "CHECKING" → "Checking", "LOAN" → "Loan": the account's readable name. */
 function typeName(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase();
 }
@@ -61,7 +61,7 @@ function StripCell({
   );
 }
 
-/** Balance cell content for ONE account - shared by the desktop table row and
+/** Balance cell content for ONE account: shared by the desktop table row and
  *  the narrow stacked row so the two views can never disagree. */
 function AccountAmount({ account }: { account: Account }) {
   if (account.type === "LOAN") {
@@ -94,7 +94,7 @@ function AccountAmount({ account }: { account: Account }) {
     <>
       <p className="nums text-right text-base font-semibold">{usd(account.balance)}</p>
       {account.status === "FROZEN" && (
-        <p className="muted mt-0.5 text-right text-xs">Frozen - not spendable</p>
+        <p className="muted mt-0.5 text-right text-xs">Frozen: not spendable</p>
       )}
     </>
   );
@@ -105,7 +105,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
   const me = useMe();
   const accounts = useAccounts();
 
-  // The feed and chart scope is EXPLICIT - never an invisible first-account
+  // The feed and chart scope is EXPLICIT: never an invisible first-account
   // coupling. The choice lives in the URL so it survives navigation to
   // account detail or Activity; the fallback is the first account only when
   // the URL names none.
@@ -192,7 +192,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
         </Card>
       ) : (
         <>
-          {/* The account record. Position band first - usable funds and debt
+          {/* The account record. Position band first: usable funds and debt
               are separate figures; net position is never presented as
               spendable money. Then the account list. */}
           <Card className="mt-5">
@@ -257,7 +257,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
               </Table>
             </div>
 
-            {/* Narrow stacked rows - the same essential information, never a
+            {/* Narrow stacked rows: the same essential information, never a
                 horizontally scrolling table that hides status or amounts. */}
             <ul className="divide-y divide-divider md:hidden">
               {accountList.map((a) => (
@@ -383,7 +383,7 @@ export default function DashboardPage({
 }: {
   searchParams?: Promise<{ account?: string | string[] }>;
 }) {
-  // Next 15+ delivers searchParams as a Promise - unwrap it, mirroring the
+  // Next 15+ delivers searchParams as a Promise: unwrap it, mirroring the
   // account-detail page pattern (kept optional so tests render without it).
   const params = searchParams ? React.use(searchParams) : null;
   const initial = typeof params?.account === "string" ? params.account : "";

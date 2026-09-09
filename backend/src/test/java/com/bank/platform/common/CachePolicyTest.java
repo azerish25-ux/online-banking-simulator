@@ -35,7 +35,7 @@ class CachePolicyTest {
         "the typed binding must produce a real Caffeine manager");
 
     // CaffeineCacheManager creates a region on first use with the builder it
-    // was given - pull the actual runtime policies out of the cache itself.
+    // was given: pull the actual runtime policies out of the cache itself.
     for (String region : new String[] {"summaries", "public-stats"}) {
       Cache cache = cacheManager.getCache(region);
       assertNotNull(cache, region + " region must be creatable");

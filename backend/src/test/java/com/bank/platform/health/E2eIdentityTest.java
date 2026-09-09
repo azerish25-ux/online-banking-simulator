@@ -45,7 +45,7 @@ class E2eIdentityTest {
         .andExpect(jsonPath("$.marker").value("unit-run-42"))
         .andExpect(jsonPath("$.testMode").value(true))
         .andExpect(jsonPath("$.version").exists())
-        // The DB identity is live JDBC metadata - the H2 test database here,
+        // The DB identity is live JDBC metadata: the H2 test database here,
         // never an environment variable named TEST.
         .andExpect(jsonPath("$.db.product").isString())
         .andExpect(jsonPath("$.db.url").isString())
@@ -53,7 +53,7 @@ class E2eIdentityTest {
   }
 }
 
-/** Production context: no marker configured - the control does not exist. */
+/** Production context: no marker configured: the control does not exist. */
 @SpringBootTest(properties = "app.e2e.marker=")
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -63,7 +63,7 @@ class ProductionE2eIdentityTest {
 
   @Test
   void productionWithoutMarkerHasNoIdentityControl() throws Exception {
-    // 404 - a health scanner cannot tell the control exists, and a stale
+    // 404: a health scanner cannot tell the control exists, and a stale
     // leftover server would have to be booted WITH this run's marker to pass.
     mvc.perform(get("/api/e2e/identity"))
         .andExpect(status().isNotFound());

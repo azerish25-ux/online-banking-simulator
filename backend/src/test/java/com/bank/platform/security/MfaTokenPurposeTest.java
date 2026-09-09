@@ -32,7 +32,7 @@ import org.springframework.test.web.servlet.MvcResult;
  * MFA audience) must NEVER authenticate a protected request, and an access
  * token must NEVER complete an MFA challenge. Purpose-less tokens, wrong
  * purpose/audience/issuer, expired tokens, bad signatures, and unapproved
- * algorithms are all rejected - while a properly completed MFA session keeps
+ * algorithms are all rejected: while a properly completed MFA session keeps
  * working.
  */
 @SpringBootTest(properties = "app.auth.rate-limit.per-minute=1000")

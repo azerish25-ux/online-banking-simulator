@@ -40,7 +40,7 @@ public class TotpService {
     }
   }
 
-  /** Current code - exposed for tests; production callers never need it. */
+  /** Current code: exposed for tests; production callers never need it. */
   public String currentCode(String secret) {
     long counter = clock.getTime() / 30;
     try {

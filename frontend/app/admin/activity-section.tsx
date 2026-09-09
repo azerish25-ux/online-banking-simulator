@@ -16,7 +16,7 @@ function shortId(id: string | null | undefined): string {
  * The console's posted-flow readout and the reversal workbench: REVERSAL rows
  * are labelled with their parent and the operator's reason, a POSTED row that
  * has already been reversed carries a small mark, and every reversible posted
- * TRANSFER/DEPOSIT offers Reverse here (the reason dialog is shared - see
+ * TRANSFER/DEPOSIT offers Reverse here (the reason dialog is shared: see
  * ReversalAction).
  */
 export function ActivitySection() {
@@ -44,7 +44,7 @@ export function ActivitySection() {
             const isReversal = t.kind === "REVERSAL";
             // A reversal row already carries the legs in the direction money
             // moves back, so a plain A → B route reads correctly; a deposit
-            // reversal has no payee - its money returns to the funding rail.
+            // reversal has no payee: its money returns to the funding rail.
             const dest =
               isReversal && !t.toIban ? "funding rail" : (maskIban(t.toIban) ?? "-");
             const route = (maskIban(t.fromIban) ?? "DEP") + " → " + dest;

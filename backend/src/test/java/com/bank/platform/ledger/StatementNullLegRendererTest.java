@@ -20,7 +20,7 @@ import org.junit.jupiter.api.Test;
 /**
  * Regression: a statement row whose counterpart leg is NULL (a deposit
  * reversal returning to the funding rail, V29; an engine interest row
- * settling against its counteraccount - a shape shipped since V23) must
+ * settling against its counteraccount: a shape shipped since V23) must
  * render through BOTH exporters. The PDF description fallback used to probe
  * the immutable IBAN map ({@code Map.copyOf}) with the null leg as the key,
  * which throws NPE on {@code get(null)} → HTTP 500; the CSV renderer already

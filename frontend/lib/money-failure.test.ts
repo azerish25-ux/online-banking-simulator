@@ -37,7 +37,7 @@ describe("classifyMoneyFailure", () => {
     expect(failure.message).toContain("cannot double-post");
   });
 
-  it("treats a 409 key conflict as unknown - the operation may already exist", () => {
+  it("treats a 409 key conflict as unknown: the operation may already exist", () => {
     const failure = classifyMoneyFailure("deposit", new ApiError(409, "Idempotency Conflict", "used"));
     expect(failure.ambiguous).toBe(true);
     expect(failure.message).toContain("may already have gone through");
@@ -76,14 +76,14 @@ describe("classifyReversalFailure", () => {
       const failure = classifyReversalFailure(err);
       expect(failure.ambiguous).toBe(true);
       expect(failure.message).toContain("could not confirm whether the reversal was recorded");
-      // The check is the posted list - NOT a blind retry.
+      // The check is the posted list: NOT a blind retry.
       expect(failure.message).toContain("Refresh the posted list");
       expect(failure.message).toContain("A second reversal of the same transaction would be refused");
     }
   });
 });
 
-describe("isDefinitiveRejection - the single owner of the boundary", () => {
+describe("isDefinitiveRejection: the single owner of the boundary", () => {
   it("is true only for a real 4xx rejection (never 409/429, network or 5xx)", () => {
     expect(isDefinitiveRejection(new ApiError(400, "x", "m"))).toBe(true);
     expect(isDefinitiveRejection(new ApiError(404, "x", "m"))).toBe(true);

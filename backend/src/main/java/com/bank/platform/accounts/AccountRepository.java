@@ -21,7 +21,7 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
   Optional<Account> findByIban(String iban);
 
   /**
-   * Scalars only - never returns a managed {@link Account} into the caller's
+   * Scalars only: never returns a managed {@link Account} into the caller's
    * persistence context. Money flows must resolve the two account IDs this
    * way and let {@link #findByIdForUpdate} be the first entity read of the
    * rows: if an Account were loaded here first, the later FOR UPDATE would

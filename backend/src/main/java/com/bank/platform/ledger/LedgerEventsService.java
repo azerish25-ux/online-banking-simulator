@@ -127,7 +127,7 @@ public class LedgerEventsService {
     return accounts.findById(accountId).map(Account::getIban).orElse("");
   }
 
-  /** Decision reasons are bounded, rendered-safe metadata - never whole
+  /** Decision reasons are bounded, rendered-safe metadata: never whole
    *  request payloads. */
   private static String boundedReason(String reason) {
     if (reason == null) {

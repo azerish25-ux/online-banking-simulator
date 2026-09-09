@@ -13,11 +13,11 @@ import java.util.UUID;
 /**
  * One committed external-delivery intent. The row is written in the
  * SAME transaction as the operation that produced it, and only a worker that
- * claims it AFTER that commit may call the provider - so a rolled-back
+ * claims it AFTER that commit may call the provider: so a rolled-back
  * operation never sends mail, and a committed operation's mail cannot be
  * lost to a crash before delivery (it stays PENDING and is picked up again).
  * Delivery is at-least-once: if the provider fails after accepting, the row
- * retries (attempts + backoff) and may duplicate - the honest contract for a
+ * retries (attempts + backoff) and may duplicate: the honest contract for a
  * stub with no provider-side idempotency. Rows that exhaust their budget
  * dead-letter to {@link Status#FAILED} for an operator.
  */
@@ -32,7 +32,7 @@ public class EmailOutbox {
     DELIVERING,
     /** Provider accepted the mail. */
     SENT,
-    /** Exhausted retries - operator review required. */
+    /** Exhausted retries: operator review required. */
     FAILED
   }
 

@@ -17,7 +17,7 @@ public class V6__loan_balance_checks extends BaseJavaMigration {
 
   @Override
   public void migrate(Context context) throws Exception {
-    // NOTE: never close context.getConnection() - Flyway owns it and will commit/rollback.
+    // NOTE: never close context.getConnection(): Flyway owns it and will commit/rollback.
     Connection connection = context.getConnection();
     {
       List<String> toDrop = new ArrayList<>();

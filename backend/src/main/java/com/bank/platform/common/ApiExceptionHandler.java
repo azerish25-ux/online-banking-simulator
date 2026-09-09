@@ -176,7 +176,7 @@ public class ApiExceptionHandler {
 
   /**
    * DB constraint races (a unique/index collision two requests hit at once)
-   * must not surface as a 500 with internals - they are conflicts.
+   * must not surface as a 500 with internals: they are conflicts.
    */
   @ExceptionHandler(DataIntegrityViolationException.class)
   public ResponseEntity<ApiProblem> conflict(DataIntegrityViolationException ex) {
@@ -185,7 +185,7 @@ public class ApiExceptionHandler {
   }
 
   /**
-   * A row changed after it was read (optimistic lock on accounts - see V16).
+   * A row changed after it was read (optimistic lock on accounts: see V16).
    * The other writer won; the request is safe to retry against fresh state.
    * Reaching this is always better than silently overwriting a newer balance.
    */
@@ -214,7 +214,7 @@ public class ApiExceptionHandler {
 
   /**
    * Last-resort guard: whatever escapes the specific handlers still answers
-   * RFC-7807 with NO internals - never the exception message or stack trace.
+   * RFC-7807 with NO internals: never the exception message or stack trace.
    * The body stays generic, but the failure itself is always logged with the
    * request's trace id so operators can actually investigate it.
    */
@@ -227,8 +227,7 @@ public class ApiExceptionHandler {
   /**
    * The one RFC-7807 body. Controllers outside this advice's reach (e.g.
    * package-local not-found handlers) and the security chain's 401/403
-   * entry point use it so the problem shape - including the type URI -
-   * cannot drift between responses.
+   * entry point use it so the problem shape: including the type URI: * cannot drift between responses.
    */
   public static ApiProblem body(HttpStatus status, String title, String detail) {
     return new ApiProblem(

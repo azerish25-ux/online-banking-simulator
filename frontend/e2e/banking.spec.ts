@@ -2,19 +2,19 @@ import { expect, test, type Page } from "@playwright/test";
 
 /**
  * The one test that proves the whole machine: register through the browser,
- * fund via the simulated rail, move money, see it land - against a real
+ * fund via the simulated rail, move money, see it land: against a real
  * backend and a real PostgreSQL, never mocks. CI boots the stack for this.
  *
  * Flow relies on two deterministic facts: accounts list oldest-first
  * (CHECKING before SAVINGS), and the dashboard account list shows MASKED
  * identifiers while each account's detail page shows the full
- * simulator identifier - the transfers form only accepts full identifiers.
+ * simulator identifier: the transfers form only accepts full identifiers.
  */
 const email = `e2e-${Date.now()}@bank.local`;
 const emailHeld = `e2e-held-${Date.now()}@bank.local`;
 
 /** Open account row `row` (1-based creation order: Checking, then Savings)
- *  and read its full simulator identifier from the detail page - the only
+ *  and read its full simulator identifier from the detail page: the only
  *  place the dashboard shows it in full (the account list is masked). */
 async function accountIban(page: Page, row: number): Promise<string> {
   const links = page.locator("main table a[href*='/accounts/']");
@@ -42,7 +42,7 @@ test("review-threshold transfer is held for review, never reported as posted", a
   await page.getByLabel("Account type").selectOption("SAVINGS");
   await page.getByRole("button", { name: /^Open$/, exact: true }).click();
   await expect(page.getByText("Account opened.")).toBeVisible();
-  // The toast can land before the second account row re-renders - wait for
+  // The toast can land before the second account row re-renders: wait for
   // both rows, then open the savings detail page to read its identifier.
   const accountLinks = page.locator("main table a[href*='/accounts/']");
   await expect(accountLinks).toHaveCount(2);
@@ -53,7 +53,7 @@ test("review-threshold transfer is held for review, never reported as posted", a
   await page.getByRole("button", { name: /^Deposit$/ }).click();
   await expect(page.getByText("Deposited $10,000.00")).toBeVisible();
 
-  // A $10,000+ transfer must NOT toast "Transfer posted" - it is held until
+  // A $10,000+ transfer must NOT toast "Transfer posted": it is held until
   // an operator approves it (the regression: a bare `status` reference
   // resolved to window.status and always reported the transfer as posted).
   await page.goto("/transfers");
@@ -126,7 +126,7 @@ test("full money loop in the browser", async ({ page }) => {
   await expect(page.getByText("e2e rent")).toBeVisible();
 
   // The durable receipt route answers later (bookmark reload) with the
-  // authoritative POSTED state and posting time - never component state.
+  // authoritative POSTED state and posting time: never component state.
   await page.goto(receiptHref as string);
   await expect(page.getByRole("heading", { name: "Transfer receipt" })).toBeVisible();
   await expect(page.getByText("Settled. The money moved")).toBeVisible();

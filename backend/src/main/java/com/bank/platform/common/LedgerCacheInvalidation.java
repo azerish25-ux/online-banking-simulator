@@ -11,10 +11,10 @@ import org.springframework.transaction.support.TransactionSynchronizationManager
  * <p>Each clear is applied twice, deliberately:
  *
  * <ol>
- *   <li><b>Immediately</b> - a later read in the SAME transaction (test flows,
+ *   <li><b>Immediately</b>: a later read in the SAME transaction (test flows,
  *       or a service that reads after writing) must not observe a value cached
  *       before this transaction's changes became visible in it.</li>
- *   <li><b>At transaction completion (commit OR rollback)</b> - this closes
+ *   <li><b>At transaction completion (commit OR rollback)</b>: this closes
  *       the pre-commit race where a concurrent reader repopulates the cache
  *       with the pre-commit state between the immediate clear and the commit;
  *       the completion clear removes anything cached from a state that did not
@@ -50,7 +50,7 @@ public class LedgerCacheInvalidation {
     }
   }
 
-  /** Immediate clear - for callers that are already past every relevant commit. */
+  /** Immediate clear: for callers that are already past every relevant commit. */
   public void clearNow(String... regions) {
     for (String region : regions) {
       org.springframework.cache.Cache cache = cacheManager.getCache(region);

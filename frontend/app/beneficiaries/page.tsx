@@ -26,7 +26,7 @@ export default function BeneficiariesPage() {
   const [removeError, setRemoveError] = React.useState<string | null>(null);
   const { register, handleSubmit, reset, formState } = useForm<Form>({ resolver: zodResolver(schema) });
 
-  // Each new confirm dialog starts clean - a rejection from a previous
+  // Each new confirm dialog starts clean: a rejection from a previous
   // attempt must not reappear.
   React.useEffect(() => {
     if (confirm) setRemoveError(null);

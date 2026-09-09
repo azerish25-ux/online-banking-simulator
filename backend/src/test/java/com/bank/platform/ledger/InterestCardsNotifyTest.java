@@ -116,7 +116,7 @@ class InterestCardsNotifyTest {
                 .formatted(savingsIban, loanId)))
         .andExpect(status().isUnprocessableEntity());
 
-    // July 1st, 03:00 - the accrual run prices June.
+    // July 1st, 03:00: the accrual run prices June.
     CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
     assertEquals(2, interestService.accrueMonthly().get("accrued"));
     // Savings: 1400 held from June 15-30 (16 closing days) at 4% actual/365.
@@ -165,7 +165,7 @@ class InterestCardsNotifyTest {
   /**
    * Frozen accounts do not accrue and are not retroactively charged after
    * re-activation. A loan drawn in June and frozen on July 10 is charged for
-   * June and for July 1..9 only - never July 10..31. When it is unfrozen in
+   * June and for July 1..9 only: never July 10..31. When it is unfrozen in
    * August, the next run prices August 5..31 and skips the frozen days, using
    * the recorded status history rather than today's principal or status.
    */
@@ -195,7 +195,7 @@ class InterestCardsNotifyTest {
     expectBalance(token, loanId, expectedLoanBalance("500.00", juneCharge));
 
     // Freeze the loan on July 10. The August 1 run (which prices July) sees a
-    // frozen account and skips it entirely - nothing accrues, nothing zeroes.
+    // frozen account and skips it entirely: nothing accrues, nothing zeroes.
     CLOCK.set(Instant.parse("2026-07-10T10:00:00Z"));
     mvc.perform(post("/api/v1/admin/accounts/" + loanId + "/freeze")
             .header("Authorization", "Bearer " + admin))
@@ -377,7 +377,7 @@ class InterestCardsNotifyTest {
     throw new IllegalStateException("account not found");
   }
 
-  /** A clock a test can wind forward - reset in @BeforeEach. */
+  /** A clock a test can wind forward: reset in @BeforeEach. */
   private static final class SettableClock extends Clock {
     private Instant instant = Instant.parse("2026-06-15T10:00:00Z");
 

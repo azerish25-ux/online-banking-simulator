@@ -32,7 +32,7 @@ import org.springframework.transaction.annotation.Transactional;
  * Contract for the record-and-alert side effects of ledger money events,
  * owned by {@link LedgerEventsService}. The notification copy, the recipient
  * per event, and the audit metadata maps are user-facing product behavior, so
- * they are pinned exactly as emitted - a refactor that moves or rewrites them
+ * they are pinned exactly as emitted: a refactor that moves or rewrites them
  * must update this file deliberately, never silently.
  */
 @SpringBootTest
@@ -103,7 +103,7 @@ class LedgerEventContractTest {
     assertEquals("Your transfer of $12,000.00 to " + bobIban
         + " is held for operator review; no money has moved yet.", held.getBody());
 
-    // The recipient is not told about an intent - no money has reached them.
+    // The recipient is not told about an intent: no money has reached them.
     assertNoNotifications("events-e@example.com", "TRANSFER_RECEIVED");
 
     AuditLog log = auditRow("TRANSFER_HELD");
@@ -131,7 +131,7 @@ class LedgerEventContractTest {
 
     AuditLog log = auditRow("TRANSFER_APPROVED");
     assertEquals(heldId, log.getEntityId());
-    // The decision reason is part of the audit contract - bounded and
+    // The decision reason is part of the audit contract: bounded and
     // plain (the API default when a programmatic caller sends none).
     assertEquals(Map.of("amount", "12000.0000", "from", aliceIban, "to", bobIban,
             "reason", "Operator decision"),

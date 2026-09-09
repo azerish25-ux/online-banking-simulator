@@ -1174,14 +1174,14 @@ export interface components {
             /** @enum {string} */
             kind: "TRANSFER" | "DEPOSIT" | "INTEREST" | "REVERSAL";
             memo: string | null;
-            /** @description null while HELD or when CANCELLED - money has not moved */
+            /** @description null while HELD or when CANCELLED: money has not moved */
             postedAt: string | null;
             /**
              * Format: uuid
              * @description Operator surfaces only: id of the REVERSAL row when this posted transaction has been reversed. Always null on customer-facing feeds.
              */
             reversalId: string | null;
-            /** @description Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds - it is the operator's internal note. */
+            /** @description Operator surfaces only: the mandatory reason on a REVERSAL row. Always null on customer-facing feeds: it is the operator's internal note. */
             reversalReason: string | null;
             /**
              * Format: uuid
@@ -1212,7 +1212,7 @@ export interface components {
             /** Format: uuid */
             id: string;
             memo: string | null;
-            /** @description null while HELD or when CANCELLED - money has not moved */
+            /** @description null while HELD or when CANCELLED: money has not moved */
             postedAt: string | null;
             /** @enum {string} */
             status: "POSTED" | "HELD" | "CANCELLED";
@@ -1902,7 +1902,7 @@ export interface operations {
             };
         };
         responses: {
-            /** @description Authenticated - session tokens issued */
+            /** @description Authenticated: session tokens issued */
             200: {
                 headers: {
                     [name: string]: unknown;
@@ -1911,7 +1911,7 @@ export interface operations {
                     "application/json": components["schemas"]["AuthResponse"];
                 };
             };
-            /** @description MFA required - verify the returned mfaToken */
+            /** @description MFA required: verify the returned mfaToken */
             202: {
                 headers: {
                     [name: string]: unknown;

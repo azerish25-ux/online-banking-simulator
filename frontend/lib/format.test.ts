@@ -41,7 +41,7 @@ describe("usd", () => {
 
 describe("exact sums and review precision", () => {
   it("sums at the ledger scale and rounds only the final result", () => {
-    // 0.0049 + 0.0049 = 0.0098 - per-item rounding would give $0.00 + $0.00;
+    // 0.0049 + 0.0049 = 0.0098: per-item rounding would give $0.00 + $0.00;
     // summing at ten-thousandths and rounding once shows the true $0.01.
     expect(totalUsd(["0.0049", "0.0049"])).toBe("$0.01");
     // The classic float trap stays exact: 0.1 + 0.2 + 0.3 = 0.6.

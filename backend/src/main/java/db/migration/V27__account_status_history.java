@@ -10,8 +10,8 @@ import org.flywaydb.core.api.migration.Context;
  * <p>Interest must not be charged for days an account was frozen, and a frozen
  * period must not be retroactively charged after re-activation. The interest
  * job therefore prices each calendar day only if the account was ACTIVE that
- * day. That requires knowing when status actually changed - the audit log is
- * not a queryable schedule - so every FROZEN/ACTIVE transition written by
+ * day. That requires knowing when status actually changed: the audit log is
+ * not a queryable schedule: so every FROZEN/ACTIVE transition written by
  * operations is recorded here, in the same transaction as the status change.
  * Rows are immutable: nothing edits or deletes a transition.
  */

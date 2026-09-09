@@ -56,7 +56,7 @@ public class CardService {
 
   /**
    * Issues a Luhn-valid demo PAN. The full number and CVV are returned exactly
-   * once - only hashes and the last4 are stored (tokenization-lite).
+   * once: only hashes and the last4 are stored (tokenization-lite).
    */
   @Transactional
   public IssuedCard issue(String email, UUID accountId) {

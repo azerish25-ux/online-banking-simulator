@@ -9,7 +9,7 @@ import org.junit.jupiter.api.Test;
 
 /**
  * The account wire shape carries authoritative principal
- * owed, interest owed, total owed, and available credit - derived server-side
+ * owed, interest owed, total owed, and available credit: derived server-side
  * from the loan policy (available credit is principal headroom, never
  * balance-derived). Non-loan accounts carry nulls.
  */

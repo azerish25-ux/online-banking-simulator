@@ -1,5 +1,5 @@
 /**
- * The MFA challenge token lives in module memory only - never a cookie,
+ * The MFA challenge token lives in module memory only: never a cookie,
  * never the URL. It survives client-side navigation from the login page to
  * the /login/mfa challenge screen; a hard reload loses it, in which case
  * the challenge page asks the user to log in again (the token is a
@@ -23,7 +23,7 @@ export function peekMfaToken(): string | null {
   return pending.token;
 }
 
-/** Called only after a successful verification - the challenge is spent. */
+/** Called only after a successful verification: the challenge is spent. */
 export function clearMfaToken(): void {
   pending = null;
 }

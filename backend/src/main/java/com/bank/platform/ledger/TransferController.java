@@ -92,13 +92,13 @@ public class TransferController {
     // so no sentinel bounds exist). An inverted from/to pair is rejected by
     // Period and surfaces as a 400 before any query runs. The cursor is the
     // opaque position AFTER the previously returned page: an absent or
-    // null cursor is the newest page, and a malformed one is a 400 - keyset
+    // null cursor is the newest page, and a malformed one is a 400: keyset
     // paging has no "absurd depth" to clamp because it never re-scans an
     // offset.
     Period window = new Period(from, to);
     // server-backed filters: amount range, kind(s), state(s) and a
     // reference/counterparty search are VALIDATED here (400 before any query)
-    // and then become SQL predicates over the whole account history - never a
+    // and then become SQL predicates over the whole account history: never a
     // client-side filter of the loaded page. "Searching" a 10-row page is
     // deliberately impossible: the DAO's predicates run on the database.
     BigDecimal min = decimalFilter(minAmount, "minAmount");
@@ -113,7 +113,7 @@ public class TransferController {
     String term = q == null || q.isBlank() ? null : q.trim();
     if (term != null && term.length() < 2) {
       // A one-character LIKE over every memo and counter-party IBAN is not a
-      // search - it is a scan. Bound expensive searches.
+      // search: it is a scan. Bound expensive searches.
       throw new IllegalArgumentException(
           "Search term must be at least 2 characters");
     }
@@ -143,7 +143,7 @@ public class TransferController {
     if (hasMore && last != null) {
       // The ordering key's seq is DB-assigned and never written back to the
       // mapped entity (see TransactionRepository.rawSeqOf), so read it from
-      // the table - a keyset cursor built from a null seq would corrupt the
+      // the table: a keyset cursor built from a null seq would corrupt the
       // next page's boundary.
       Long seq = transactions.rawSeqOf(last.getId())
           .orElseThrow(() -> new IllegalStateException("transaction row lacks its seq key"));
@@ -193,7 +193,7 @@ public class TransferController {
   /**
    * Operation-status lookup by idempotency key. Ownership is
    * originator-scoped: only the user whose account carries the key may see
-   * the operation - a foreign or unknown key is indistinguishable (404), so
+   * the operation: a foreign or unknown key is indistinguishable (404), so
    * probing never discloses another user's row. A client that lost the
    * response resolves its key here before offering another submit.
    *
@@ -216,7 +216,7 @@ public class TransferController {
 
   /**
    * Authorized recovery list (namespace fix): the caller's own recent
-   * keyed transfers and deposits, newest first, bounded - including
+   * keyed transfers and deposits, newest first, bounded: including
    * completed-but-unacknowledged postings. After a lost response, a reload
    * or a re-login the owner can rediscover what a key actually did without
    * relying on browser storage.

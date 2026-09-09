@@ -115,7 +115,7 @@ describe("query hooks", () => {
     const user = userEvent.setup();
     setToken("tok");
     vi.mocked(api)
-      // Transient 5xx: the transfer may or may not have posted - the retry
+      // Transient 5xx: the transfer may or may not have posted: the retry
       // must reuse the same key so the server deduplicates, never double-sends.
       .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"));
     withClient(<TransferSender />);
@@ -148,7 +148,7 @@ describe("query hooks", () => {
     first.unmount();
     cleanup();
 
-    // "Reload": a brand-new hook instance, no in-memory ref - only the store.
+    // "Reload": a brand-new hook instance, no in-memory ref: only the store.
     // Re-submitting the SAME reviewed intent must resume the SAME key, so the
     // server replays the original operation instead of posting a second one.
     withClient(<TransferSender />);
@@ -211,7 +211,7 @@ describe("query hooks", () => {
     await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
     const after5xx = sentKeys();
 
-    // The successful retry reuses the 5xx attempt's key - the server dedupes
+    // The successful retry reuses the 5xx attempt's key: the server dedupes
     // on it, so a transfer that actually posted must not double-send.
     await user.click(send);
     await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
@@ -268,7 +268,7 @@ describe("query hooks", () => {
     const user = userEvent.setup();
     setToken("tok");
     vi.mocked(api)
-      // Transient 5xx: the deposit may or may not have posted - the retry must
+      // Transient 5xx: the deposit may or may not have posted: the retry must
       // reuse the same key so the server never double-credits.
       .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"))
       .mockResolvedValueOnce({
@@ -294,7 +294,7 @@ describe("query hooks", () => {
     const user = userEvent.setup();
     setToken("tok");
     vi.mocked(api)
-      // A 409 means the key already names an operation - never discard it: a
+      // A 409 means the key already names an operation: never discard it: a
       // retry must resolve the original result, not mint a competing op.
       .mockRejectedValueOnce(new ApiError(409, "Idempotency Conflict", "already used"))
       .mockResolvedValueOnce({

@@ -77,9 +77,9 @@ public class AuthController {
    */
   @Operation(summary = "Log in", description = "Returns 200 with an authenticated session, or 202 with a single-use MFA challenge when the account has a factor enabled.")
   @ApiResponses({
-      @ApiResponse(responseCode = "200", description = "Authenticated - session tokens issued",
+      @ApiResponse(responseCode = "200", description = "Authenticated: session tokens issued",
           content = @Content(mediaType = "application/json", schema = @Schema(implementation = AuthResponse.class))),
-      @ApiResponse(responseCode = "202", description = "MFA required - verify the returned mfaToken",
+      @ApiResponse(responseCode = "202", description = "MFA required: verify the returned mfaToken",
           content = @Content(mediaType = "application/json", schema = @Schema(implementation = AuthDtos.MfaRequiredResponse.class))),
       @ApiResponse(responseCode = "400", description = "Invalid credentials or validation failure",
           content = @Content(mediaType = "application/json", schema = @Schema(implementation = ApiProblem.class))),
@@ -141,7 +141,7 @@ public class AuthController {
    */
   /**
    * Enabling (or replacing) the factor bumps the user's security version and
-   * revokes every outstanding refresh token - which would invalidate
+   * revokes every outstanding refresh token: which would invalidate
    * THIS session's access token on its very next call. So the response
    * reissues a fresh credential pair under the NEW version: the caller stays
    * signed in across the factor change and the old credentials stay dead.

@@ -41,7 +41,7 @@ export function totpCode(secret: string, atMs: number = Date.now()): string {
   return (truncated % 1_000_000).toString().padStart(6, "0");
 }
 
-/** Codes for the current, previous and next windows - retries land safely. */
+/** Codes for the current, previous and next windows: retries land safely. */
 export function totpCodesNearNow(secret: string): string[] {
   const now = Date.now();
   return [totpCode(secret, now), totpCode(secret, now - 30_000), totpCode(secret, now + 30_000)];

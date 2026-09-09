@@ -16,7 +16,7 @@
   <artifactId>platform</artifactId>
   <version>1.3.0</version>
   <name>platform</name>
-  <description>Online Banking Simulator - demo of a banking core (Spring Boot backend)</description>
+  <description>Online Banking Simulator: a demo of a banking core (Spring Boot backend)</description>
 
   <properties>
     <java.version>17</java.version>

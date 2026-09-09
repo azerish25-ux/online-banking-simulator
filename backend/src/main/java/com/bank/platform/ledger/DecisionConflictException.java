@@ -17,7 +17,7 @@ public class DecisionConflictException extends RuntimeException {
   private final boolean reviewed;
 
   public DecisionConflictException(UUID transactionId, String currentStatus, boolean reviewed) {
-    super("Case " + transactionId + " is no longer awaiting this decision - current state: "
+    super("Case " + transactionId + " is no longer awaiting this decision: current state: "
         + currentStatus + (reviewed ? " (reviewed)" : "") + ". Refresh the queue.");
     this.transactionId = transactionId;
     this.currentStatus = currentStatus;

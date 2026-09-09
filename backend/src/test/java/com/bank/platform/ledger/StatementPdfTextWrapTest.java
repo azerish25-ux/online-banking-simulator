@@ -20,8 +20,8 @@ import org.junit.jupiter.api.Test;
  *   <li>an unbreakable token wider than the column wraps at grapheme-cluster
  *       boundaries into measured lines that each FIT the column, with every
  *       character preserved (no clip, no drop, no mid-cluster break);</li>
- *   <li>Persian/Arabic memos are SHAPED - ICU produces joined presentation
- *       forms, not the old mirrored isolated letters - and Latin content in
+ *   <li>Persian/Arabic memos are SHAPED: ICU produces joined presentation
+ *       forms, not the old mirrored isolated letters: and Latin content in
  *       the same line stays in order and untouched.</li>
  * </ul>
  */
@@ -54,8 +54,7 @@ class StatementPdfTextWrapTest {
     assertEquals(token, String.join("", lines),
         "wrapping must not add, drop or reorder a single character");
 
-    // The ASCII token is pure LTR: each measured line must FIT the column -
-    // this is the exact defect class that used to overflow into the amounts.
+    // The ASCII token is pure LTR: each measured line must FIT the column: // this is the exact defect class that used to overflow into the amounts.
     for (String line : lines) {
       assertTrue(width(line) <= DESC_WIDTH,
           "every wrapped line must fit the column (overflowed at width "
@@ -89,7 +88,7 @@ class StatementPdfTextWrapTest {
 
   @Test
   void persianTextIsShapedIntoPresentationFormsNotIsolatedLetters() {
-    // "پرداخت به فروشگاه" - under real shaping the drawn glyph stream must
+    // "پرداخت به فروشگاه": under real shaping the drawn glyph stream must
     // carry Arabic PRESENTATION FORMS (FB50-FDFF / FE70-FEFF), which is what
     // joins letters into connected script. The old defect mirrored isolated
     // base letters and produced none of these code points.
@@ -112,8 +111,7 @@ class StatementPdfTextWrapTest {
         "the leading Latin identifier must survive contiguous and in order: " + hex(display));
     assertTrue(display.contains("12.50"),
         "the amount digits must survive contiguous and in order: " + hex(display));
-    // The Persian text must be shaped (joined presentation forms present) -
-    // the old defect emitted mirrored isolated base letters instead.
+    // The Persian text must be shaped (joined presentation forms present): // the old defect emitted mirrored isolated base letters instead.
     boolean shaped = display.codePoints().anyMatch(cp ->
         (cp >= 0xFB50 && cp <= 0xFDFF) || (cp >= 0xFE70 && cp <= 0xFEFF));
     assertTrue(shaped, "the RTL portion must be shaped: " + hex(display));

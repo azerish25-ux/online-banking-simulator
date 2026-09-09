@@ -13,7 +13,7 @@ import org.flywaydb.core.api.migration.Context;
  *
  * <p>Loan interest is priced from the principal outstanding on each day of
  * the period, never from today's principal. That requires an immutable
- * record of what changed principal and when - draws (principal up),
+ * record of what changed principal and when: draws (principal up),
  * principal repayments (principal down, interest extinguished first under the
 (repayment policy) and the legacy cutover baseline. Every row carries
  * the financial transaction that produced it (unique per account + source, so
@@ -23,7 +23,7 @@ import org.flywaydb.core.api.migration.Context;
  * <p>Legacy loans (created before this deployment) cannot prove their
  * day-by-day principal history, so each receives ONE {@code CUTOVER} baseline
  * row stamped at the migration instant. Periods wholly before that instant
- * are never priced - no fabricated history - and the first supported accrual
+ * are never priced: no fabricated history: and the first supported accrual
  * boundary for that account is the month containing the cutover instant.
  */
 public class V26__principal_movements extends BaseJavaMigration {

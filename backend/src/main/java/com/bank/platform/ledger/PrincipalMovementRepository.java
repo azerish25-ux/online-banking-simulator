@@ -11,7 +11,7 @@ import org.springframework.data.repository.query.Param;
 
 public interface PrincipalMovementRepository extends JpaRepository<PrincipalMovement, UUID> {
 
-  /** All movements within a pricing window, oldest first - the day walk input. */
+  /** All movements within a pricing window, oldest first: the day walk input. */
   List<PrincipalMovement> findByAccountIdAndPostedAtGreaterThanEqualAndPostedAtLessThanOrderByPostedAtAsc(
       UUID accountId, Instant from, Instant to);
 

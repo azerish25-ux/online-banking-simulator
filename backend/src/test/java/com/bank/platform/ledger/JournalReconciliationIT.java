@@ -32,10 +32,10 @@ import org.springframework.test.web.servlet.MvcResult;
  * here:
  *
  * <ul>
- *   <li>journal_entries and journal_lines are APPEND-ONLY - even the
+ *   <li>journal_entries and journal_lines are APPEND-ONLY: even the
  *       application's own role cannot UPDATE or DELETE a posted entry
  *       (BEFORE UPDATE/DELETE triggers, V21);</li>
- *   <li>one operation can produce only one journal entry - the DB unique
+ *   <li>one operation can produce only one journal entry: the DB unique
  *       constraint rejects a duplicate even when the application layer
  *       somehow tried;</li>
  *   <li>a corrupted balance projection is reported by the operator-facing
@@ -89,7 +89,7 @@ class JournalReconciliationIT {
     client.deposit(alice, aliceId, "250.00");
 
     // Take THIS deposit's journal identity, then try to book it again
-    // directly - the (kind, operation_ref) uniqueness must refuse.
+    // directly: the (kind, operation_ref) uniqueness must refuse.
     try (Connection c = dataSource.getConnection()) {
       String operationRef = null;
       String kind = null;

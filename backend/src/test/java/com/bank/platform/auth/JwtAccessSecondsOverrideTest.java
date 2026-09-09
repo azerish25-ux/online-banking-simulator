@@ -50,7 +50,7 @@ class JwtAccessSecondsOverrideTest {
     mvc.perform(get("/api/v1/auth/me").header(HttpHeaders.AUTHORIZATION, "Bearer " + firstToken))
         .andExpect(status().isOk());
 
-    // Idle past the TTL: the same token is now rejected as expired - and the
+    // Idle past the TTL: the same token is now rejected as expired: and the
     // rejection is a 401 RFC-7807 body (the status the browser keys its
     // silent refresh on), never the default 403 that would end the session.
     Thread.sleep(3_500);
@@ -59,7 +59,7 @@ class JwtAccessSecondsOverrideTest {
         .andExpect(jsonPath("$.title").value("Unauthorized"));
 
     // The refresh cookie (still the browser's one credential) mints a
-    // successor token that works again - the server chain the e2e exercises.
+    // successor token that works again: the server chain the e2e exercises.
     jakarta.servlet.http.Cookie refresh = register.getResponse().getCookie("refresh_token");
     if (refresh == null || refresh.getValue() == null || refresh.getValue().isEmpty()) {
       throw new AssertionError("register must set a refresh cookie");

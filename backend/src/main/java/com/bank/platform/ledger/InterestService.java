@@ -43,7 +43,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>Savings</b> close each day on the balance derived from the
  *       account's authoritative journal postings (deposits/transfers/interest
  *       credits), so nothing is invented before an account had history.</li>
- *   <li><b>Loans price PRINCIPAL ONLY</b> - interest never compounds. Each
+ *   <li><b>Loans price PRINCIPAL ONLY</b>: interest never compounds. Each
  *       day's closing principal is reconstructed from the immutable
  *       {@link PrincipalMovement} history (draws up, principal repayments
  *       down, legacy cutover baseline), never from today's total debt and   *       never from today's principal. A later repayment cannot erase an
@@ -54,14 +54,14 @@ import org.springframework.transaction.support.TransactionTemplate;
    *       each day is eligible only if the account was ACTIVE at its close. A
    *       run skips an account frozen at run time; when it is re-activated the
    *       catch-up prices only the ACTIVE days of each skipped period from
-   *       that history - a frozen period is never retroactively charged.</li>
+   *       that history: a frozen period is never retroactively charged.</li>
  *   <li><b>Historical periods are priced from the movements that actually
  *       occurred in them.</b> Days before the V26 cutover boundary of a
  *       legacy loan carry no record, so they are never priced and never
- *       claimed as zero - the first supported accrual period starts at the
+ *       claimed as zero: the first supported accrual period starts at the
  *       cutover month.</li>
  *   <li><b>Resumable account-period work.</b> Every eligible account has a
- *       bounded queue of due periods - from its first supported accrual
+ *       bounded queue of due periods: from its first supported accrual
  *       month (or one past its last completed accrual) through the previous
  *       calendar month. Periods are processed in chronological order, one
  *       account×period unit per transaction, and a legitimately-zero period
@@ -70,7 +70,7 @@ import org.springframework.transaction.support.TransactionTemplate;
  *   <li><b>Exact duplicate arbitration.</b> The database uniqueness on
  *       (account, period) decides which overlapping scheduler/admin run owns
  *       a unit; a DataIntegrityViolationException is treated as the expected
- *       duplicate only when it names that constraint - any other integrity
+ *       duplicate only when it names that constraint: any other integrity
  *       failure (foreign key, malformed row) surfaces redacted instead of
  *       being silently swallowed as "already posted".</li>
  * </ul>
@@ -141,7 +141,7 @@ public class InterestService {
     } finally {
       // Interest postings are per-account transactions; whichever units
       // committed (or none) have changed summary buckets, so the cache is
-      // cleared after the run - including a run that died part-way.
+      // cleared after the run: including a run that died part-way.
       invalidation.clearNow("summaries");
     }
   }
@@ -180,7 +180,7 @@ public class InterestService {
                     + " period " + period + " (integrity, not a duplicate)", integrity);
           }
           // The expected duplicate: another run posted this unit while we
-          // waited - it rolled back cleanly and is recorded there.
+          // waited: it rolled back cleanly and is recorded there.
         }
       }
     }
@@ -191,7 +191,7 @@ public class InterestService {
    * The first still-due period for an account: one past its last completed
    * accrual, but never before its first SUPPORTED accrual month. For legacy
    * loans (a V26 CUTOVER baseline exists) the first supported month is the
-   * cutover month - pre-cutover principal was never recorded, so those months
+   * cutover month: pre-cutover principal was never recorded, so those months
    * are neither priced nor claimed zero. Everything else starts at the
    * account's creation month.
    */
@@ -340,7 +340,7 @@ public class InterestService {
   /**
    * Walks a day-by-day pricing window applying the account's status history:
    * only days whose close saw the account ACTIVE are eligible, so a frozen
-   * period is never charged - including when the account is re-activated and
+   * period is never charged: including when the account is re-activated and
    * the job later catches up the months the freeze skipped. Accounts start
    * ACTIVE (creation); every transition with changed_at inside the window
    * flips the flag before that day's close is priced.
@@ -381,7 +381,7 @@ public class InterestService {
    * journal posting (balanced against the INTEREST counteraccount), the
    * customer's INTEREST transaction row, audit and notification. {@code
    * credit} is true for savings (the balance rises) and false for loans (the
-   * debt deepens; principal is untouched - interest never compounds).
+   * debt deepens; principal is untouched: interest never compounds).
    */
   private Integer post(Account account, String periodKey, String memo, boolean credit,
       BigDecimal amount, BigDecimal basis, int dayCount) {
@@ -429,7 +429,7 @@ public class InterestService {
 
   /**
    * The expected duplicate is the (account, period) uniqueness on
-   * {@code interest_accruals} - everything else is a real integrity failure
+   * {@code interest_accruals}: everything else is a real integrity failure
    * and must surface. Constraint names/messages differ between PostgreSQL and
    * H2, so both the named constraint and the H2 shape are recognised.
    */
