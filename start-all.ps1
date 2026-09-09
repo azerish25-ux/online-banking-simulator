@@ -42,7 +42,8 @@ if (-not (Test-Path (Join-Path $pgData "PG_VERSION"))) {
   exit 1
 }
 $installedMajor = (Get-Content (Join-Path $pgData "PG_VERSION")).Trim()
-$binaryMajor = (Get-Content (Join-Path $pgHome "share\postgresql\PG_VERSION") -ErrorAction SilentlyContinue).Trim()
+$binaryVersionFile = Get-Content (Join-Path $pgHome "share\postgresql\PG_VERSION") -ErrorAction SilentlyContinue
+$binaryMajor = if ($binaryVersionFile) { $binaryVersionFile.Trim() } else { $null }
 if ($binaryMajor -and $binaryMajor -ne $installedMajor) {
   Write-Error "PostgreSQL binary at $pgHome is major $binaryMajor but the cluster at $pgData is $installedMajor - use the matching install or point PGHOME at it."
   exit 1

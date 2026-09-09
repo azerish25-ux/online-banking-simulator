@@ -9,9 +9,10 @@ try { $healthy = (Invoke-RestMethod http://localhost:8080/api/health -TimeoutSec
 if (-not $healthy) { Write-Error "backend not healthy on :8080 - run .\start-all.ps1 first"; exit 1 }
 
 $base = "http://localhost:8080/api/v1"
-function Post($path, $body, $token) {
+function Post($path, $body, $token, $idemKey) {
   $h = @{}
   if ($token) { $h.Authorization = "Bearer $token" }
+  if ($idemKey) { $h["Idempotency-Key"] = $idemKey }
   Invoke-RestMethod -Uri "$base$path" -Method Post -ContentType "application/json" -Headers $h -Body ($body | ConvertTo-Json)
 }
 function EnsureUser($email, $name) { try { return Post "/auth/register" @{ email = $email; password = "secret123"; fullName = $name } } catch { return Post "/auth/login" @{ email = $email; password = "secret123" } } }
@@ -25,7 +26,7 @@ $bobAccs = Invoke-RestMethod -Uri "$base/accounts" -Headers @{ Authorization = "
 $checking = $aliceAccs[0]
 if ([double]$checking.balance -lt 13000) {
   $deposit = 14000 - [double]$checking.balance
-  Post "/accounts/$($checking.id)/deposit" @{ amount = $deposit.ToString("0.00") } $alice.accessToken | Out-Null
+  Post "/accounts/$($checking.id)/deposit" @{ amount = $deposit.ToString("0.00") } $alice.accessToken "seed-alice-deposit-1" | Out-Null
 }
 
 # Small everyday transfer (idempotency key makes replays safe).
