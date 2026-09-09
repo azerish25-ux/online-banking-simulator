@@ -210,7 +210,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
 
   const pageHeading = (
     <>
-      <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Activity</h1>
+      <h1 className="text-xl leading-7">Activity</h1>
       <p className="muted text-sm">Full transaction history with statement export.</p>
     </>
   );
@@ -263,7 +263,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
             aria-label="Account"
             value={accountId}
             onChange={(e) => selectAccount(e.target.value)}
-            className="h-10 rounded-md"
+            className="h-10 w-56"
           >
             {list.map((a) => (
               <option key={a.id} value={a.id}>{accountLabel(a)}</option>
@@ -279,7 +279,10 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
           resolve it, never left guessing). */}
       <UnresolvedOperations />
 
-      <Card className="mb-4">
+      {/* Filters sit in a labelled band - a real fieldset, not another panel
+          floating between the toolbar and the ledger. */}
+      <fieldset className="well mb-4 px-4 py-3">
+        <legend className="px-1 text-sm font-medium text-content-secondary">Filter history</legend>
         <form onSubmit={applyFilters} className="flex flex-wrap items-end gap-3">
           <Field label="From"><Input type="date" value={draft.from} onChange={(e) => setDraft((d) => ({ ...d, from: e.target.value }))} /></Field>
           <Field label="To"><Input type="date" value={draft.to} onChange={(e) => setDraft((d) => ({ ...d, to: e.target.value }))} /></Field>
@@ -313,7 +316,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
         <p className="muted mt-2 text-xs">
           Filters run against the whole account history on the server - never just the rows already on screen.
         </p>
-      </Card>
+      </fieldset>
 
       <Card>
         {page.isLoading && page.data == null ? (
@@ -337,7 +340,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
         ) : (
           <>
             {page.isError && page.data != null ? (
-              <div className="mb-3 flex items-center justify-between gap-2 rounded-md border border-divider bg-surface-subtle px-3 py-2 text-sm">
+              <div className="well mb-3 flex items-center justify-between gap-2 px-3 py-2 text-sm">
                 <p className="text-content-secondary">Couldn&apos;t refresh. Showing the last loaded page.</p>
                 <Button type="button" variant="ghost" size="sm" onClick={() => page.refetch()}>Retry</Button>
               </div>
@@ -356,7 +359,7 @@ function ActivityContent({ initial }: { initial: InitialParams }) {
                     <TD className="mono">{maskIban(t.toIban) ?? "-"}</TD>
                     <TD className="max-w-48 truncate">{t.memo ?? "-"}</TD>
                     <TD><TxStatusBadge status={t.status} /></TD>
-                    <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, viewedAccount?.iban ?? "")}</TD>
+                    <TD className="nums text-right font-semibold">{signedUsd(t.amount, t.fromIban, t.toIban, viewedAccount?.iban ?? "")}</TD>
                   </TRow>
                 ))}
               </tbody>

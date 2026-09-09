@@ -19,7 +19,7 @@ export default function AboutPage() {
             <ArrowLeft size={14} aria-hidden="true" className="inline" /> {BrandName}
           </Link>
         </p>
-        <h1 className="mt-2 text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">{AboutThisDemo}</h1>
+        <h1 className="mt-2 text-xl leading-7">{AboutThisDemo}</h1>
         <p className="muted mt-1 max-w-2xl text-sm">
           What you can do here, what is simulated, and the machinery underneath,
           in plain words.
@@ -96,7 +96,7 @@ export default function AboutPage() {
           </Card>
         </div>
 
-        <div className="mt-6 rounded-md border border-divider p-5">
+        <div className="well mt-6 p-5">
           <p className="text-sm font-medium text-content-secondary">Residual risks</p>
           <ul className="muted mt-3 list-disc space-y-2 pl-5 text-sm">
             <li>

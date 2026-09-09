@@ -10,7 +10,7 @@ export function InlineAlert({ children }: { children: React.ReactNode }) {
   return (
     <p
       role="alert"
-      className="rounded-md border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger"
+      className="border border-danger-border bg-danger-surface px-3 py-2 text-sm text-danger"
     >
       {children}
     </p>

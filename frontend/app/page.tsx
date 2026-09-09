@@ -15,7 +15,7 @@ export default function Home() {
   return (
     <div className="min-h-screen bg-workspace">
       <div className="mx-auto max-w-5xl px-5 py-16 md:py-24">
-        <h1 className="max-w-3xl text-[28px] leading-[34px] font-semibold tracking-tight md:text-[40px] md:leading-[48px]">
+        <h1 className="max-w-3xl text-[28px] leading-[34px] font-semibold md:text-[34px] md:leading-10">
           {BrandName}
         </h1>
 

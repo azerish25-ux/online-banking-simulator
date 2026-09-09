@@ -228,12 +228,12 @@ describe("Table", () => {
       </Table>
     );
     const amountHead = screen.getByRole("columnheader", { name: "Amount" });
-    expect(amountHead.className).toContain("px-4 py-2.5");
+    expect(amountHead.className).toContain("px-4 py-2");
     expect(amountHead.className).toContain("text-right");
     const head = screen.getByText("When").closest("thead");
     expect(head?.className).toContain("sr-only");
     const amountCell = screen.getByText("$10.00");
-    expect(amountCell.className).toContain("px-4 py-2.5");
+    expect(amountCell.className).toContain("px-4 py-2");
     expect(amountCell.className).toContain("tabular-nums");
   });
 });

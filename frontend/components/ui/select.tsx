@@ -23,7 +23,7 @@ export const Select = React.forwardRef<
       ref={ref}
       style={{ backgroundImage: chevron, backgroundRepeat: "no-repeat", backgroundPosition: "right 0.6rem center" }}
       className={cn(
-        "h-11 w-full appearance-none rounded border border-control bg-surface py-1.5 pl-3 pr-9 text-sm text-content shadow-panel",
+        "h-11 w-full appearance-none border border-control bg-surface py-1.5 pl-3 pr-9 text-sm text-content",
         "focus:border-focus focus:outline-none focus:ring-1 focus:ring-focus",
         "disabled:cursor-not-allowed disabled:opacity-60",
         className

@@ -79,7 +79,7 @@ export default function TransferReceiptPage({ params }: { params: Promise<{ id: 
             Reference <span className="mono">{tx.id}</span>
           </CardDescription>
 
-          <p className="mt-4 text-[32px] leading-10 font-semibold tabular-nums">{usdReview(tx.amount)}</p>
+          <p className="mt-4 nums text-[28px] leading-9 font-semibold">{usdReview(tx.amount)}</p>
 
           <dl className="mt-4 space-y-2 border-t border-divider pt-3 text-sm">
             {!isDeposit && tx.fromIban ? (
@@ -106,7 +106,7 @@ export default function TransferReceiptPage({ params }: { params: Promise<{ id: 
             </div>
           </dl>
 
-          <p className="mt-4 rounded-md border border-divider bg-surface-subtle px-3 py-2 text-sm">
+          <p className="well mt-4 px-3 py-2 text-sm">
             {tx.status === "HELD" ? (
               <>This transfer is awaiting operator review. No money has moved yet. Once an
                 operator approves it, the posting time above will appear here. If they decline

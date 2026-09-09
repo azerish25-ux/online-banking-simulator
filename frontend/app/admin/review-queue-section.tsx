@@ -227,14 +227,14 @@ export function ReviewQueueSection() {
             const isHeld = t.status === "HELD";
             const isDeposit = t.kind === "DEPOSIT" || !t.fromIban;
             return (
-              <li key={t.id} className="rounded-md border border-divider p-3">
+              <li key={t.id} className="well p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 text-sm">
                     <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                       <Badge tone={isHeld ? "warning" : "neutral"}>
                         {isHeld ? "Held" : isDeposit ? "Flagged deposit" : "Flagged transfer"}
                       </Badge>
-                      <span className="font-semibold tabular-nums">{usd(t.amount)}</span>
+                      <span className="nums font-semibold">{usd(t.amount)}</span>
                       <span className="mono muted text-xs">
                         {isDeposit
                           ? maskIban(t.toIban ?? "")

@@ -36,9 +36,9 @@ export function TotalsSection() {
               {rows.slice(-14).map((d) => (
                 <TRow key={d.date}>
                   <TD className="whitespace-nowrap">{d.date}</TD>
-                  <TD className="text-right tabular-nums">{d.transfers}</TD>
-                  <TD className="text-right tabular-nums">{usd(d.transferVolume)}</TD>
-                  <TD className="text-right tabular-nums">{d.deposits}</TD>
+                  <TD className="nums text-right">{d.transfers}</TD>
+                  <TD className="nums text-right">{usd(d.transferVolume)}</TD>
+                  <TD className="nums text-right">{d.deposits}</TD>
                 </TRow>
               ))}
             </tbody>

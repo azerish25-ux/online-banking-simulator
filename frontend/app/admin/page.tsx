@@ -35,7 +35,7 @@ export default function AdminPage() {
 
   return (
     <AppShell>
-      <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Operations</h1>
+      <h1 className="text-xl leading-7">Operations</h1>
       <p className="muted mt-1 text-sm">Users, account status, money flow and the audit trail.</p>
 
       <div className="mt-4 grid gap-4 lg:grid-cols-2">

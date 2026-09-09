@@ -6,7 +6,7 @@ import Link from "next/link";
 import { AppShell } from "../../../components/layout/app-shell";
 import { Badge } from "../../../components/ui/badge";
 import { Button } from "../../../components/ui/button";
-import { Card, CardDescription, CardTitle } from "../../../components/ui/card";
+import { Card, CardBody, CardHead, CardTitle } from "../../../components/ui/card";
 import { ConfirmDialog } from "../../../components/ui/confirm-dialog";
 import { EmptyState } from "../../../components/ui/empty-state";
 import { LoadFailed } from "../../../components/ui/load-failed";
@@ -27,9 +27,7 @@ function typeName(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase();
 }
 
-function statusText(status: string): string {
-  return status.charAt(0) + status.slice(1).toLowerCase();
-}
+
 
 /** One labelled loan figure - authoritative, policy-derived (never a
  *  client-side balance subtraction). */
@@ -37,7 +35,7 @@ function LoanFigure({ label, value, danger = false }: { label: string; value: st
   return (
     <div>
       <dt className="muted text-sm">{label}</dt>
-      <dd className={cn("mt-1 text-2xl font-semibold tabular-nums", danger && "text-danger")}>{value}</dd>
+      <dd className={cn("nums mt-1 text-2xl font-semibold", danger && "text-danger")}>{value}</dd>
     </div>
   );
 }
@@ -126,10 +124,10 @@ export function AccountDetailPageContent({ id }: { id: string }) {
         <>
           <div className="mt-2">
             <div className="flex flex-wrap items-center gap-3">
-              <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">
-                {typeName(account.data.type)}
-              </h1>
-              <Badge tone={frozen ? "warning" : "neutral"}>{statusText(account.data.status)}</Badge>
+            <h1 className="text-xl leading-7">
+              {typeName(account.data.type)}
+            </h1>
+              {frozen ? <Badge tone="warning">Frozen</Badge> : <span className="muted text-sm">Active</span>}
             </div>
             {/* The identifier sits under the recognizable title with a copy
                 control - never the page's giant heading. */}
@@ -149,18 +147,17 @@ export function AccountDetailPageContent({ id }: { id: string }) {
           <Card className="mt-4">
             {isLoan ? (
               <>
-                <CardTitle>Loan position</CardTitle>
-                <CardDescription>
-                  Drawn principal and unpaid interest are kept separate by the loan policy; credit
-                  available is headroom on principal.
-                </CardDescription>
-                <dl className="mt-4 grid gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-4">
+                <CardHead>
+                  <CardTitle>Loan position</CardTitle>
+                  <p className="muted text-sm">Principal and interest kept separate by the loan policy</p>
+                </CardHead>
+                <dl className="grid gap-x-8 gap-y-4 px-4 py-3.5 sm:grid-cols-2 lg:grid-cols-4">
                   <LoanFigure label="Total owed" value={usdReview(account.data.totalOwed ?? "0.0000")} danger />
                   <LoanFigure label="Principal owed" value={usdReview(account.data.principalOwed ?? "0.0000")} />
                   <LoanFigure label="Interest owed" value={usdReview(account.data.interestOwed ?? "0.0000")} />
                   <LoanFigure label="Available credit" value={usdReview(account.data.availableCredit ?? "0.0000")} />
                 </dl>
-                <p className="muted mt-4 text-xs">
+                <p className="muted border-t border-divider px-4 py-2.5 text-xs">
                   Simulator loan, USD. Borrow by sending money from this account to another of yours;
                   repay by sending money back to this account. Interest is posted monthly on each
                   day&apos;s outstanding principal. {frozen ? "This loan is frozen - repayments and new draws are disabled." : ""}
@@ -168,15 +165,17 @@ export function AccountDetailPageContent({ id }: { id: string }) {
               </>
             ) : (
               <>
-                <CardTitle>Balance</CardTitle>
-                <CardDescription>
-                  {account.data.type === "SAVINGS"
-                    ? "Earns monthly interest, posted automatically."
-                    : "Simulated funds. The balance updates when a deposit or transfer posts."}
-                </CardDescription>
-                <p className="mt-3 text-[32px] leading-10 font-semibold tabular-nums">{usd(account.data.balance)}</p>
-                <p className="muted mt-2 text-xs">
-                  USD. {frozen ? "This account is frozen - money cannot be sent from it until an operator unfreezes it." : "Available to spend."}
+                <CardHead>
+                  <CardTitle>Balance</CardTitle>
+                  <p className="muted text-sm">
+                    {account.data.type === "SAVINGS" ? "Interest posted monthly" : "Simulated funds, USD"}
+                  </p>
+                </CardHead>
+                <div className="well m-4 border-x-0 border-b-0 px-4 py-2.5">
+                  <p className="nums text-[28px] leading-9 font-semibold">{usd(account.data.balance)}</p>
+                </div>
+                <p className="muted px-4 pb-3 text-xs">
+                  {frozen ? "This account is frozen - money cannot be sent from it until an operator unfreezes it." : "Available to spend."}
                 </p>
               </>
             )}
@@ -185,41 +184,39 @@ export function AccountDetailPageContent({ id }: { id: string }) {
           <div className="mt-4 grid gap-4 lg:grid-cols-3">
             {/* Activity is primary content for an account. */}
             <Card className="lg:col-span-2">
-              <CardTitle>Recent activity</CardTitle>
-              <CardDescription>
+              <CardHead>
+                <CardTitle>Recent activity</CardTitle>
+              </CardHead>
+              <p className="muted border-b border-divider px-4 py-2 text-xs">
                 Posted rows show their posting date; a row awaiting review shows when it was requested.
-              </CardDescription>
+              </p>
               {recent.isLoading && recent.data == null ? (
-                <div className="mt-3 space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+                <div className="space-y-2 px-4 py-3"><Skeleton className="h-9" /><Skeleton className="h-9" /><Skeleton className="h-9" /></div>
               ) : recent.isError && recent.data == null ? (
-                <div className="mt-3">
+                <div className="px-4 py-3">
                   <LoadFailed
                     title="Couldn't load recent activity"
                     onRetry={() => recent.refetch()}
                   />
                 </div>
               ) : (recent.data?.items ?? []).length === 0 ? (
-                <div className="mt-3">
-                  <CardDescription>No transactions yet.</CardDescription>
-                </div>
+                <p className="muted px-4 py-3 text-sm">No transactions yet.</p>
               ) : (
-                <div className="mt-3">
-                  <Table>
-                    <THead><TRow><TH>When</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH></TRow></THead>
-                    <tbody>
-                      {(recent.data?.items ?? []).map((t) => (
-                        <TRow key={t.id}>
-                          <TD><TxWhen tx={t} /></TD>
-                          <TD className="max-w-40 truncate">{t.memo ?? (t.fromIban ? "Transfer" : "Deposit")}</TD>
-                          <TD><TxStatusBadge status={t.status} /></TD>
-                          <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, account.data.iban)}</TD>
-                        </TRow>
-                      ))}
-                    </tbody>
-                  </Table>
-                </div>
+                <Table>
+                  <THead><TRow><TH>When</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH></TRow></THead>
+                  <tbody>
+                    {(recent.data?.items ?? []).map((t) => (
+                      <TRow key={t.id}>
+                        <TD><TxWhen tx={t} /></TD>
+                        <TD className="max-w-40 truncate">{t.memo ?? (t.fromIban ? "Transfer" : "Deposit")}</TD>
+                        <TD><TxStatusBadge status={t.status} /></TD>
+                        <TD className="nums text-right font-semibold">{signedUsd(t.amount, t.fromIban, t.toIban, account.data.iban)}</TD>
+                      </TRow>
+                    ))}
+                  </tbody>
+                </Table>
               )}
-              <p className="mt-3 text-sm">
+              <p className="border-t border-divider px-4 py-2.5 text-sm">
                 <Link href={Routes.activity + "?account=" + encodeURIComponent(id)} className="text-action hover:underline">
                   Full history and statement export (CSV / PDF)
                 </Link>
@@ -230,14 +227,15 @@ export function AccountDetailPageContent({ id }: { id: string }) {
                 the account's financial record. */}
             {!isLoan && (
               <Card>
-                <div className="mb-3 flex items-center justify-between">
+                <CardHead>
                   <CardTitle>Virtual cards</CardTitle>
                   <Button size="sm" onClick={() => issue.mutate(id)} disabled={issue.isPending}>
                     {issue.isPending ? "Issuing..." : "Issue card"}
                   </Button>
-                </div>
+                </CardHead>
+                <CardBody className="space-y-3">
                 {issued && (
-                  <div className="mb-3 rounded-md border border-success-border bg-success-surface p-4" role="status">
+                  <div className="border border-success-border bg-success-surface p-4" role="status">
                     <p className="text-sm font-medium text-success">Copy now. This number is shown only once.</p>
                     <p className="mono mt-2 text-xl tracking-widest">{issued.pan}</p>
                     <p className="mono muted text-sm">CVV {issued.cvv} · Exp {issued.expMonth}/{issued.expYear}</p>
@@ -251,14 +249,14 @@ export function AccountDetailPageContent({ id }: { id: string }) {
                 ) : cards.data == null ? (
                   <div className="space-y-2"><Skeleton className="h-16" /><Skeleton className="h-16" /></div>
                 ) : (cards.data ?? []).length === 0 ? (
-                  <CardDescription>No cards on this account yet.</CardDescription>
+                  <p className="muted text-sm">No cards on this account yet.</p>
                 ) : (
-                  <ul className="space-y-2">
+                  <ul className="divide-y divide-divider">
                     {(cards.data ?? []).map((c) => (
-                      <li key={c.id} className="flex items-center justify-between rounded-md border border-divider p-3">
+                      <li key={c.id} className="flex items-center justify-between py-2.5 first:pt-0 last:pb-0">
                         <div>
                           <p className="mono">•••• •••• •••• {c.last4}</p>
-                          <p className="muted text-xs">Exp {c.expMonth}/{c.expYear} · <Badge tone={c.status === "ACTIVE" ? "success" : "danger"}>{statusText(c.status)}</Badge></p>
+                          <p className="muted mt-0.5 text-xs">Exp {c.expMonth}/{c.expYear} · {c.status === "ACTIVE" ? <span>Active</span> : <Badge tone="danger">Frozen</Badge>}</p>
                         </div>
                         {c.status === "ACTIVE" ? (
                           <Button size="sm" variant="secondary" onClick={() => { setFreezeError(null); setFreezeCandidate(c); }}>Freeze</Button>
@@ -269,6 +267,7 @@ export function AccountDetailPageContent({ id }: { id: string }) {
                     ))}
                   </ul>
                 )}
+                </CardBody>
               </Card>
             )}
           </div>

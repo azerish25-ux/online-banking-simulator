@@ -2,7 +2,6 @@
 
 import * as React from "react";
 import { AppShell } from "../../components/layout/app-shell";
-import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
 import { Card } from "../../components/ui/card";
 import { Pager } from "../../components/ui/pager";
@@ -37,7 +36,7 @@ export default function NotificationsPage() {
     <AppShell>
       <div className="mb-4 flex items-end justify-between">
         <div>
-          <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Notifications</h1>
+          <h1 className="text-xl leading-7">Notifications</h1>
           <p className="muted text-sm">Money movement, cards and account events.</p>
         </div>
         <Button variant="secondary" onClick={markAll} disabled={markAllRead.isPending || items.length === 0}>
@@ -66,7 +65,7 @@ export default function NotificationsPage() {
                       <strong>{n.title}</strong>
                     </p>
                     <p className="muted text-sm">{n.body}</p>
-                    <p className="muted mt-1 text-xs"><Badge tone="neutral">{n.type}</Badge> · {fmtDate(n.createdAt)}</p>
+                    <p className="muted mt-1 text-xs">{n.type} · {fmtDate(n.createdAt)}</p>
                   </div>
                   {!n.read && (
                     <Button size="sm" variant="ghost" disabled={markRead.isPending} onClick={() => markRead.mutate(n.id)}>

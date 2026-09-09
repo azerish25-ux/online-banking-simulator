@@ -24,7 +24,7 @@ export function HeroStats() {
       {items.map((item) => (
         <div key={item.label}>
           <dt className="text-sm text-content-secondary">{item.label}</dt>
-          <dd className="mt-1 text-[28px] leading-[34px] font-semibold tabular-nums">
+          <dd className="nums mt-1 text-[26px] leading-8 font-semibold">
             {item.value}
           </dd>
         </div>

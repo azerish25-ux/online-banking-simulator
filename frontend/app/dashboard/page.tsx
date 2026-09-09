@@ -9,7 +9,7 @@ import { DepositDialog } from "../../components/banking/deposit-dialog";
 import { OpenAccountDialog } from "../../components/banking/open-account-dialog";
 import { Badge } from "../../components/ui/badge";
 import { Button } from "../../components/ui/button";
-import { Card, CardDescription, CardTitle } from "../../components/ui/card";
+import { Card, CardBody, CardHead, CardTitle } from "../../components/ui/card";
 import { EmptyState } from "../../components/ui/empty-state";
 import { LoadFailed } from "../../components/ui/load-failed";
 import { Select } from "../../components/ui/select";
@@ -29,11 +29,6 @@ function typeName(type: string): string {
   return type.charAt(0) + type.slice(1).toLowerCase();
 }
 
-/** Sentence-case status text ("ACTIVE" → "Active"), not an uppercase code. */
-function statusText(status: string): string {
-  return status.charAt(0) + status.slice(1).toLowerCase();
-}
-
 /** Exact debt test on the server's policy-derived total: a 0.0001 obligation
  *  is debt even though it rounds to $0.00. Never derive debt from a rounded
  *  balance figure. */
@@ -42,6 +37,8 @@ function owesAnything(a: Account): boolean {
   return owed !== null && owed > 0n;
 }
 
+/** A labelled figure on the summary band: small label over the number, and
+ *  when the figure is a debt the color says so. */
 function StripCell({
   label,
   value,
@@ -56,7 +53,7 @@ function StripCell({
   return (
     <div className="md:border-l md:border-divider md:pl-4 first:md:border-l-0 first:md:pl-0">
       <p className="muted text-sm">{label}</p>
-      <p className={cn("mt-1 text-[32px] leading-10 font-semibold tabular-nums", danger && "text-danger")}>
+      <p className={cn("nums mt-1 text-[26px] leading-8 font-semibold", danger && "text-danger")}>
         {value}
       </p>
       {sub ? <p className="muted mt-1 text-xs">{sub}</p> : null}
@@ -71,10 +68,10 @@ function AccountAmount({ account }: { account: Account }) {
     if (owesAnything(account)) {
       return (
         <>
-          <p className="text-right text-lg font-semibold tabular-nums text-danger md:text-xl">
+          <p className="nums text-right text-base font-semibold text-danger">
             {usdReview(account.totalOwed ?? "0.0000")}
           </p>
-          <p className="muted mt-0.5 text-right text-xs">
+          <p className="nums muted mt-0.5 text-right text-xs">
             Principal {usdReview(account.principalOwed ?? "0.0000")} · Interest{" "}
             {usdReview(account.interestOwed ?? "0.0000")} · Credit left{" "}
             {usdReview(account.availableCredit ?? "0.0000")}
@@ -84,10 +81,10 @@ function AccountAmount({ account }: { account: Account }) {
     }
     return (
       <>
-        <p className="text-right text-lg font-semibold tabular-nums md:text-xl">
+        <p className="nums text-right text-base font-semibold">
           {usdReview(account.totalOwed ?? "0.0000")}
         </p>
-        <p className="muted mt-0.5 text-right text-xs">
+        <p className="nums muted mt-0.5 text-right text-xs">
           Nothing owed · Credit {usdReview(account.availableCredit ?? "0.0000")} available
         </p>
       </>
@@ -95,7 +92,7 @@ function AccountAmount({ account }: { account: Account }) {
   }
   return (
     <>
-      <p className="text-right text-lg font-semibold tabular-nums md:text-xl">{usd(account.balance)}</p>
+      <p className="nums text-right text-base font-semibold">{usd(account.balance)}</p>
       {account.status === "FROZEN" && (
         <p className="muted mt-0.5 text-right text-xs">Frozen - not spendable</p>
       )}
@@ -153,9 +150,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
     <AppShell>
       <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">
-            Overview
-          </h1>
+          <h1 className="text-xl leading-7">Overview</h1>
           <p className="muted mt-1 text-sm">
             {user ? "Welcome back, " + user.fullName + ". Everything here uses simulated funds." : "Loading..."}
           </p>
@@ -172,31 +167,36 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
       </div>
 
       {accountsFailed ? (
-        <Card>
-          <LoadFailed
-            title="Couldn't load your accounts"
-            description="Balances, recent activity, and the chart all depend on the account list. Check your connection and try again."
-            onRetry={() => accounts.refetch()}
-          />
+        <Card className="mt-4">
+          <CardBody>
+            <LoadFailed
+              title="Couldn't load your accounts"
+              description="Balances, recent activity, and the chart all depend on the account list. Check your connection and try again."
+              onRetry={() => accounts.refetch()}
+            />
+          </CardBody>
         </Card>
       ) : loading ? (
-        <div className="space-y-4">
-          <Skeleton className="h-28" />
-          <Skeleton className="h-56" />
+        <div className="mt-4 space-y-4">
+          <Skeleton className="h-24" />
+          <Skeleton className="h-52" />
         </div>
       ) : accountList.length === 0 ? (
-        <Card>
-          <EmptyState
-            title="No accounts yet"
-            description="Open a checking, savings, or loan account to get started. Deposits and transfers land here."
-          />
+        <Card className="mt-4">
+          <CardBody>
+            <EmptyState
+              title="No accounts yet"
+              description="Open a checking, savings, or loan account to get started. Deposits and transfers land here."
+            />
+          </CardBody>
         </Card>
       ) : (
         <>
-          {/* Summary strip - usable funds and debt are separate figures; net
-              position is never presented as spendable money. */}
-          <Card className="mt-4">
-            <div className="grid gap-4 md:grid-cols-3">
+          {/* The account record. Position band first - usable funds and debt
+              are separate figures; net position is never presented as
+              spendable money. Then the account list. */}
+          <Card className="mt-5">
+            <div className="grid gap-4 px-4 py-3.5 md:grid-cols-3">
               <StripCell
                 label="Available funds"
                 value={availableUsd}
@@ -220,14 +220,14 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
             </div>
           </Card>
 
-          <Card className="mt-4">
-            <CardTitle>Accounts</CardTitle>
-            <CardDescription>
-              Simulator accounts in USD. Amounts update when a transfer posts; a loan&apos;s split comes from the loan policy.
-            </CardDescription>
+          <Card className="mt-5">
+            <CardHead>
+              <CardTitle>Accounts</CardTitle>
+              <p className="muted text-sm">USD · loan splits from the loan policy</p>
+            </CardHead>
 
             {/* Desktop table (deliberately hidden below md). */}
-            <div className="mt-3 hidden md:block">
+            <div className="hidden md:block">
               <Table>
                 <THead>
                   <TRow>
@@ -246,7 +246,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
                         <p className="mono muted mt-0.5">{maskIban(a.iban)}</p>
                       </TD>
                       <TD>
-                        <Badge tone={a.status === "FROZEN" ? "warning" : "neutral"}>{statusText(a.status)}</Badge>
+                        {a.status === "FROZEN" ? <Badge tone="warning">Frozen</Badge> : <span className="muted text-sm">Active</span>}
                       </TD>
                       <TD className="text-right align-top">
                         <AccountAmount account={a} />
@@ -259,9 +259,9 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
 
             {/* Narrow stacked rows - the same essential information, never a
                 horizontally scrolling table that hides status or amounts. */}
-            <ul className="mt-3 space-y-2 md:hidden">
+            <ul className="divide-y divide-divider md:hidden">
               {accountList.map((a) => (
-                <li key={a.id} className="rounded-md border border-divider p-3">
+                <li key={a.id} className="p-3">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <Link href={Routes.account(a.id)} className="font-medium text-content hover:text-action hover:underline">
@@ -269,7 +269,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
                       </Link>
                       <p className="mono muted mt-0.5">{maskIban(a.iban)}</p>
                       <p className="mt-1">
-                        <Badge tone={a.status === "FROZEN" ? "warning" : "neutral"}>{statusText(a.status)}</Badge>
+                        {a.status === "FROZEN" ? <Badge tone="warning">Frozen</Badge> : <span className="muted text-sm">Active</span>}
                       </p>
                     </div>
                     <div className="min-w-0 shrink text-right">
@@ -283,15 +283,15 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
 
           <UnresolvedOperations />
 
-          <Card className="mt-4">
-            <div className="mb-2 flex flex-wrap items-center justify-between gap-3">
+          <Card className="mt-5">
+            <CardHead>
               <CardTitle>Recent activity</CardTitle>
               <div className="flex items-center gap-3">
                 <Select
                   aria-label="Account shown in recent activity and the chart"
                   value={accountId}
                   onChange={(e) => selectAccount(e.target.value)}
-                  className="h-9 w-auto text-sm"
+                  className="h-8 w-auto text-sm"
                 >
                   {accountList.map((a) => (
                     <option key={a.id} value={a.id}>{accountLabel(a)}</option>
@@ -301,17 +301,17 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
                   Full activity
                 </Link>
               </div>
-            </div>
-            <CardDescription>
+            </CardHead>
+            <p className="muted border-b border-divider px-4 py-2 text-xs">
               {scopedAccount
-                ? typeName(scopedAccount.type) + " " + (maskIban(scopedAccount.iban) ?? "") + " - money in and out, in USD."
+                ? typeName(scopedAccount.type) + " · " + (maskIban(scopedAccount.iban) ?? "") + " · USD"
                 : "Money in and out of the selected account."}
-            </CardDescription>
+            </p>
 
             {recent.isLoading && recent.data == null ? (
-              <div className="mt-3 space-y-2"><Skeleton className="h-10" /><Skeleton className="h-10" /><Skeleton className="h-10" /></div>
+              <div className="space-y-2 px-4 py-3"><Skeleton className="h-9" /><Skeleton className="h-9" /><Skeleton className="h-9" /></div>
             ) : recent.isError && recent.data == null ? (
-              <div className="mt-3">
+              <div className="px-4 py-3">
                 <LoadFailed
                   title="Couldn't load recent activity"
                   description="The history request failed. Try again."
@@ -319,43 +319,41 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
                 />
               </div>
             ) : (recent.data?.items ?? []).length === 0 ? (
-              <div className="mt-3">
+              <div className="px-4 py-3">
                 <EmptyState title="No transactions yet" description="Send your first transfer to see it here." />
               </div>
             ) : (
-              <div className="mt-3">
-                <Table>
-                  <THead>
-                    <TRow>
-                      <TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH>
+              <Table>
+                <THead>
+                  <TRow>
+                    <TH>When</TH><TH>From</TH><TH>To</TH><TH>Memo</TH><TH>Status</TH><TH className="text-right">Amount</TH>
+                  </TRow>
+                </THead>
+                <tbody>
+                  {(recent.data?.items ?? []).map((t) => (
+                    <TRow key={t.id}>
+                      <TD><TxWhen tx={t} /></TD>
+                      <TD className="mono">{maskIban(t.fromIban) ?? "DEPOSIT"}</TD>
+                      <TD className="mono">{maskIban(t.toIban) ?? "-"}</TD>
+                      <TD className="max-w-40 truncate">{t.memo ?? "-"}</TD>
+                      <TD><TxStatusBadge status={t.status} /></TD>
+                      <TD className="nums text-right font-semibold">{signedUsd(t.amount, t.fromIban, t.toIban, scopedAccount?.iban ?? "")}</TD>
                     </TRow>
-                  </THead>
-                  <tbody>
-                    {(recent.data?.items ?? []).map((t) => (
-                      <TRow key={t.id}>
-                        <TD><TxWhen tx={t} /></TD>
-                        <TD className="mono">{maskIban(t.fromIban) ?? "DEPOSIT"}</TD>
-                        <TD className="mono">{maskIban(t.toIban) ?? "-"}</TD>
-                        <TD className="max-w-40 truncate">{t.memo ?? "-"}</TD>
-                        <TD><TxStatusBadge status={t.status} /></TD>
-                        <TD className="text-right font-semibold tabular-nums">{signedUsd(t.amount, t.fromIban, t.toIban, scopedAccount?.iban ?? "")}</TD>
-                      </TRow>
-                    ))}
-                  </tbody>
-                </Table>
-              </div>
+                  ))}
+                </tbody>
+              </Table>
             )}
           </Card>
 
           {/* The chart stays below the money and the account record. */}
-          <Card className="mt-4">
-            <CardTitle>
-              Money flow · {scopedAccount ? accountLabel(scopedAccount) : "selected account"} · last 6 months
-            </CardTitle>
-            <CardDescription>
-              Money in and out of this account, in USD. Bars are monthly totals; use the table for exact amounts.
-            </CardDescription>
-            <div className="mt-3">
+          <Card className="mt-5">
+            <CardHead>
+              <CardTitle>
+                Money flow · {scopedAccount ? accountLabel(scopedAccount) : "selected account"} · last 6 months
+              </CardTitle>
+              <p className="muted text-sm">Monthly totals, USD</p>
+            </CardHead>
+            <CardBody>
               {summary.data == null ? (
                 summary.isError ? (
                   <LoadFailed
@@ -369,7 +367,7 @@ function DashboardContent({ initialAccountId }: { initialAccountId?: string }) {
               ) : (
                 <SpendingChart data={summary.data} />
               )}
-            </div>
+            </CardBody>
           </Card>
 
           <OpenAccountDialog open={openOpen} onClose={() => setOpenOpen(false)} hasLoan={loanAccounts.length > 0} />

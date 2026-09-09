@@ -97,7 +97,7 @@ export function UsersSection() {
               <button
                 type="button"
                 onClick={() => setSelectedId(u.id)}
-                className={"flex w-full items-center justify-between rounded-md border p-3 text-left hover:bg-surface-subtle " + (selectedId === u.id ? "border-action" : "border-divider")}
+                className={"flex w-full items-center justify-between border p-3 text-left hover:bg-surface-subtle " + (selectedId === u.id ? "border-action" : "border-divider")}
               >
                 <span>
                   <span className="block text-sm font-medium">{u.fullName}</span>
@@ -117,7 +117,7 @@ export function UsersSection() {
           <CardTitle>Accounts · {selected.fullName}</CardTitle>
           {accountRows.length === 0 && <CardDescription>No accounts.</CardDescription>}
           {accountRows.map((a) => (
-            <div key={a.id} className="mt-2 flex items-center justify-between rounded-md border border-divider p-3">
+            <div key={a.id} className="well mt-2 flex items-center justify-between p-3">
               <div>
                 <p className="mono text-sm">{a.iban}</p>
                 <p className="text-sm">{usd(a.balance)} · <Badge tone={a.status === "ACTIVE" ? "success" : "danger"}>{a.status}</Badge></p>

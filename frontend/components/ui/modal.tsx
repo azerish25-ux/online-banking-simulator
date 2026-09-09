@@ -97,7 +97,7 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}
-        className="panel w-full max-w-md rounded-lg p-5 shadow-dialog motion-safe:animate-dialog-in"
+        className="panel w-full max-w-md shadow-dialog motion-safe:animate-dialog-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">

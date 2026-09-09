@@ -150,7 +150,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           aria-label="Primary"
           className="hidden w-60 shrink-0 flex-col border-r border-divider bg-surface px-4 py-5 md:flex"
         >
-          <p className="px-2 text-lg font-semibold tracking-tight">
+          <p className="px-2 text-lg font-semibold">
             <Link href={Routes.dashboard}>{BrandName}</Link>
           </p>
           <p className="label px-2">{DemoTagline}</p>
@@ -177,7 +177,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 >
                   <Menu size={18} aria-hidden="true" />
                 </button>
-                <p className="truncate text-base font-semibold tracking-tight md:hidden">{BrandName}</p>
+                <p className="truncate text-base font-semibold md:hidden">{BrandName}</p>
                 <p className="hidden text-sm text-content-secondary md:block">
                   {user ? (
                     <>
@@ -220,7 +220,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             className="absolute inset-y-0 left-0 flex w-72 max-w-[85vw] flex-col bg-surface p-4 shadow-dialog motion-safe:animate-dialog-in"
           >
             <div className="flex items-center justify-between gap-2">
-              <p className="truncate text-lg font-semibold tracking-tight">{BrandName}</p>
+              <p className="truncate text-lg font-semibold">{BrandName}</p>
               <button
                 ref={closeRef}
                 type="button"

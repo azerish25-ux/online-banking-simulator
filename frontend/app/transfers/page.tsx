@@ -8,7 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { transferSchema as schema, type TransferForm as Form } from "../../lib/validation";
 import { AppShell } from "../../components/layout/app-shell";
 import { Button } from "../../components/ui/button";
-import { Card, CardDescription, CardTitle } from "../../components/ui/card";
+import { Card, CardBody, CardHead, CardTitle } from "../../components/ui/card";
 import { Field, Input } from "../../components/ui/input";
 import { Select } from "../../components/ui/select";
 import { useResultToast } from "../../components/feedback/use-result-toast";
@@ -142,14 +142,18 @@ export default function TransfersPage() {
           <ArrowLeft size={14} aria-hidden="true" /> Back to overview
         </Link>
       </p>
-      <h1 className="mt-1 text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Send money</h1>
+      <h1 className="mt-1 text-xl leading-7">Send money</h1>
       <p className="muted mt-1 max-w-2xl text-sm">
         Transfers post right away. Large amounts go to the review desk first:
         nothing leaves your account until an operator approves them.
       </p>
 
       <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card className="max-w-xl">
+        <Card className="max-w-xl self-start">
+          <CardHead>
+            <CardTitle>Transfer details</CardTitle>
+          </CardHead>
+          <CardBody>
           <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
             <Field label="From account" error={formState.errors.fromAccountId?.message}>
               <Select {...register("fromAccountId")}>
@@ -186,9 +190,9 @@ export default function TransfersPage() {
             <div
               role="region"
               aria-label="Review your transfer"
-              className="mt-4 rounded-md border border-divider bg-surface-subtle p-4"
+              className="well mt-4 p-4"
             >
-              <p className="text-lg leading-7 font-semibold tracking-tight">Review your transfer</p>
+              <h2 className="text-base leading-[22px] font-semibold">Review your transfer</h2>
               <dl className="mt-3 space-y-2 text-sm">
                 <div className="flex justify-between gap-4">
                   <dt className="label">From</dt>
@@ -212,7 +216,7 @@ export default function TransfersPage() {
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="label">Amount (USD)</dt>
-                  <dd className="text-right font-semibold tabular-nums">{usdReview(review.amount)}</dd>
+                  <dd className="nums text-right font-semibold">{usdReview(review.amount)}</dd>
                 </div>
                 <div className="flex justify-between gap-4">
                   <dt className="label">Memo</dt>
@@ -233,43 +237,49 @@ export default function TransfersPage() {
               </div>
             </div>
           )}
+          </CardBody>
         </Card>
 
         <div>
           <Card>
-            <CardTitle>Beneficiaries</CardTitle>
-            <CardDescription>Tap to fill the recipient.</CardDescription>
+            <CardHead>
+              <CardTitle>Beneficiaries</CardTitle>
+              <p className="muted text-sm">Tap to fill the recipient</p>
+            </CardHead>
+            <CardBody>
             {(beneficiaries.data ?? []).length === 0 ? (
-              <p className="muted mt-3 text-sm">
+              <p className="muted text-sm">
                 None saved. <Link href={Routes.beneficiaries} className="text-action hover:underline">Add one <ArrowRight size={14} aria-hidden="true" /></Link>
               </p>
             ) : (
-              <ul className="mt-3 space-y-2">
+              <ul className="divide-y divide-divider">
                 {(beneficiaries.data ?? []).map((b) => (
                   <li key={b.id}>
                     <button
                       type="button"
                       onClick={() => setValue("toIban", b.iban, { shouldValidate: true })}
-                      className={"w-full rounded-md border p-3 text-left transition-colors hover:bg-surface-subtle " + (chosenBeneficiary === b.iban ? "border-action" : "border-divider")}
+                      aria-pressed={chosenBeneficiary === b.iban}
+                      className={"w-full px-1 py-2 text-left transition-colors hover:bg-surface-subtle " + (chosenBeneficiary === b.iban ? "font-medium" : "")}
                     >
-                      <span className="block text-sm font-medium">{b.nickname}</span>
+                      <span className="block text-sm">{b.nickname}</span>
                       <span className="mono muted">{b.iban}</span>
                     </button>
                   </li>
                 ))}
               </ul>
             )}
+            </CardBody>
           </Card>
 
           {receipt && (
             <Card className="mt-4 border-success-border">
-              <div className="flex items-center gap-2">
+              <CardHead>
                 <CardTitle>{receipt.status === "HELD" ? "Transfer submitted for review" : "Transfer posted"}</CardTitle>
                 <TxStatusBadge status={receipt.status} />
-              </div>
-              <CardDescription>
-                {usdReview(receipt.amount)} → <span className="mono">{receipt.toIban}</span>
-              </CardDescription>
+              </CardHead>
+              <CardBody>
+                <p className="nums text-[22px] leading-7 font-semibold">{usdReview(receipt.amount)}</p>
+                <p className="mono muted mt-1 text-sm">→ {receipt.toIban}</p>
               {receipt.status === "HELD" && (
                 <p className="muted mt-2 text-sm">
                   No money has moved yet. The transfer is queued for operator review.
@@ -284,6 +294,7 @@ export default function TransfersPage() {
                   Open permanent receipt ↗
                 </Link>
               </p>
+              </CardBody>
             </Card>
           )}
         </div>

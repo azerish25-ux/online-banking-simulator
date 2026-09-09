@@ -60,10 +60,10 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           const outH = scale(parseFloat(d.outflow));
           return (
             <g key={d.month}>
-              <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} rx={1.5} className="fill-action">
+              <rect x={x - barW - 2} y={H - pad - inH} width={barW} height={Math.max(0, inH)} className="fill-action">
                 <title>{"In " + d.month + ": " + usd(d.inflow)}</title>
               </rect>
-              <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(0, outH)} rx={1.5} className="fill-outflow">
+              <rect x={x + 2} y={H - pad - outH} width={barW} height={Math.max(0, outH)} className="fill-outflow">
                 <title>{"Out " + d.month + ": " + usd(d.outflow)}</title>
               </rect>
               <text x={x} y={H - 8} textAnchor="middle" fontSize={11} className="fill-content-secondary">
@@ -73,9 +73,9 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           );
         })}
         <g fontSize={11} className="fill-content-secondary">
-          <rect x={pad} y={4} width={10} height={10} rx={1.5} className="fill-action" />
+          <rect x={pad} y={4} width={10} height={10} className="fill-action" />
           <text x={pad + 14} y={13}>In</text>
-          <rect x={pad + 52} y={4} width={10} height={10} rx={1.5} className="fill-outflow" />
+          <rect x={pad + 52} y={4} width={10} height={10} className="fill-outflow" />
           <text x={pad + 66} y={13}>Out</text>
         </g>
       </svg>
@@ -84,7 +84,7 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           type="button"
           aria-expanded={showValues}
           onClick={() => setShowValues((v) => !v)}
-          className="rounded border border-divider bg-surface px-3 py-1.5 text-sm text-content-secondary hover:bg-surface-subtle"
+          className="border border-divider bg-surface px-3 py-1.5 text-sm text-content-secondary hover:bg-surface-subtle"
         >
           {showValues ? "Hide exact values" : "Show exact values"}
         </button>
@@ -105,8 +105,8 @@ export function SpendingChart({ data }: { data: MonthPoint[] }) {
           {data.map((d) => (
             <tr key={d.month} className="border-b border-divider/60">
               <th scope="row" className="py-1.5 pr-4 text-left font-medium">{monthLabel(d.month)}</th>
-              <td className="py-1.5 pr-4 text-right tabular-nums">{usd(d.inflow)}</td>
-              <td className="py-1.5 text-right tabular-nums">{usd(d.outflow)}</td>
+              <td className="nums py-1.5 pr-4 text-right">{usd(d.inflow)}</td>
+              <td className="nums py-1.5 text-right">{usd(d.outflow)}</td>
             </tr>
           ))}
         </tbody>

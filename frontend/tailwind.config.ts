@@ -56,9 +56,9 @@ export default {
         mono: ["ui-monospace", "SFMono-Regular", "Menlo", "monospace"]
       },
       boxShadow: {
-        // Panels carry restrained borders and little shadow; elevation is
-        // reserved for genuine overlays (dialogs).
-        panel: "0 1px 2px rgba(23, 35, 48, 0.05)",
+        // Elevation is reserved for genuine overlays (dialogs, the drawer).
+        // Panels and controls are flat: the divider line does that work.
+        panel: "none",
         dialog: "0 8px 24px rgba(23, 35, 48, 0.14)"
       },
       // Motion language - bank-quiet: fast, small, no bounce. Applied with

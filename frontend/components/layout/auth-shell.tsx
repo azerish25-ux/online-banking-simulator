@@ -26,12 +26,12 @@ export function AuthShell({
     <div className="flex min-h-screen items-center justify-center bg-workspace px-4 py-8">
       {/* Modest form width (~440px), readable labels, one primary action. */}
       <div className="w-full max-w-md">
-        <p className="mb-2 text-center text-2xl font-semibold tracking-tight">
+        <p className="mb-2 text-center text-2xl font-semibold">
           <Link href="/">{BrandName}</Link>
         </p>
         <p className="mb-6 text-center text-sm text-content-secondary">{DemoTagline}</p>
         <Card>
-          <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">
+          <h1 className="text-xl leading-7">
             {title}
           </h1>
           {subtitle ? <p className="muted mt-1 text-sm">{subtitle}</p> : null}

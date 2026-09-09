@@ -18,6 +18,12 @@
   --info: #205a83;
 }
 
+/* Money figures set in tabular numerals: amounts keep their column while
+   typing or animating, the way statement and booking screens do. */
+.nums {
+  font-variant-numeric: tabular-nums;
+}
+
 html, body {
   background: var(--bg);
   color: var(--text);
@@ -26,6 +32,10 @@ html, body {
 body {
   font-family: var(--font-sans), ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+}
+
+h1, h2, h3 {
+  letter-spacing: -0.01em;
 }
 
 ::selection { background: rgba(25, 60, 96, 0.16); }
@@ -37,12 +47,21 @@ body {
 }
 
 @layer components {
+  /* A surface with its boundary line - not a floating card. Panels are
+     square-cornered and shadowless; the divider is the whole elevation
+     story, the way ledger and booking screens read. */
   .panel {
-    @apply rounded-md border bg-surface;
+    @apply border bg-surface;
     border-color: var(--line);
-    box-shadow: 0 1px 2px rgba(23, 35, 48, 0.05);
   }
   .muted { color: var(--secondary); }
+
+  /* A pale well for grouped inputs, confirmations, and secondary blocks:
+     boundary + faint fill, no border on the parent panel. */
+  .well {
+    @apply border bg-surface-subtle;
+    border-color: var(--line);
+  }
 
   .mono {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;

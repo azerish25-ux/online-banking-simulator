@@ -52,14 +52,14 @@ export function ActivitySection() {
               ? "Reverses " + shortId(t.reversesTransactionId) + ": “" + (t.reversalReason ?? "") + "”"
               : null;
             return (
-              <li key={t.id} className="rounded-md border border-divider p-3">
+              <li key={t.id} className="well p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0 text-sm">
                     <span className="flex flex-wrap items-center gap-2">
                       <ReversalMark tx={t} />
                       <span className="mono">{route}</span>
                     </span>
-                    <span className="ml-2 font-semibold tabular-nums">{usd(t.amount)}</span>
+                    <span className="nums ml-2 font-semibold">{usd(t.amount)}</span>
                     <span className="muted ml-2 text-xs">{fmtDate(t.createdAt)}</span>
                   </div>
                   <div className="flex shrink-0 gap-2">

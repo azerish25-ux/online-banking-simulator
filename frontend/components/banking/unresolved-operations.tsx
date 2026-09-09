@@ -103,7 +103,7 @@ export function UnresolvedOperations() {
           return (
             <li
               key={id}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-divider bg-surface-subtle p-3"
+              className="well flex flex-wrap items-center justify-between gap-3 p-3"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium">

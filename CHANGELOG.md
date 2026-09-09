@@ -6,6 +6,24 @@ versions follow [SemVer](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Interface redesign - the workspace reads as one financial record
+
+- Every section is now flush: white surfaces with square corners and a single
+  divider, no card shadows and no rounded chrome. Elevation is reserved for
+  genuine overlays (dialogs, the drawer).
+- Sections are headed by a divider-drawn band (title and actions on one line);
+  the page title sits at 16/22 like the body text - hierarchy comes from
+  weight, not size.
+- Statuses render as notation, not stickers: square monospaced tokens only for
+  states needing attention (awaiting review, cancelled, frozen). A posted row
+  is plain text - a ledger marks exceptions, it does not decorate every row.
+- All money figures use one `.nums` class (tabular numerals); ledger tables
+  drop their outer box and tighten row rhythm; the summary band, balance and
+  loan figures set labels and numbers in the statement style.
+- Activity filters sit in a labelled fieldset well; notification rows drop the
+  type pill; beneficiary pickers render as a divided list instead of boxed
+  buttons.
+
 ### Full local Playwright sweep (two real-browser witnesses + five real fixes)
 
 - The whole browser suite now runs against an ephemeral stack (second backend

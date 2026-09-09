@@ -164,7 +164,7 @@ export default function SettingsPage() {
 
   return (
     <AppShell>
-      <h1 className="text-[24px] leading-[30px] font-semibold tracking-tight md:text-[28px] md:leading-[34px]">Security</h1>
+      <h1 className="text-xl leading-7">Security</h1>
       <p className="muted mt-1 text-sm">Two-factor authentication for your sign-in.</p>
 
       {me.isLoading || me.data == null ? (
@@ -205,7 +205,7 @@ export default function SettingsPage() {
           )}
 
           {pendingSetup && (
-            <div className="mt-4 rounded-md border border-divider p-4">
+            <div className="well mt-4 p-4">
               <p className="text-sm font-medium">
                 {isReplacement ? "Replace your authenticator" : "Scan with your authenticator app"}
               </p>
@@ -223,11 +223,11 @@ export default function SettingsPage() {
                   alt="QR code to add Online Banking Simulator to your authenticator app"
                   width={176}
                   height={176}
-                  className="rounded-md border border-divider"
+                  className="border border-divider"
                 />
                 <div className="min-w-0">
                   <p className="label mb-1 text-content-secondary">Secret key</p>
-                  <p className="mono break-all rounded-md border border-divider bg-surface-subtle px-3 py-2">{pendingSetup.secret}</p>
+                  <p className="mono well break-all px-3 py-2">{pendingSetup.secret}</p>
                   <Button size="sm" variant="secondary" className="mt-2" onClick={copySecret}>
                     Copy secret
                   </Button>

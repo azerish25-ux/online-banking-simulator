@@ -22,9 +22,9 @@ export function LoadFailed({
   return (
     <div
       role="alert"
-      className="rounded-md border border-danger-border bg-danger-surface px-4 py-6 text-center"
+      className="border border-danger-border bg-danger-surface px-4 py-6 text-center"
     >
-      <p className="text-base font-semibold tracking-tight text-danger">{title}</p>
+      <p className="text-base font-semibold text-danger">{title}</p>
       {description ? <p className="muted mx-auto mt-1 max-w-sm text-sm">{description}</p> : null}
       {onRetry ? (
         <Button type="button" variant="secondary" size="sm" className="mt-3" onClick={onRetry}>

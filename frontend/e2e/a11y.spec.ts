@@ -120,7 +120,7 @@ async function loginAsAlice(page: Page): Promise<void> {
   await page.getByLabel("Password", { exact: true }).fill("secret123");
   await page.getByRole("button", { name: /^Log in$/ }).click();
   await expect(page).toHaveURL(/\/dashboard/);
-  await page.locator("main .tabular-nums").first().waitFor({ timeout: 10_000 });
+  await page.locator("main .nums").first().waitFor({ timeout: 10_000 });
 }
 
 /**
