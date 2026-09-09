@@ -6,15 +6,6 @@ real money-movement semantics - atomic transfers, idempotency keys, interest
 accrual, an operator review queue, audit trails - without inventing a fake
 bank brand or touching real money.
 
-| | |
-|---|---|
-| ![Landing page](docs/screenshots/landing.png) | ![Dashboard](docs/screenshots/dashboard.png) |
-| ![Transfer receipt](docs/screenshots/transfer-receipt.png) | ![Admin review queue](docs/screenshots/admin-review-queue.png) |
-
-These are captures of the running product, taken by
-[frontend/e2e-screenshots/screenshots.spec.ts](frontend/e2e-screenshots/screenshots.spec.ts)
-against the exact stack `start-all.ps1` + `seed-demo.ps1` boot - the wire in
-the ops queue is a real threshold-triggered hold, not a prop.
 
 ## What it does
 
@@ -110,8 +101,6 @@ npm run lint
 npm test                                    # 98 tests: lib units + RTL component suite
 npx playwright test                         # boots its own fresh build on :3000 and fails loudly if the port is busy (no stale-app testing); an ephemeral stack runs via E2E_BASE_URL; the silent-refresh specs additionally need a short-TTL backend + E2E_ACCESS_TTL_SECONDS (CI sets both)
 npm run build
-# README screenshots (requires the seeded stack; kept out of CI by design):
-npx playwright test --config=playwright.screenshots.config.ts
 ```
 
 CI (`.github/workflows/ci.yml`) runs eight jobs: backend verify (+ the
