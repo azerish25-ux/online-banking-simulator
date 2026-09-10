@@ -90,6 +90,7 @@ public final class TransactionMapper {
         tx.getAmount().toPlainString(),
         tx.getCurrency(),
         tx.getMemo(),
+        tx.getKind(),
         tx.getStatus(),
         tx.getCreatedAt().toString(),
         tx.getPostedAt() == null ? null : tx.getPostedAt().toString(),

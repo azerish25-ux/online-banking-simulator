@@ -1222,6 +1222,8 @@ export interface components {
             id: string;
             /** @description The key this operation was recorded under, so a client can verify a receipt answers its own dispatch */
             idempotencyKey: string;
+            /** @enum {string} */
+            kind: "TRANSFER" | "DEPOSIT" | "INTEREST" | "REVERSAL";
             memo: string | null;
             /** @description null while HELD or when CANCELLED: money has not moved */
             postedAt: string | null;

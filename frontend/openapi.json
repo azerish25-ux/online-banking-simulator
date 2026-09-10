@@ -1143,6 +1143,10 @@
             "description" : "The key this operation was recorded under, so a client can verify a receipt answers its own dispatch",
             "type" : "string"
           },
+          "kind" : {
+            "enum" : [ "TRANSFER", "DEPOSIT", "INTEREST", "REVERSAL" ],
+            "type" : "string"
+          },
           "memo" : {
             "type" : [ "string", "null" ]
           },
@@ -1158,7 +1162,7 @@
             "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "idempotencyKey", "memo", "postedAt", "status", "toIban" ],
+        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "idempotencyKey", "kind", "memo", "postedAt", "status", "toIban" ],
         "type" : "object"
       },
       "UnbalancedEntryRow" : {

@@ -36,7 +36,7 @@ public final class TransferDtos {
       @Schema(nullable = true) String toIban,
       String amount, String currency,
       @Schema(nullable = true) String memo,
-      TxStatus status, String createdAt,
+      TxKind kind, TxStatus status, String createdAt,
       @Schema(nullable = true, description = "null while HELD or when CANCELLED: money has not moved") String postedAt,
       boolean flagged,
       @Schema(description = "The key this operation was recorded under, so a client can verify a receipt answers its own dispatch") String idempotencyKey) {}
