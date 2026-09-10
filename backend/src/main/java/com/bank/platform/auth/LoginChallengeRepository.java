@@ -10,6 +10,16 @@ import org.springframework.data.repository.query.Param;
 public interface LoginChallengeRepository extends JpaRepository<LoginChallenge, UUID> {
 
   /**
+   * Consumes every live challenge of a user (factor-change invalidation).
+   * A challenge issued before a security transition was never proven against
+   * the new state, so it must not be verifiable afterwards.
+   */
+  @Modifying
+  @Query("update LoginChallenge c set c.consumed = true "
+      + "where c.userId = :userId and c.consumed = false and c.expiresAt > :now")
+  int revokeAllByUserId(@Param("userId") UUID userId, @Param("now") Instant now);
+
+  /**
    * Atomically consumes one challenge. Returns 1 only when this caller won the
    * race on an unused, unexpired challenge; 0 when it was already consumed,
    * never existed as usable, or expired: in which case the caller rejects the

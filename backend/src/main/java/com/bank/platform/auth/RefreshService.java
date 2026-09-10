@@ -56,8 +56,44 @@ public class RefreshService {
     return refreshDays * 24 * 3600L;
   }
 
+  /**
+   * The authoritative credential-issuance boundary. The caller supplies the
+   * user snapshot its proof was validated against; this boundary re-reads the
+   * user UNDER the per-user lock, refuses a snapshot whose security epoch is
+   * no longer current, and only then mints the credential pair bound to that
+   * epoch. A paused login that verified its proof before a factor change
+   * therefore cannot insert a live refresh row after the revocation commit.
+   *
+   * <p>Callers run this in their own transaction; the lock and the insert
+   * commit atomically with the proof validation. The returned user is the
+   * locked, current row — never the caller's snapshot.
+   */
   @Transactional
-  public TokenPair issue(User user) {
+  public TokenPair issue(User provenUser) {
+    User current = users.findByIdForUpdate(provenUser.getId())
+        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    if (current.getSecurityVersion() != provenUser.getSecurityVersion()) {
+      // The proof was validated against an epoch that no longer exists (a
+      // factor change committed between proof and issuance). Minting now
+      // would let rotation upgrade stale authentication, so nothing is
+      // issued and nothing is inserted.
+      throw new BadCredentialsException(
+          "Authentication proof no longer matches the current security state");
+    }
+    return issue(current, current.getSecurityVersion());
+  }
+
+  /**
+   * The epoch-bound mint, callable only with the CURRENT epoch (callers hold
+   * the per-user lock or the epoch has just been verified). Callers that
+   * moved security state in this same transaction pass the new epoch so the
+   * new credentials are born under the state they just created.
+   */
+  public TokenPair issue(User current, int securityVersion) {
+    if (current.getSecurityVersion() != securityVersion) {
+      throw new BadCredentialsException(
+          "Credential epoch does not match the user's current security state");
+    }
     // Opportunistic housekeeping on every mint keeps the table bounded: rows
     // only leave once they are past their expiry (a revoked-but-unexpired
     // token must still be findable so replaying it burns its family).
@@ -65,11 +101,13 @@ public class RefreshService {
     byte[] bytes = new byte[32];
     random.nextBytes(bytes);
     String plain = Base64.getUrlEncoder().withoutPadding().encodeToString(bytes);
-    refreshTokens.save(new RefreshToken(
-        user.getId(), sha256(plain), Instant.now().plusSeconds(refreshDays * 24 * 3600)));
+    RefreshToken stored = new RefreshToken(
+        current.getId(), sha256(plain), Instant.now().plusSeconds(refreshDays * 24 * 3600));
+    stored.setSecurityVersion(securityVersion);
+    refreshTokens.save(stored);
     String access = jwtService.generate(
-        user.getEmail(), user.getRole().name(), user.getSecurityVersion());
-    return new TokenPair(access, plain, jwtService.getAccessSeconds(), user);
+        current.getEmail(), current.getRole().name(), securityVersion);
+    return new TokenPair(access, plain, jwtService.getAccessSeconds(), current);
   }
 
   /**
@@ -114,7 +152,14 @@ public class RefreshService {
     entityManager.refresh(found);
     User user = users.findById(found.getUserId())
         .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-    return issue(user);
+    // The presented token's epoch must still be current: a credential minted
+    // before a factor change is dead even if its row escaped the revocation
+    // (the paused-login interleaving this bound exists to close).
+    if (user.getSecurityVersion() != found.getSecurityVersion()) {
+      throw new BadCredentialsException(
+          "This session predates a security change; sign in again");
+    }
+    return issue(user, user.getSecurityVersion());
   }
 
   @Transactional

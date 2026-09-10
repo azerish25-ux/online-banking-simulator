@@ -56,6 +56,16 @@ public class User {
   @Column(name = "totp_enabled", nullable = false)
   private boolean totpEnabled;
 
+  /**
+   * Optimistic-lock guard (V30): a writer that changed security state without
+   * the per-user lock fails loudly on commit instead of silently interleaving
+   * two factor transitions. The pessimistic lock remains the primary
+   * serializer; this column only turns a lost update into an error.
+   */
+  @jakarta.persistence.Version
+  @Column(name = "row_version", nullable = false)
+  private long rowVersion;
+
   @Column(name = "updated_at")
   private Instant updatedAt;
 

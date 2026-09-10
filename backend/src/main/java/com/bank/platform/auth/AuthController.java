@@ -201,6 +201,14 @@ public class AuthController {
         .orElseThrow(() -> new UsernameNotFoundException("User not found"));
   }
 
+  /**
+   * Issues the credential pair through the authoritative boundary: the
+   * service re-reads the user under the per-user lock and refuses to mint
+   * anything when the caller's proof was validated against a security epoch
+   * that no longer exists (a factor change committed between proof and
+   * issuance). The mint is epoch-bound: the new refresh credential carries
+   * the security version it was authenticated under.
+   */
   private AuthResponse withRefresh(User user, HttpServletResponse response) {
     RefreshService.TokenPair pair = refreshService.issue(user);
     response.addHeader(HttpHeaders.SET_COOKIE,

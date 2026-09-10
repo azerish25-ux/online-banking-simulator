@@ -28,6 +28,15 @@ public class RefreshToken {
   @Column(nullable = false)
   private boolean revoked;
 
+  /**
+   * The security epoch this credential was authenticated under (the user's
+   * security_version at mint time). Rotation re-checks it against the user's
+   * current version under the per-user lock, so a credential whose proof was
+   * invalidated by a later factor change can never mint a live session.
+   */
+  @Column(name = "security_version", nullable = false)
+  private int securityVersion;
+
   @Column(name = "created_at", nullable = false, updatable = false)
   private Instant createdAt;
 
@@ -51,5 +60,7 @@ public class RefreshToken {
   public Instant getExpiresAt() { return expiresAt; }
   public boolean isRevoked() { return revoked; }
   public void setRevoked(boolean v) { revoked = v; }
+  public int getSecurityVersion() { return securityVersion; }
+  public void setSecurityVersion(int v) { securityVersion = v; }
   public Instant getCreatedAt() { return createdAt; }
 }

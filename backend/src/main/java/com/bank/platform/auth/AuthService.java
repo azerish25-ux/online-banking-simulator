@@ -171,12 +171,33 @@ public class AuthService {
    * password plus a valid code from the EXISTING authenticator: an ordinary
    * session alone can never swap a victim's factor.
    */
+  /**
+   * Verifies the pending enrollment and promotes it. When an active factor
+   * exists this is a REPLACEMENT and additionally requires the current
+   * password plus a valid code from the EXISTING authenticator: an ordinary
+   * session alone can never swap a victim's factor.
+   *
+   * <p>The whole transition runs on the per-user LOCKED read: state is
+   * validated, moved, and the credential pair issued in ONE transaction, so
+   * two parallel enables (or an enable racing a paused login's issuance)
+   * serialize instead of interleaving contradictory state.
+   */
   @Transactional
   public User enableTotp(String email, String code, String currentPassword, String currentCode) {
-    User user = userOf(email);
-    TotpEnrollment pending = enrollments.findUsable(user.getId(), clock.instant()).stream()
-        .findFirst()
-        .orElseThrow(() -> new BadCredentialsException("No pending TOTP setup"));
+    User user = users.findByEmailForUpdate(email)
+        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+    // Superseding policy: only the newest usable enrollment may be promoted;
+    // older pending setups are consumed now so two pending enrollments can
+    // never race into contradictory factor state.
+    java.util.List<TotpEnrollment> usable = enrollments.findUsable(user.getId(), clock.instant());
+    if (usable.isEmpty()) {
+      throw new BadCredentialsException("No pending TOTP setup");
+    }
+    TotpEnrollment pending = usable.get(0);
+    for (TotpEnrollment superseded : usable.subList(1, usable.size())) {
+      superseded.setConsumed(true);
+      enrollments.save(superseded);
+    }
     totpThrottle.verifyAvailable(email);
 
     boolean replacing = user.isTotpEnabled();
@@ -203,10 +224,14 @@ public class AuthService {
     // Immediate revocation: bump the version so every previously minted access
     // token fails validation, and revoke refresh rows so nothing can silently
     // mint successors.
-    user.setSecurityVersion(user.getSecurityVersion() + 1);
+    int newVersion = user.getSecurityVersion() + 1;
+    user.setSecurityVersion(newVersion);
     users.save(user);
     pending.setConsumed(true);
     enrollments.save(pending);
+    // Challenges issued before the transition were never proven against the
+    // new state: they die with the old epoch.
+    challenges.revokeAllByUserId(user.getId(), clock.instant());
     audits.save(metadataAudit(user, replacing ? "TOTP_REPLACED" : "TOTP_ENABLED"));
     refreshTokens.revokeAllByUserId(user.getId());
     return user;
@@ -228,10 +253,14 @@ public class AuthService {
    * Disables MFA. Like a replacement, this requires the current password AND a
    * valid code from the active authenticator (recent reauthentication + factor
    * proof); a stolen bearer token alone cannot remove the factor.
+   *
+   * <p>Runs on the per-user LOCKED read (see {@link #enableTotp}): proof,
+   * state transition, and challenge invalidation commit atomically.
    */
   @Transactional
   public User disableTotp(String email, String password, String code) {
-    User user = userOf(email);
+    User user = users.findByEmailForUpdate(email)
+        .orElseThrow(() -> new UsernameNotFoundException("User not found"));
     totpThrottle.verifyAvailable(email);
     if (!user.isTotpEnabled()) {
       throw new BadCredentialsException("MFA is not enabled");
@@ -248,6 +277,7 @@ public class AuthService {
     clearSecret(user);
     user.setSecurityVersion(user.getSecurityVersion() + 1);
     users.save(user);
+    challenges.revokeAllByUserId(user.getId(), clock.instant());
     audits.save(metadataAudit(user, "TOTP_DISABLED"));
     refreshTokens.revokeAllByUserId(user.getId());
     return user;
