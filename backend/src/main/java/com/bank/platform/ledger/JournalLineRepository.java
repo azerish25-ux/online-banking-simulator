@@ -6,12 +6,24 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 public interface JournalLineRepository extends JpaRepository<JournalLine, UUID> {
 
-  /** An account's journal postings from an instant on: the daily-balance source. */
-  List<JournalLine> findByAccountIdAndPostedAtGreaterThanEqualOrderByPostedAtAsc(
-      UUID accountId, Instant from);
+  /**
+   * An account's journal postings inside a half-open window, oldest first:
+   * the priced-period movements for the daily-balance walk. The upper bound
+   * is exclusive, so a posting at the next period's first midnight is never
+   * consumed by this period's day walk.
+   */
+  List<JournalLine> findByAccountIdAndPostedAtGreaterThanEqualAndPostedAtLessThanOrderByPostedAtAsc(
+      UUID accountId, Instant from, Instant to);
+
+  /** Signed total of an account's postings at or after an instant. */
+  @Query("select coalesce(sum(l.amount), 0) from JournalLine l "
+      + "where l.accountId = :accountId and l.postedAt >= :from")
+  BigDecimal sumAmountByAccountIdAndPostedAtGreaterThanEqual(
+      @Param("accountId") UUID accountId, @Param("from") Instant from);
 
   /**
    * Every customer account whose balance projection disagrees with what its

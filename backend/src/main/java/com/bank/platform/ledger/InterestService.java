@@ -16,6 +16,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
+import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
@@ -133,8 +134,8 @@ public class InterestService {
     this.businessZone = ZoneId.of(businessZone);
   }
 
-  /** Runs at 03:00 on the first of every month. Also triggerable via the admin API for demos. */
-  @Scheduled(cron = "0 0 3 1 * *")
+  /** Runs at 03:00 on the first of every month, in the business zone. Also triggerable via the admin API for demos. */
+  @Scheduled(cron = "0 0 3 1 * *", zone = "${app.interest.business-zone:UTC}")
   public Map<String, Integer> accrueMonthly() {
     try {
       return accrueMonthlyInternal();
@@ -243,12 +244,18 @@ public class InterestService {
 
   private Integer accrueSavings(Account account, String periodKey, Instant windowStart,
       Instant windowEnd) {
-    List<JournalLine> postings = journalLines
-        .findByAccountIdAndPostedAtGreaterThanEqualOrderByPostedAtAsc(account.getId(), windowStart);
-    BigDecimal sinceWindow = postings.stream()
-        .map(JournalLine::getAmount)
-        .reduce(BigDecimal.ZERO, BigDecimal::add);
+    // The opening balance is derived from the authoritative journal: today's
+    // projected balance minus the signed total of every posting AT OR AFTER
+    // the window start (deliberately unbounded above, so later months cannot
+    // corrupt the reconstruction). The day walk itself consumes a separately
+    // bounded in-window list: bounding this query alone would leave the
+    // opening wrong.
+    BigDecimal sinceWindow = journalLines
+        .sumAmountByAccountIdAndPostedAtGreaterThanEqual(account.getId(), windowStart);
     BigDecimal opening = account.getBalance().subtract(sinceWindow);
+    List<JournalLine> postings = journalLines
+        .findByAccountIdAndPostedAtGreaterThanEqualAndPostedAtLessThanOrderByPostedAtAsc(
+            account.getId(), windowStart, windowEnd);
 
     BigDecimal dailyRate = savingsAnnualRate
         .divide(BigDecimal.valueOf(365), 12, RoundingMode.HALF_EVEN);
@@ -260,9 +267,15 @@ public class InterestService {
     int eligibleDays = 0;
     int lineIndex = 0;
     BigDecimal running = opening;
-    Instant day = windowStart;
-    while (day.isBefore(windowEnd)) {
-      Instant nextDay = day.plusSeconds(86_400);
+    // One interval per business calendar date. Stepping an Instant by 86,400
+    // seconds overshoots in zones with daylight saving time (November 2026 in
+    // America/Halifax holds 30 dates but 31 fixed-24h steps), which both
+    // misprices the month and consumes the next day's midnight postings.
+    for (LocalDate day = LocalDate.ofInstant(windowStart, businessZone);
+        day.isBefore(LocalDate.ofInstant(windowEnd, businessZone));
+        day = day.plusDays(1)) {
+      LocalDate nextDate = day.plusDays(1);
+      Instant nextDay = nextDate.atStartOfDay(businessZone).toInstant();
       status.advanceTo(nextDay);
       while (lineIndex < postings.size()
           && postings.get(lineIndex).getPostedAt().isBefore(nextDay)) {
@@ -274,7 +287,6 @@ public class InterestService {
         eligibleTotal = eligibleTotal.add(running);
         eligibleDays++;
       }
-      day = nextDay;
     }
     BigDecimal posted = accrued.setScale(4, RoundingMode.HALF_EVEN);
     BigDecimal basis = eligibleDays == 0 ? BigDecimal.ZERO
@@ -311,9 +323,12 @@ public class InterestService {
     BigDecimal basisTotal = BigDecimal.ZERO;
     int eligibleDays = 0;
     int index = 0;
-    Instant day = windowStart;
-    while (day.isBefore(windowEnd)) {
-      Instant nextDay = day.plusSeconds(86_400);
+    // Same business-calendar walk as savings: one interval per date.
+    for (LocalDate day = LocalDate.ofInstant(windowStart, businessZone);
+        day.isBefore(LocalDate.ofInstant(windowEnd, businessZone));
+        day = day.plusDays(1)) {
+      LocalDate nextDate = day.plusDays(1);
+      Instant nextDay = nextDate.atStartOfDay(businessZone).toInstant();
       status.advanceTo(nextDay);
       while (index < inWindow.size()
           && inWindow.get(index).getPostedAt().isBefore(nextDay)) {
@@ -325,7 +340,6 @@ public class InterestService {
         basisTotal = basisTotal.add(running);
         eligibleDays++;
       }
-      day = nextDay;
     }
     BigDecimal posted = accrued.setScale(4, RoundingMode.HALF_EVEN);
     BigDecimal basis = basisTotal.setScale(4, RoundingMode.HALF_EVEN);
