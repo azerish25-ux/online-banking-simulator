@@ -119,10 +119,13 @@ public class MoneyService {
     BigDecimal scaled = requireSettleable(amount);
     String key = requireKey(idempotencyKey, "deposit");
     Account account = lockOwned(email, accountId);
-    movement.requireActive(account);
 
-    // Replay check before the limit applies: an identical replay returns the
-    // account's current state: the original deposit already moved the money.
+    // Replay check FIRST, before any rule that governs a new deposit: an
+    // operation recorded under this key must be returned to its owner even
+    // when the account was frozen after the money moved (a retry whose
+    // response was lost must never be told "rejected" while the recorded
+    // operation sits in the ledger). The canonical hash comparison stays:
+    // a changed payload under the same key remains a conflict.
     String hash = fingerprint(TxKind.DEPOSIT, null, account.getId(), scaled, "USD",
         "Simulated deposit");
     Optional<Transaction> existing = transactions
@@ -145,6 +148,9 @@ public class MoneyService {
           "Idempotency key was already used for a different deposit");
     }
 
+    // Rules for a NEW deposit apply only when the key names nothing yet:
+    // a frozen account still cannot take new funding.
+    movement.requireActive(account);
     if (scaled.compareTo(depositMax) > 0) {
       throw new TransferValidationException("Deposit exceeds the per-transaction limit");
     }

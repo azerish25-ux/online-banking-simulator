@@ -1,6 +1,7 @@
 package com.bank.platform.ledger;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -100,6 +101,61 @@ class DepositOperationTest {
     JsonNode replayBody = objectMapper.readTree(replay.getResponse().getContentAsString());
     assertEquals(operationId, replayBody.get("operationId").asText(),
         "a replay resolves to the original operation, never a fresh identity");
+  }
+
+  @Autowired
+  com.bank.platform.ledger.TransactionRepository transactions;
+  @Autowired
+  com.bank.platform.ledger.JournalEntryRepository journalEntries;
+
+  /**
+   * A committed deposit whose response was lost stays recoverable even when
+   * the account is frozen afterwards: the recorded operation is returned
+   * before any rule that governs a NEW deposit applies. A frozen status
+   * blocks new funding; it does not hide what already posted.
+   */
+  @Test
+  void aRecordedDepositIsReturnedEvenWhenTheAccountIsFrozenAfterwards() throws Exception {
+    String alice = client.register("op-dep-frz@example.com", "Op Deposit Frozen");
+    String aliceId = client.accountId(alice);
+    String key = "dep-frz-" + UUID.randomUUID();
+
+    String first = depositBalance(alice, aliceId, "400.00", key);
+    assertEquals("400.0000", first);
+
+    // The operator freezes the account after the money moved.
+    mvc.perform(post("/api/v1/admin/accounts/" + aliceId + "/freeze")
+            .header("Authorization", "Bearer " + client.adminToken()))
+        .andExpect(status().isOk());
+
+    // The identical retry returns the recorded operation.
+    MvcResult retry = mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
+            .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", key)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"amount\":\"400.00\"}"))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode body = objectMapper.readTree(retry.getResponse().getContentAsString());
+    assertEquals("400.0000", body.get("account").get("balance").asText());
+    String operationId = body.get("operationId").asText();
+
+    // Exactly one operation row and one journal entry exist for the key:
+    // the frozen retry recorded nothing new.
+    assertEquals(1L, transactions.findAll().stream()
+        .filter(tx -> tx.getKind() == com.bank.platform.ledger.TxKind.DEPOSIT
+            && key.equals(tx.getIdempotencyKey()))
+        .count());
+    assertNotNull(journalEntries.findByKindAndOperationRef(
+        com.bank.platform.ledger.JournalKind.DEPOSIT, operationId));
+
+    // New funding is still refused while frozen.
+    mvc.perform(post("/api/v1/accounts/" + aliceId + "/deposit")
+            .header("Authorization", "Bearer " + alice)
+            .header("Idempotency-Key", "dep-new-" + UUID.randomUUID())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"amount\":\"100.00\"}"))
+        .andExpect(status().isBadRequest());
   }
 
   @Test
