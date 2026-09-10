@@ -984,6 +984,11 @@ export interface components {
             /** @enum {string} */
             kind: "TRANSFER" | "DEPOSIT" | "INTEREST" | "REVERSAL";
             memo: string | null;
+            /**
+             * Format: uuid
+             * @description The account whose key namespace the operation lives in: the sender for a transfer, the funded account for a deposit
+             */
+            originatingAccountId: string;
             postedAt: string | null;
             /** @enum {string} */
             status: "POSTED" | "HELD" | "CANCELLED";
@@ -2346,6 +2351,7 @@ export interface operations {
             query: {
                 key: string;
                 accountId?: string;
+                kind?: string;
             };
             header?: never;
             path?: never;

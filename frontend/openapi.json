@@ -506,6 +506,11 @@
           "memo" : {
             "type" : [ "string", "null" ]
           },
+          "originatingAccountId" : {
+            "description" : "The account whose key namespace the operation lives in: the sender for a transfer, the funded account for a deposit",
+            "format" : "uuid",
+            "type" : "string"
+          },
           "postedAt" : {
             "type" : [ "string", "null" ]
           },
@@ -517,7 +522,7 @@
             "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "amount", "createdAt", "currency", "fromIban", "id", "idempotencyKey", "kind", "memo", "postedAt", "status", "toIban" ],
+        "required" : [ "amount", "createdAt", "currency", "fromIban", "id", "idempotencyKey", "kind", "memo", "originatingAccountId", "postedAt", "status", "toIban" ],
         "type" : "object"
       },
       "OperationListResponse" : {
@@ -2586,6 +2591,13 @@
           "required" : false,
           "schema" : {
             "format" : "uuid",
+            "type" : "string"
+          }
+        }, {
+          "in" : "query",
+          "name" : "kind",
+          "required" : false,
+          "schema" : {
             "type" : "string"
           }
         } ],
