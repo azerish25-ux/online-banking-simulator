@@ -31,7 +31,8 @@ public final class TransactionMapper {
         tx.isFlagged(), tx.isReviewed(),
         tx.getReversesTransactionId(),
         null,
-        null);
+        null,
+        tx.getIdempotencyKey());
   }
 
   /**
@@ -39,6 +40,7 @@ public final class TransactionMapper {
    * on a REVERSAL row and, via {@code reversalByOriginalId} (original-id → its
    * reversal row id, see TransactionRepository.reversalIndexBy), whether a
    * POSTED row has already been reversed so the console never offers a second.
+   * The reversal faces never surface a raw idempotency key.
    */
   public static TransactionResponse toAdminResponse(Transaction tx, Map<UUID, String> ibans,
       Map<UUID, UUID> reversalByOriginalId) {
@@ -56,7 +58,8 @@ public final class TransactionMapper {
         tx.isFlagged(), tx.isReviewed(),
         tx.getReversesTransactionId(),
         tx.getReversalReason(),
-        reversalByOriginalId.get(tx.getId()));
+        reversalByOriginalId.get(tx.getId()),
+        null);
   }
 
   /**
@@ -90,6 +93,7 @@ public final class TransactionMapper {
         tx.getStatus(),
         tx.getCreatedAt().toString(),
         tx.getPostedAt() == null ? null : tx.getPostedAt().toString(),
-        tx.isFlagged());
+        tx.isFlagged(),
+        tx.getIdempotencyKey());
   }
 }

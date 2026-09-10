@@ -263,6 +263,10 @@
           "account" : {
             "$ref" : "#/components/schemas/AccountResponse"
           },
+          "amount" : {
+            "description" : "The deposited amount as a ledger decimal, so a client can verify a receipt answers its own dispatch",
+            "type" : "string"
+          },
           "idempotencyKey" : {
             "type" : "string"
           },
@@ -275,7 +279,7 @@
             "type" : "string"
           }
         },
-        "required" : [ "account", "idempotencyKey", "operationId", "status" ],
+        "required" : [ "account", "amount", "idempotencyKey", "operationId", "status" ],
         "type" : "object"
       },
       "DuplicateRow" : {
@@ -1042,6 +1046,10 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "idempotencyKey" : {
+            "description" : "The key this operation was recorded under (set only on receipt/operation shapes, never on history rows), so a client can verify a receipt answers its own dispatch",
+            "type" : [ "string", "null" ]
+          },
           "kind" : {
             "enum" : [ "TRANSFER", "DEPOSIT", "INTEREST", "REVERSAL" ],
             "type" : "string"
@@ -1079,7 +1087,7 @@
             "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "kind", "memo", "postedAt", "reversalId", "reversalReason", "reversesTransactionId", "reviewed", "status", "toIban" ],
+        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "idempotencyKey", "kind", "memo", "postedAt", "reversalId", "reversalReason", "reversesTransactionId", "reviewed", "status", "toIban" ],
         "type" : "object"
       },
       "TransferRequest" : {
@@ -1131,6 +1139,10 @@
             "format" : "uuid",
             "type" : "string"
           },
+          "idempotencyKey" : {
+            "description" : "The key this operation was recorded under, so a client can verify a receipt answers its own dispatch",
+            "type" : "string"
+          },
           "memo" : {
             "type" : [ "string", "null" ]
           },
@@ -1146,7 +1158,7 @@
             "type" : [ "string", "null" ]
           }
         },
-        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "memo", "postedAt", "status", "toIban" ],
+        "required" : [ "amount", "createdAt", "currency", "flagged", "fromIban", "id", "idempotencyKey", "memo", "postedAt", "status", "toIban" ],
         "type" : "object"
       },
       "UnbalancedEntryRow" : {

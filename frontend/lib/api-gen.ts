@@ -896,6 +896,8 @@ export interface components {
         };
         DepositResponse: {
             account: components["schemas"]["AccountResponse"];
+            /** @description The deposited amount as a ledger decimal, so a client can verify a receipt answers its own dispatch */
+            amount: string;
             idempotencyKey: string;
             /** Format: uuid */
             operationId: string;
@@ -1176,6 +1178,8 @@ export interface components {
             fromIban: string | null;
             /** Format: uuid */
             id: string;
+            /** @description The key this operation was recorded under (set only on receipt/operation shapes, never on history rows), so a client can verify a receipt answers its own dispatch */
+            idempotencyKey: string | null;
             /** @enum {string} */
             kind: "TRANSFER" | "DEPOSIT" | "INTEREST" | "REVERSAL";
             memo: string | null;
@@ -1216,6 +1220,8 @@ export interface components {
             fromIban: string | null;
             /** Format: uuid */
             id: string;
+            /** @description The key this operation was recorded under, so a client can verify a receipt answers its own dispatch */
+            idempotencyKey: string;
             memo: string | null;
             /** @description null while HELD or when CANCELLED: money has not moved */
             postedAt: string | null;

@@ -3,6 +3,7 @@ package com.bank.platform.accounts;
 import com.bank.platform.ledger.MoneyService;
 import com.bank.platform.ledger.Transaction;
 import com.bank.platform.ledger.TxStatus;
+import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -73,7 +74,8 @@ public class AccountController {
         AccountMapper.toResponse(outcome.account()),
         op.getId(),
         op.getIdempotencyKey(),
-        op.getStatus());
+        op.getStatus(),
+        op.getAmount().toPlainString());
   }
 
   /**
@@ -86,6 +88,7 @@ public class AccountController {
       AccountResponse account,
       UUID operationId,
       String idempotencyKey,
-      TxStatus status) {}
+      TxStatus status,
+      @Schema(description = "The deposited amount as a ledger decimal, so a client can verify a receipt answers its own dispatch") String amount) {}
 
 }
