@@ -34,6 +34,16 @@ public interface AccountRepository extends JpaRepository<Account, UUID> {
   @Query("select a.id from Account a where a.iban = :iban")
   Optional<UUID> findIdByIban(String iban);
 
+  /**
+   * Scalar type read for classification checks. It never loads a managed
+   * Account into the caller's persistence context, so a later
+   * {@link #findByIdForUpdate} in the same transaction stays the first
+   * entity read of the row (the first-read discipline at
+   * LedgerMovementService).
+   */
+  @Query("select a.type from Account a where a.id = :id")
+  Optional<AccountType> findTypeById(@Param("id") UUID id);
+
   @Lock(LockModeType.PESSIMISTIC_WRITE)
   @Query("select a from Account a where a.id = :id")
   Optional<Account> findByIdForUpdate(UUID id);

@@ -143,11 +143,29 @@ public class ReversalService {
     return reverseTransfer(actor, original, originalEntry, reversal, now);
   }
 
-  /** A transfer reverses along its own legs: the payee pays the money back. */
+  /**
+   * A transfer reverses along its own legs: the payee pays the money back.
+   * A LOAN on either leg takes the transfer out of this workflow: a credit
+   * to a loan is a repayment that extinguishes interest before principal, so
+   * the plain reverse movement would book that interest back as fresh
+   * principal (and later accrual would charge interest on it). The debt
+   * composition cannot be rebuilt from recorded evidence, so the reversal is
+   * refused before any mutation. The type check reads a scalar column, never
+   * a managed Account, so the movement lock below stays the first entity
+   * read of both rows.
+   */
   private Transaction reverseTransfer(User actor, Transaction original, JournalEntry originalEntry,
       Transaction reversal, Instant now) {
     UUID payee = original.getToAccountId();
     UUID payer = original.getFromAccountId();
+    if (accounts.findTypeById(payer).orElse(AccountType.CHECKING) == AccountType.LOAN
+        || accounts.findTypeById(payee).orElse(AccountType.CHECKING) == AccountType.LOAN) {
+      throw new TransferValidationException(
+          "A transfer involving a loan account cannot be reversed by this workflow: a loan"
+              + " repayment extinguishes interest before principal, so the reverse movement"
+              + " would reclassify that interest as principal. Correct the loan by an"
+              + " explicitly reviewed adjustment instead.");
+    }
     reversal.setFromAccountId(payee);
     reversal.setToAccountId(payer);
     // move() takes the ID-ordered locks and enforces ACTIVE + affordability on

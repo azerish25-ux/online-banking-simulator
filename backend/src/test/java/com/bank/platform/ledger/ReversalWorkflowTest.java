@@ -14,8 +14,10 @@ import com.bank.platform.support.ApiTestClient;
 import tools.jackson.databind.JsonNode;
 import tools.jackson.databind.ObjectMapper;
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Clock;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -35,7 +37,10 @@ import org.springframework.transaction.annotation.Transactional;
  * a NEW linked operation that moves the money back: the original row is never
  * edited or relabelled. One reversal per original, a mandatory reason and an
  * audited actor, duplicate-reversal protection, and honest refusal when the
- * current account state cannot absorb the reverse movement.
+ * current account state cannot absorb the reverse movement. A transfer that
+ * touches a LOAN leg is refused outright: a loan repayment extinguishes
+ * interest before principal, and the plain reverse movement would book that
+ * interest back as fresh principal.
  */
 @SpringBootTest
 @org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -60,6 +65,8 @@ class ReversalWorkflowTest {
   @Autowired TransactionRepository transactions;
   @Autowired JournalEntryRepository journalEntries;
   @Autowired ReconciliationService reconciliation;
+  @Autowired InterestService interestService;
+  @Autowired PrincipalMovementRepository principalMovements;
 
   ApiTestClient client;
 
@@ -269,6 +276,184 @@ class ReversalWorkflowTest {
     assertTrue(feedReversal.has("reversalReason")
         && feedReversal.get("reversalReason").isNull(),
         "the operator's reason is never exposed on a customer-facing feed");
+  }
+
+  // ------------------------------------------------------------------
+  // Loan-leg reversals. The interest-first repayment allocation has no
+  // plain inverse: reversing the movement would reclassify extinguished
+  // interest as principal, so the workflow refuses before any mutation.
+  // ------------------------------------------------------------------
+
+  @Test
+  void reversalOfAnInterestOnlyLoanRepaymentIsRefusedBeforeAnyMutation()
+      throws Exception {
+    String alice = client.register("rev-loan-a@example.com", "Rev Loan A");
+    String aliceIban = client.accountIban(alice);
+    String loanId = openLoan(alice);
+    String loanIban = account(UUID.fromString(loanId)).getIban();
+
+    // Draw 100 of principal on June 15; the July 1 run accrues June interest.
+    transferFrom(alice, loanId, aliceIban, "100.00");
+    CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
+    assertEquals(1, interestService.accrueMonthly().get("accrued"));
+    BigDecimal juneInterest = loanCharge(List.of(segment(15, 30, "100.00")), "0.12");
+    assertEquals(new BigDecimal("100.0000").add(juneInterest).negate(),
+        account(UUID.fromString(loanId)).getBalance());
+
+    // An interest-only repayment: principal stays 100, only the interest is
+    // extinguished.
+    CLOCK.set(Instant.parse("2026-07-10T10:00:00Z"));
+    String repayTxId = client.transfer(alice, loanIban, juneInterest.toPlainString());
+    assertEquals(new BigDecimal("100.0000"), account(UUID.fromString(loanId)).getPrincipal());
+    assertEquals(new BigDecimal("100.0000").negate(), account(UUID.fromString(loanId)).getBalance());
+
+    // Reversing the repayment would book the interest back as principal: the
+    // debt composition cannot be restored from recorded evidence, so the
+    // workflow refuses before any mutation.
+    mvc.perform(post("/api/v1/admin/transactions/" + repayTxId + "/reverse")
+            .header("Authorization", "Bearer " + client.adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"reason\":\"Operator error\"}"))
+        .andExpect(status().isBadRequest());
+    assertEquals(0L, transactions.findAll().stream()
+        .filter(tx -> tx.getReversesTransactionId() != null).count(),
+        "no reversal row may exist for a refused loan-leg reversal");
+    assertEquals(new BigDecimal("100.0000"), account(UUID.fromString(loanId)).getPrincipal());
+    assertEquals(new BigDecimal("100.0000").negate(), account(UUID.fromString(loanId)).getBalance());
+    assertTrue(reconciliation.reconcile().balanced());
+  }
+
+  @Test
+  void reversalOfAMixedLoanRepaymentIsRefusedAndAccrualStaysOnTruePrincipal()
+      throws Exception {
+    String alice = client.register("rev-loan-d@example.com", "Rev Loan D");
+    String aliceIban = client.accountIban(alice);
+    String loanId = openLoan(alice);
+    String loanIban = account(UUID.fromString(loanId)).getIban();
+
+    transferFrom(alice, loanId, aliceIban, "100.00");
+    CLOCK.set(Instant.parse("2026-07-01T03:00:00Z"));
+    assertEquals(1, interestService.accrueMonthly().get("accrued"));
+    BigDecimal juneInterest = loanCharge(List.of(segment(15, 30, "100.00")), "0.12");
+
+    // A mixed repayment: part interest, part principal.
+    CLOCK.set(Instant.parse("2026-07-10T10:00:00Z"));
+    String repayTxId = client.transfer(alice, loanIban, "10.00");
+    BigDecimal principalAfterRepay = new BigDecimal("100.0000")
+        .subtract(new BigDecimal("10.0000").subtract(juneInterest));
+    assertEquals(principalAfterRepay, account(UUID.fromString(loanId)).getPrincipal());
+
+    mvc.perform(post("/api/v1/admin/transactions/" + repayTxId + "/reverse")
+            .header("Authorization", "Bearer " + client.adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"reason\":\"Operator error\"}"))
+        .andExpect(status().isBadRequest());
+    assertEquals(principalAfterRepay, account(UUID.fromString(loanId)).getPrincipal(),
+        "the refused reversal must not reclassify the interest component");
+    // The principal-movement history agrees with the row: one draw, one
+    // repayment component, nothing else.
+    assertEquals(principalAfterRepay,
+        principalMovements.sumPostedBefore(UUID.fromString(loanId),
+            Instant.parse("2027-01-01T00:00:00Z")).orElseThrow());
+
+    // The next accrual prices the TRUE principal, never a misclassified one.
+    CLOCK.set(Instant.parse("2026-08-01T03:00:00Z"));
+    assertEquals(1, interestService.accrueMonthly().get("accrued"));
+    BigDecimal julyCharge = loanCharge(List.of(
+        segment(1, 9, "100.0000"),
+        segment(10, 31, principalAfterRepay.toPlainString())), "0.12");
+    assertEquals(principalAfterRepay.add(julyCharge).negate(),
+        account(UUID.fromString(loanId)).getBalance());
+    assertTrue(reconciliation.reconcile().balanced());
+  }
+
+  @Test
+  void reversalOfATransferDrawnFromALoanIsRefused() throws Exception {
+    String alice = client.register("rev-loan-b@example.com", "Rev Loan B");
+    UUID aliceId = UUID.fromString(client.accountId(alice));
+    String aliceIban = client.accountIban(alice);
+    String loanId = openLoan(alice);
+
+    String drawTxId = transferFrom(alice, loanId, aliceIban, "100.00");
+
+    // The reverse movement would credit the loan as a repayment (or, once
+    // interest exists, misallocate it): refusal, not guessed accounting.
+    mvc.perform(post("/api/v1/admin/transactions/" + drawTxId + "/reverse")
+            .header("Authorization", "Bearer " + client.adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"reason\":\"Drawn by mistake\"}"))
+        .andExpect(status().isBadRequest());
+    assertEquals(0L, transactions.findAll().stream()
+        .filter(tx -> tx.getReversesTransactionId() != null).count());
+    assertEquals(new BigDecimal("100.0000"), account(UUID.fromString(loanId)).getPrincipal());
+    assertEquals(new BigDecimal("100.0000").negate(), account(UUID.fromString(loanId)).getBalance());
+    assertEquals(new BigDecimal("100.0000"), account(aliceId).getBalance());
+    assertTrue(reconciliation.reconcile().balanced());
+  }
+
+  @Test
+  void reversalOfAFullyDrawnLoanTransferIsRefusedWithoutAnAffordabilityGuess()
+      throws Exception {
+    String alice = client.register("rev-loan-c@example.com", "Rev Loan C");
+    String aliceIban = client.accountIban(alice);
+    String loanId = openLoan(alice);
+
+    // The draw consumed the whole credit limit; the reverse movement would
+    // push new borrowing onto the loan. The loan-leg rule refuses before any
+    // movement instead of letting affordability arithmetic decide.
+    String drawTxId = transferFrom(alice, loanId, aliceIban, "1000.00");
+    mvc.perform(post("/api/v1/admin/transactions/" + drawTxId + "/reverse")
+            .header("Authorization", "Bearer " + client.adminToken())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"reason\":\"Wrong account\"}"))
+        .andExpect(status().isBadRequest());
+    assertEquals(new BigDecimal("1000.0000"), account(UUID.fromString(loanId)).getPrincipal());
+    assertEquals(new BigDecimal("1000.0000").negate(), account(UUID.fromString(loanId)).getBalance());
+    assertEquals(0L, transactions.findAll().stream()
+        .filter(tx -> tx.getReversesTransactionId() != null).count());
+  }
+
+  /** Opens a LOAN account (credit limit 1000) and returns its id. */
+  private String openLoan(String token) throws Exception {
+    MvcResult result = mvc.perform(post("/api/v1/accounts")
+            .header("Authorization", "Bearer " + token)
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"type\":\"LOAN\"}"))
+        .andExpect(status().isCreated())
+        .andReturn();
+    return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+  }
+
+  /** Transfer FROM a specific owned account (e.g. a loan draw); returns the id. */
+  private String transferFrom(String token, String fromId, String toIban, String amount)
+      throws Exception {
+    MvcResult result = mvc.perform(post("/api/v1/transfers")
+            .header("Authorization", "Bearer " + token)
+            .header("Idempotency-Key", "rev-" + UUID.randomUUID())
+            .contentType(MediaType.APPLICATION_JSON)
+            .content("{\"toIban\":\"%s\",\"amount\":\"%s\",\"fromAccountId\":\"%s\"}"
+                .formatted(toIban, amount, fromId)))
+        .andExpect(status().isCreated())
+        .andReturn();
+    return objectMapper.readTree(result.getResponse().getContentAsString()).get("id").asText();
+  }
+
+  private record PrincipalSegment(int fromDay, int toDay, BigDecimal principal) {}
+
+  private static PrincipalSegment segment(int fromDay, int toDay, String principal) {
+    return new PrincipalSegment(fromDay, toDay, new BigDecimal(principal));
+  }
+
+  /** Fixed-365 charge over constant-principal day ranges, rounded once at 4dp. */
+  private static BigDecimal loanCharge(List<PrincipalSegment> segments, String annualRate) {
+    BigDecimal dailyRate = new BigDecimal(annualRate)
+        .divide(BigDecimal.valueOf(365), 12, RoundingMode.HALF_EVEN);
+    BigDecimal total = BigDecimal.ZERO;
+    for (PrincipalSegment segment : segments) {
+      int days = segment.toDay - segment.fromDay + 1;
+      total = total.add(segment.principal.multiply(dailyRate).multiply(BigDecimal.valueOf(days)));
+    }
+    return total.setScale(4, RoundingMode.HALF_EVEN);
   }
 
   private JsonNode findById(JsonNode array, String id) {
