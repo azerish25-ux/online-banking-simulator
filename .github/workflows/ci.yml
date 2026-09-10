@@ -20,12 +20,12 @@ jobs:
           cache: maven
       - working-directory: backend
         run: ./mvnw -B verify
-      # Forward-only kind-reclassification chain over a V7-era fixture.
-      # The class is *IT-named, which Maven's default surefire/failsafe
-      # naming never picks up, so it must be requested explicitly (H2 in
-      # PostgreSQL mode; no service needed).
-      - working-directory: backend
-        run: ./mvnw -B test -Dtest=TransactionKindMigrationIT
+      # ./mvnw verify now runs the H2-runnable migration ITs through the
+      # Failsafe gate configured in the pom (TransactionKindMigrationIT and
+      # KindAuditProvenanceMigrationIT, which Surefire's default naming
+      # never picked up; an empty match fails the build), so no separate
+      # explicit invocation is needed. The PostgreSQL-only ITs keep their
+      # dedicated jobs below with their disposable-database properties.
 
   frontend:
     runs-on: ubuntu-latest

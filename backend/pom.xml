@@ -190,6 +190,36 @@
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-maven-plugin</artifactId>
       </plugin>
+      <!--
+        Persistent gate for the *IT migration tests: Surefire's default
+        naming never picks up a *IT class, so KindAuditProvenanceMigrationIT
+        only ever ran when CI requested it by exact name, and any accidental
+        exclusion would pass silently. The two H2-runnable migration ITs are
+        part of ./mvnw verify now, and an empty match fails the build, so
+        the class can never silently drop out of the build again. The
+        PostgreSQL-only ITs keep their explicit CI invocation with their
+        disposable-database properties.
+      -->
+      <plugin>
+        <groupId>org.apache.maven.plugins</groupId>
+        <artifactId>maven-failsafe-plugin</artifactId>
+        <version>3.5.3</version>
+        <configuration>
+          <includes>
+            <include>TransactionKindMigrationIT</include>
+            <include>KindAuditProvenanceMigrationIT</include>
+          </includes>
+          <failIfNoTests>true</failIfNoTests>
+        </configuration>
+        <executions>
+          <execution>
+            <goals>
+              <goal>integration-test</goal>
+              <goal>verify</goal>
+            </goals>
+          </execution>
+        </executions>
+      </plugin>
     </plugins>
   </build>
 </project>

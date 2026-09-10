@@ -220,7 +220,7 @@ public class TransferController {
     Transaction tx = money.operationStatus(authentication.getName(), key, accountId, kindFilter)
         .orElseThrow(() -> new TransactionNotFoundException(
             "No operation found for this idempotency key"));
-    return TransactionMapper.toResponse(tx, statements.ibanMap(List.of(tx)));
+    return TransactionMapper.toReceiptResponse(tx, statements.ibanMap(List.of(tx)));
   }
 
   /**
@@ -252,7 +252,7 @@ public class TransferController {
     Transaction tx = money.transferDetail(authentication.getName(), id)
         .orElseThrow(() -> new TransactionNotFoundException(
             "No transfer found for this id"));
-    return TransactionMapper.toResponse(tx, statements.ibanMap(List.of(tx)));
+    return TransactionMapper.toReceiptResponse(tx, statements.ibanMap(List.of(tx)));
   }
 
   @GetMapping("/accounts/{id}/summary")

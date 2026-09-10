@@ -101,4 +101,51 @@ class ReceiptLookupTest {
             .header("Authorization", "Bearer " + alice))
         .andExpect(status().isNotFound());
   }
+
+  /**
+   * The idempotency key is receipt-only. A history row can be a LEG of
+   * another user's operation, so serving its key would disclose the
+   * originator's client-generated dispatch token to the counterparty: the
+   * exact string their recovery flow replays. The receipt face (by id, the
+   * caller's own dispatch) keeps the key; every history face nulls it.
+   */
+  @Test
+  void historyCarriesNoIdempotencyKeyTheReceiptDoes() throws Exception {
+    String alice = client.register("receipt-key-a@example.com", "Receipt Key A");
+    String bob = client.register("receipt-key-b@example.com", "Receipt Key B");
+    String aliceId = client.accountId(alice);
+    client.deposit(alice, aliceId, "80.00");
+    String key = "hist-" + java.util.UUID.randomUUID();
+    String txId = client.transferWithKey(alice, client.accountIban(bob), "7.50", key);
+
+    // The receipt face self-identifies: it names the key the request
+    // was dispatched under, so the client can verify the answer is its own.
+    MvcResult receipt = mvc.perform(get("/api/v1/transfers/" + txId)
+            .header("Authorization", "Bearer " + alice))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode receiptBody =
+        json.readValue(receipt.getResponse().getContentAsString(), JsonNode.class);
+    assertEquals(key, receiptBody.get("idempotencyKey").asText(),
+        "the receipt must name the key its dispatch was recorded under");
+
+    // The counterparty's history drops the key entirely: no row may carry
+    // any non-empty key, and the transfer leg itself must be among them.
+    MvcResult history = mvc.perform(get("/api/v1/transactions")
+            .header("Authorization", "Bearer " + bob)
+            .param("accountId", client.accountId(bob)))
+        .andExpect(status().isOk())
+        .andReturn();
+    JsonNode rows = json.readValue(history.getResponse().getContentAsString(), JsonNode.class)
+        .get("items");
+    boolean sawTheTransfer = false;
+    for (JsonNode row : rows) {
+      if (txId.equals(row.path("id").asText())) {
+        sawTheTransfer = true;
+      }
+      assertTrue(!row.hasNonNull("idempotencyKey"),
+          "a history row must never disclose an operation's idempotency key");
+    }
+    assertTrue(sawTheTransfer, "the transfer leg must appear in the recipient's history");
+  }
 }
