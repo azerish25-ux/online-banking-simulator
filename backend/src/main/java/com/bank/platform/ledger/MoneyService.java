@@ -387,11 +387,12 @@ public class MoneyService {
    */
   @Transactional(readOnly = true)
   public Optional<Transaction> operationStatus(String email, String key) {
-    return operationStatus(email, key, null);
+    return operationStatus(email, key, null, null);
   }
 
   @Transactional(readOnly = true)
-  public Optional<Transaction> operationStatus(String email, String key, UUID accountId) {
+  public Optional<Transaction> operationStatus(String email, String key, UUID accountId,
+      TxKind kind) {
     User owner = userOf(email);
     List<UUID> owned = accounts.findByUserIdOrderByCreatedAtAsc(owner.getId()).stream()
         .map(Account::getId)
@@ -401,12 +402,21 @@ public class MoneyService {
     }
     if (accountId != null) {
       // The originating account must belong to the caller, and the row must
-      // live in that account's key namespace: foreign or unknown resolves
-      // to nothing (404), never to another user's operation.
+      // live in that account's key namespace for the given kind: foreign or
+      // unknown resolves to nothing (404), never to another user's operation.
+      // Scope that still spans both namespaces (no kind, both kinds recorded)
+      // is a controlled ambiguity, never an arbitrary row.
       if (!owned.contains(accountId)) {
         return Optional.empty();
       }
-      return transactions.findOperationByKeyAndAccount(key, accountId);
+      List<Transaction> scoped = transactions.findOperationByKeyAndAccount(key, accountId, kind);
+      if (scoped.isEmpty()) {
+        return Optional.empty();
+      }
+      if (scoped.size() > 1) {
+        throw new OperationKeyAmbiguousException(key, scoped);
+      }
+      return Optional.of(scoped.get(0));
     }
     List<Transaction> hits = transactions.findOperationsByKey(key, owned);
     if (hits.isEmpty()) {

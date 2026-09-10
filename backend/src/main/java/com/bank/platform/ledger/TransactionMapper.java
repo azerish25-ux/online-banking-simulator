@@ -59,10 +59,14 @@ public final class TransactionMapper {
         reversalByOriginalId.get(tx.getId()));
   }
 
-  /** The recovery-list shape: transaction fields plus the idempotency key. */
+  /**
+   * The recovery-list shape: transaction fields plus the idempotency key and
+   * the originating account whose namespace the key is unique on.
+   */
   public static OperationListItem toOperationListItem(Transaction tx, Map<UUID, String> ibans) {
     return new OperationListItem(
         tx.getId(),
+        tx.getFromAccountId() != null ? tx.getFromAccountId() : tx.getToAccountId(),
         tx.getFromAccountId() == null ? null : ibans.getOrDefault(tx.getFromAccountId(), tx.getFromAccountId().toString()),
         tx.getToAccountId() == null ? null : ibans.getOrDefault(tx.getToAccountId(), tx.getToAccountId().toString()),
         tx.getAmount().toPlainString(),

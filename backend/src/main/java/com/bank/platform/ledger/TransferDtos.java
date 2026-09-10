@@ -79,6 +79,7 @@ public final class TransferDtos {
    */
   public record OperationListItem(
       UUID id,
+      @Schema(description = "The account whose key namespace the operation lives in: the sender for a transfer, the funded account for a deposit") UUID originatingAccountId,
       @Schema(nullable = true) String fromIban,
       @Schema(nullable = true) String toIban,
       String amount, String currency,

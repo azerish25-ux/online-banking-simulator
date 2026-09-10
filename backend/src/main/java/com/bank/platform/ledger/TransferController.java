@@ -207,8 +207,17 @@ public class TransferController {
   @GetMapping("/operations")
   public TransactionResponse operation(
       Authentication authentication, @RequestParam String key,
-      @RequestParam(required = false) UUID accountId) {
-    Transaction tx = money.operationStatus(authentication.getName(), key, accountId)
+      @RequestParam(required = false) UUID accountId,
+      @RequestParam(required = false) String kind) {
+    TxKind kindFilter = null;
+    if (kind != null && !kind.isBlank()) {
+      try {
+        kindFilter = TxKind.valueOf(kind.trim().toUpperCase());
+      } catch (IllegalArgumentException ex) {
+        throw new IllegalArgumentException("Unknown operation kind: " + kind);
+      }
+    }
+    Transaction tx = money.operationStatus(authentication.getName(), key, accountId, kindFilter)
         .orElseThrow(() -> new TransactionNotFoundException(
             "No operation found for this idempotency key"));
     return TransactionMapper.toResponse(tx, statements.ibanMap(List.of(tx)));

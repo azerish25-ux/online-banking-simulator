@@ -192,17 +192,20 @@ public interface TransactionRepository
   List<Transaction> findOperationsByKey(@Param("key") String key, @Param("owned") List<UUID> owned);
 
   /**
-   * Operation lookup scoped to ONE originating account (namespace fix):
-   * the database uniqueness lives on (from_account_id, key) for transfers and
-   * (to_account_id, key) for deposits, so restricting the lookup to the
-   * originating account makes the replay/lookup namespace exactly the
-   * uniqueness namespace: at most one row can ever match.
+   * Operation lookup scoped to ONE originating account and kind (namespace
+   * fix): the database uniqueness lives on (from_account_id, key) for
+   * transfers and (to_account_id, key) for deposits, so restricting the
+   * lookup to the originating account AND the operation kind makes the
+   * replay/lookup namespace exactly the uniqueness namespace: at most one
+   * row can ever match. A null kind keeps the two-namespace view for the
+   * controlled ambiguity response.
    */
   @Query("select t from Transaction t where t.idempotencyKey = :key "
       + "and ((t.fromAccountId is not null and t.fromAccountId = :accountId) "
-      + "or (t.fromAccountId is null and t.toAccountId = :accountId))")
-  Optional<Transaction> findOperationByKeyAndAccount(@Param("key") String key,
-      @Param("accountId") UUID accountId);
+      + "or (t.fromAccountId is null and t.toAccountId = :accountId)) "
+      + "and (:kind is null or t.kind = :kind)")
+  List<Transaction> findOperationByKeyAndAccount(@Param("key") String key,
+      @Param("accountId") UUID accountId, @Param("kind") TxKind kind);
 
   /**
    * Bounded, newest-first recovery list of the originator's own keyed

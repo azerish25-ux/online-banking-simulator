@@ -78,8 +78,8 @@ class OperationRecoveryTest {
 
     // The account-scoped lookup IS the uniqueness namespace: each resolves
     // exactly its own operation.
-    assertEquals("100.0000", operationAmount(alice, key, checkingId), "checking deposit resolves");
-    assertEquals("7.0000", operationAmount(alice, key, savingsId), "savings deposit resolves");
+    assertEquals("100.0000", operationAmount(alice, key, checkingId, "DEPOSIT"), "checking deposit resolves");
+    assertEquals("7.0000", operationAmount(alice, key, savingsId, "DEPOSIT"), "savings deposit resolves");
   }
 
   @Test
@@ -109,6 +109,66 @@ class OperationRecoveryTest {
     // Bob's list never surfaces Alice's operations.
     JsonNode bobList = recent(bob, 25);
     assertEquals(0, bobList.get("items").size());
+  }
+
+  @Test
+  void sameKeyOnOneAccountAcrossKindsIsDisambiguatedByTheKindDiscriminator()
+      throws Exception {
+    String alice = client.register("op-rec-f@example.com", "Op Recovery F");
+    String bob = client.register("op-rec-g@example.com", "Op Recovery G");
+    String checkingId = client.accountId(alice);
+    String bobIban = client.accountIban(bob);
+    String key = "op-kind-" + UUID.randomUUID();
+
+    // One key, one account, two kinds: a deposit funded checking and a
+    // transfer originated from checking. Both rows are legitimate.
+    depositTo(alice, checkingId, "100.00", key);
+    client.transferWithKey(alice, bobIban, "20.00", key);
+
+    // Account scope alone still spans the two namespaces: without a kind the
+    // lookup answers the controlled ambiguity, never an arbitrary row.
+    mvc.perform(get("/api/v1/operations")
+            .header("Authorization", "Bearer " + alice)
+            .param("key", key)
+            .param("accountId", checkingId))
+        .andExpect(status().isConflict());
+
+    // The kind discriminator restores a unique namespace.
+    assertEquals("100.0000", operationAmount(alice, key, checkingId, "DEPOSIT"));
+    assertEquals("20.0000", operationAmount(alice, key, checkingId, "TRANSFER"));
+
+    // An unknown kind is a 400, not a silent empty.
+    mvc.perform(get("/api/v1/operations")
+            .header("Authorization", "Bearer " + alice)
+            .param("key", key)
+            .param("accountId", checkingId)
+            .param("kind", "WITHDRAWAL"))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void recentListCarriesTheOriginatingAccountAndForeignKeysResolveToNothing()
+      throws Exception {
+    String alice = client.register("op-rec-h@example.com", "Op Recovery H");
+    String bob = client.register("op-rec-i@example.com", "Op Recovery I");
+    String aliceId = client.accountId(alice);
+    String bobId = client.accountId(bob);
+    client.deposit(alice, aliceId, "55.00");
+
+    // Every item names the account whose namespace the key lives in.
+    JsonNode list = recent(alice, 25);
+    assertEquals(1, list.get("items").size());
+    assertEquals(aliceId, list.get("items").get(0).get("originatingAccountId").asText());
+
+    // A key probe scoped to an account the caller does not own is empty
+    // (surfaced as 404), never another user's row.
+    String bobKey = "op-foreign-" + UUID.randomUUID();
+    depositTo(bob, bobId, "11.00", bobKey);
+    mvc.perform(get("/api/v1/operations")
+            .header("Authorization", "Bearer " + alice)
+            .param("key", bobKey)
+            .param("accountId", bobId))
+        .andExpect(status().isNotFound());
   }
 
   @Test
@@ -150,11 +210,13 @@ class OperationRecoveryTest {
         .andExpect(status().isOk());
   }
 
-  private String operationAmount(String token, String key, String accountId) throws Exception {
+  private String operationAmount(String token, String key, String accountId, String kind)
+      throws Exception {
     MvcResult result = mvc.perform(get("/api/v1/operations")
             .header("Authorization", "Bearer " + token)
             .param("key", key)
-            .param("accountId", accountId))
+            .param("accountId", accountId)
+            .param("kind", kind))
         .andExpect(status().isOk())
         .andReturn();
     JsonNode body = objectMapper.readTree(result.getResponse().getContentAsString());
