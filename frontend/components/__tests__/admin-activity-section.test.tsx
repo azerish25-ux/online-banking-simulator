@@ -33,6 +33,7 @@ function tx(id: string, overrides: Partial<Tx> = {}): Tx {
     reversesTransactionId: null,
     reversalReason: null,
     reversalId: null,
+    idempotencyKey: null,
     ...overrides
   };
 }

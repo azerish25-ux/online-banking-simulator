@@ -1,6 +1,13 @@
 import { describe, expect, it } from "vitest";
 import { ApiError } from "./api";
-import { classifyMoneyFailure, classifyReversalFailure, isDefinitiveRejection } from "./money-failure";
+import {
+  classifyMoneyFailure,
+  classifyReversalFailure,
+  isDefinitiveRejection,
+  isMalformedSuccess,
+  isReplayInconclusive,
+  malformedSuccessError
+} from "./money-failure";
 
 describe("classifyMoneyFailure", () => {
   it("keeps the server's words for a definitive rejection (nothing was recorded)", () => {
@@ -92,5 +99,29 @@ describe("isDefinitiveRejection: the single owner of the boundary", () => {
     expect(isDefinitiveRejection(new ApiError(429, "x", "m"))).toBe(false);
     expect(isDefinitiveRejection(new ApiError(503, "x", "m"))).toBe(false);
     expect(isDefinitiveRejection(new TypeError("network"))).toBe(false);
+  });
+});
+
+describe("malformed success (a 2xx that is not a receipt)", () => {
+  it("is an ApiError the mutation layer treats as an unknown outcome", () => {
+    const err = malformedSuccessError("transfer");
+    expect(isMalformedSuccess(err)).toBe(true);
+    expect(err.status).toBe(0);
+    expect(err.message).toContain("unreadable transfer response");
+    expect(err.message).toContain("The attempt is saved");
+    expect(isMalformedSuccess(new ApiError(0, "Other", "x"))).toBe(false);
+    expect(isMalformedSuccess(new TypeError("network"))).toBe(false);
+  });
+});
+
+describe("replay-inconclusive statuses", () => {
+  it("401/403/404/408 never prove an earlier attempt's outcome", () => {
+    for (const status of [401, 403, 404, 408]) {
+      expect(isReplayInconclusive(new ApiError(status, "x", "m"))).toBe(true);
+    }
+    // Business rejections and throttles keep their own classification.
+    expect(isReplayInconclusive(new ApiError(400, "x", "m"))).toBe(false);
+    expect(isReplayInconclusive(new ApiError(422, "x", "m"))).toBe(false);
+    expect(isReplayInconclusive(new ApiError(503, "x", "m"))).toBe(false);
   });
 });

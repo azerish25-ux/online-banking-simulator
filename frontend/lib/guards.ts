@@ -155,6 +155,10 @@ export const operationItemSchema = z
   .object({
     id: z.string().min(1),
     idempotencyKey: z.string().min(1),
+    // The account whose key namespace the operation lives in (the sender for
+    // a transfer, the funded account for a deposit): absent only on responses
+    // from a server that predates the complete operation identity.
+    originatingAccountId: z.string().min(1).optional(),
     kind: z.string().min(1),
     amount: amountString,
     currency: z.string().regex(/^[A-Z]{3}$/, "not an ISO currency code"),
@@ -188,4 +192,47 @@ export function requireShape<S extends z.ZodTypeAny>(
     throw new Error("Unrecognized " + what + " response from the server.");
   }
   return parsed.data;
+}
+
+// ---------------------------------------------------------------------------
+// Money-movement receipts: the 2xx bodies of deposit and transfer mutations.
+// A receipt is only actionable when it identifies ITSELF: the operation id,
+// the exact key the request carried, and the decimal amount actually moved.
+// Anything less is an UNKNOWN outcome (a proxy or codec answered, not the
+// ledger): the mutation must treat it exactly like a lost response instead
+// of discarding the pending identity on unverifiable success.
+// ---------------------------------------------------------------------------
+
+/** The deposit envelope: the funded account plus the operation identity. */
+export const depositReceiptSchema = z
+  .object({
+    account: accountSchema,
+    operationId: z.string().min(1),
+    idempotencyKey: z.string().min(1),
+    amount: amountString,
+    status: txStatusSchema
+  })
+  .passthrough();
+
+/**
+ * The transfer receipt: the full transaction row plus the key it was
+ * recorded under. The kind is pinned to TRANSFER: a deposit row that
+ * arrived on the transfer path must never clear a transfer's identity.
+ */
+export const transferReceiptSchema = transactionSchema
+  .extend({
+    idempotencyKey: z.string().min(1),
+    kind: z.literal("TRANSFER")
+  });
+
+/**
+ * True when two ledger decimal strings name the same amount ("10.00" vs
+ * "10.0" vs "10.0000"): the ledger's scale is presentation, not value.
+ * An unparseable operand falls back to exact string equality.
+ */
+export function sameAmount(a: string | undefined, b: string | undefined): boolean {
+  if (a === undefined || b === undefined) return a === b;
+  if (typeof a !== "string" || typeof b !== "string") return false;
+  if (!amountPattern.test(a) || !amountPattern.test(b)) return a === b;
+  return Number(a) === Number(b);
 }

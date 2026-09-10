@@ -10,15 +10,24 @@ import {
 } from "@tanstack/react-query";
 import * as React from "react";
 import { ApiError, api } from "./api";
-import { classifyMoneyFailure, isDefinitiveRejection } from "./money-failure";
+import {
+  classifyMoneyFailure,
+  isDefinitiveRejection,
+  isReplayInconclusive,
+  malformedSuccessError,
+  replayInconclusiveFailure
+} from "./money-failure";
 import {
   accountListSchema,
   accountSchema,
+  depositReceiptSchema,
   historyPageSchema,
   monthPointListSchema,
   operationListSchema,
   requireShape,
-  transactionSchema
+  sameAmount,
+  transactionSchema,
+  transferReceiptSchema
 } from "./guards";
 import {
   PENDING_OPS_EVENT,
@@ -321,11 +330,20 @@ export function useUnresolvedOperations(): {
       }
       const list = recentRef.current;
       if (list.status === "success" && list.data) {
-        const recorded = new Set((list.data.items ?? []).map((op) => op.idempotencyKey));
+        // Reconcile on the COMPLETE identity: key AND originating account.
+        // Two owned accounts (or a deposit and a transfer on one account)
+        // may legitimately share a key; resolving one must never erase the
+        // other. A server row without its namespace field cannot prove it is
+        // THIS operation, so it resolves nothing (absence never erases).
+        const recorded = new Set(
+          (list.data.items ?? [])
+            .filter((op) => op.idempotencyKey && op.originatingAccountId)
+            .map((op) => op.idempotencyKey + ":" + op.originatingAccountId)
+        );
         const kept: UnresolvedOperation[] = [];
         for (const op of stored) {
-          if (recorded.has(op.key)) {
-            removePendingOperation(userId, op.kind, op.key);
+          if (recorded.has(op.key + ":" + op.accountId)) {
+            removePendingOperation(userId, op.kind, op.accountId, op.key);
           } else {
             kept.push(op);
           }
@@ -362,8 +380,13 @@ export type UnresolvedOutcome =
  * sits held: never a second credit) or completes a request that never
  * arrived. Outcomes:
  *
- *  - 2xx            → resolved: authoritative status; the record is cleared.
+ *  - 2xx with a VERIFIED receipt → resolved: the receipt must name the same
+ *    key, originating account and amount (and parse as a valid receipt);
+ *    anything else is an UNKNOWN outcome, exactly like a lost response.
  *  - definitive 4xx → rejected: the server recorded nothing; cleared.
+ *  - 401/403/404/408 → the check itself was never processed (session,
+ *    authorization, routing, timeout): the earlier attempt's outcome stays
+ *    unknown and the record is KEPT.
  *  - 409            → the key names a recorded operation under a DIFFERENT
  *    intent; its recorded truth is fetched by key instead of guessed.
  *  - network/5xx/429 → unknown: money may have moved; the record is KEPT so
@@ -373,11 +396,22 @@ export async function resolveUnresolvedOperation(
   qc: QueryClient,
   record: UnresolvedOperation
 ): Promise<UnresolvedOutcome> {
-  const { userId, key, kind } = record;
-  const accountIds = [record.accountId ?? ""].filter(Boolean);
+  const { userId, key, kind, accountId } = record;
+  // The replay is the BYTE-IDENTICAL keyed request against the account the
+  // key is namespaced on; a malformed record must never produce a request
+  // against an undefined account id.
+  if (!accountId) {
+    return {
+      kind: "unknown",
+      message:
+        "This saved attempt predates complete operation identity, so it cannot be checked "
+        + "automatically. Review the account history instead; a keyed replay can never double-post."
+    };
+  }
+  const accountIds = [accountId];
   const replay = (): Promise<Tx | Deposit> =>
     kind === "deposit"
-      ? api<Deposit>("/v1/accounts/" + record.accountId + "/deposit", {
+      ? api<Deposit>("/v1/accounts/" + accountId + "/deposit", {
           method: "POST",
           headers: { "Idempotency-Key": key },
           body: JSON.stringify({ amount: record.amount })
@@ -386,23 +420,46 @@ export async function resolveUnresolvedOperation(
           method: "POST",
           headers: { "Idempotency-Key": key },
           body: JSON.stringify({
-            fromAccountId: record.accountId,
+            fromAccountId: accountId,
             toIban: record.toIban,
             amount: record.amount,
             memo: record.memo || undefined
           })
         });
-  const finish = (status: Tx["status"], data: Tx | Deposit): UnresolvedOutcome => {
-    removePendingOperation(userId, kind, key);
-    invalidateMoneyMovement(qc, {
-      accountIds,
-      toIban: kind === "transfer" ? record.toIban : undefined
-    });
-    return { kind: "resolved", status, data };
+  // A 2xx is only a resolution when the receipt PROVES it answers THIS
+  // dispatch: the recorded key, the originating account, the exact intent.
+  // Anything less is an unknown outcome: the record survives.
+  const finishIfVerified = (data: unknown): UnresolvedOutcome | null => {
+    if (kind === "deposit") {
+      const parsed = depositReceiptSchema.safeParse(data);
+      if (!parsed.success) return null;
+      const receipt = parsed.data;
+      if (receipt.idempotencyKey !== key || receipt.account.id !== accountId) return null;
+      if (!sameAmount(receipt.amount, record.amount)) return null;
+      removePendingOperation(userId, kind, accountId, key);
+      invalidateMoneyMovement(qc, { accountIds });
+      return { kind: "resolved", status: receipt.status, data: receipt as unknown as Deposit };
+    }
+    const parsed = transferReceiptSchema.safeParse(data);
+    if (!parsed.success) return null;
+    const receipt = parsed.data;
+    if (receipt.idempotencyKey !== key) return null;
+    if (!sameAmount(receipt.amount, record.amount)) return null;
+    // IBANs compare case-insensitively: the ledger stores them uppercased,
+    // the stored intent may carry whatever case the user typed.
+    if (record.toIban && (receipt.toIban ?? "").toUpperCase() !== record.toIban.toUpperCase()) return null;
+    removePendingOperation(userId, kind, accountId, key);
+    invalidateMoneyMovement(qc, { accountIds, toIban: record.toIban });
+    return { kind: "resolved", status: receipt.status, data: receipt as unknown as Tx };
   };
   try {
     const data = await replay();
-    return finish(data.status, data);
+    const verified = finishIfVerified(data);
+    if (verified) return verified;
+    // A malformed or foreign receipt is an UNKNOWN outcome, never a failure
+    // and never a completion: the server may have committed and answered
+    // something unreadable (proxy, captive portal, broken codec).
+    return { kind: "unknown", message: malformedSuccessError(kind).message };
   } catch (err) {
     // A 401 during RECOVERY is ambiguous, never definitive: the ORIGINAL
     // dispatch may have committed with a token that expired afterwards, so
@@ -411,20 +468,33 @@ export async function resolveUnresolvedOperation(
     if (err instanceof ApiError && err.status === 401) {
       return {
         kind: "unknown",
-        message: "Your session expired before this attempt was confirmed. Sign in again, then retry the status check."
+        message: replayInconclusiveFailure(kind).message
       };
+    }
+    // 403/404/408: the server never processed the check (authorization,
+    // routing, timeout): it says nothing about the earlier attempt.
+    if (isReplayInconclusive(err)) {
+      return { kind: "unknown", message: replayInconclusiveFailure(kind).message };
     }
     const failure = classifyMoneyFailure(kind, err);
     if (!failure.ambiguous) {
       // Definitive rejection: the server recorded nothing: resolve + clear.
-      removePendingOperation(userId, kind, key);
+      removePendingOperation(userId, kind, accountId, key);
       return { kind: "rejected", message: failure.message };
     }
     if (err instanceof ApiError && err.status === 409) {
       try {
-        // Same key, different intent: fetch the recorded operation by key: // the server's answer is the truth, not our guess.
-        const truth = await api<Tx>("/v1/operations?key=" + encodeURIComponent(key));
-        return finish(truth.status, truth);
+        // Same key, different intent: fetch the recorded operation by key,
+        // scoped to the account whose namespace the key is unique on. The
+        // server's answer is the truth, not our guess.
+        const truth = await api<Tx>(
+          "/v1/operations?key=" + encodeURIComponent(key)
+            + "&accountId=" + encodeURIComponent(accountId)
+            + "&kind=" + (kind === "deposit" ? "DEPOSIT" : "TRANSFER")
+        );
+        const verified = finishIfVerified(truth);
+        if (verified) return verified;
+        return { kind: "unknown", message: malformedSuccessError(kind).message };
       } catch {
         // Even the truth lookup failed: still unknown; keep the record.
       }
@@ -476,7 +546,9 @@ function nextOperationKey(
   if (userId) {
     const sameIntent = listPendingOperations(userId).find((op) => {
       if (op.kind !== kind) return false;
-      if (op.accountId && op.accountId !== intent.accountId) return false;
+      // The originating account is part of the identity: one key on two
+      // accounts is two operations, so a mismatch never inherits a key.
+      if (op.accountId !== intent.accountId) return false;
       if (op.amount && op.amount !== intent.amount) return false;
       // A transfer's destination is part of the reviewed intent; a deposit
       // has none, so only compare when both sides carry one.
@@ -522,15 +594,17 @@ function persistBeforeDispatch(
   });
 }
 
-/** Drops exactly ONE resolved operation record (never another's). */
+/** Drops exactly ONE resolved operation record, addressed by its complete
+ *  identity (never another account's, kind's or key's). */
 function finishPendingOperation(
   qc: ReturnType<typeof useQueryClient>,
   kind: "transfer" | "deposit",
+  accountId: string | null,
   key: string | null
 ): void {
   const userId = currentUserId(qc);
-  if (userId && key) {
-    removePendingOperation(userId, kind, key);
+  if (userId && accountId && key) {
+    removePendingOperation(userId, kind, accountId, key);
   }
 }
 
@@ -565,27 +639,42 @@ export function useDeposit(): DepositMutation {
         method: "POST",
         headers: { "Idempotency-Key": key },
         body: JSON.stringify({ amount })
+      }).then((data) => {
+        // Validation happens INSIDE the mutation promise, so onSuccess can
+        // only run for a receipt that proves it answers THIS dispatch: the
+        // same key, the funded account, the exact decimal amount. A 2xx that
+        // fails this is an UNKNOWN outcome (the server may have committed): it
+        // throws the malformed-success error, the pending identity survives,
+        // and the operation stays recoverable through the keyed replay.
+        const parsed = depositReceiptSchema.safeParse(data);
+        if (!parsed.success
+            || parsed.data.idempotencyKey !== key
+            || parsed.data.account.id !== accountId
+            || !sameAmount(parsed.data.amount, amount)) {
+          throw malformedSuccessError("deposit");
+        }
+        return parsed.data as DepositResult;
       });
     },
     onSuccess: (_data, variables) => {
-      // The server answered authoritatively: resolve THIS operation's record.
-      const key = keyRef.current;
-      finishPendingOperation(qc, "deposit", key);
+      // The server answered with a VERIFIED receipt: resolve THIS operation's
+      // record, scoped to its own account namespace.
+      finishPendingOperation(qc, "deposit", variables.accountId, keyRef.current);
       keyRef.current = null;
       invalidateMoneyMovement(qc, { accountIds: [variables.accountId] });
     },
-    onError: (err) => {
-      const key = keyRef.current;
+    onError: (err, variables) => {
       if (isDefinitiveRejection(err)) {
         // Definitive rejection (validation, funds): the server recorded
         // nothing and this operation identity is free.
-        finishPendingOperation(qc, "deposit", key);
+        finishPendingOperation(qc, "deposit", variables.accountId, keyRef.current);
         keyRef.current = null;
         return;
       }
-      // Ambiguous outcome (network, 5xx, 429, 409): the record was persisted
-      // BEFORE dispatch: the store already carries this operation, and a
-      // retry (even after a reload) deduplicates on the server.
+      // Ambiguous outcome (network, 5xx, 429, 409, malformed success): the
+      // record was persisted BEFORE dispatch: the store already carries this
+      // operation, and a retry (even after a reload) deduplicates on the
+      // server under the same key.
     }
   });
   return Object.assign(mutation, { resetIdempotencyKey });
@@ -639,23 +728,33 @@ export function useTransfer(): TransferMutation {
         method: "POST",
         headers: { "Idempotency-Key": key },
         body: JSON.stringify({ ...input, memo: input.memo || undefined })
+      }).then((data) => {
+        // Validation INSIDE the mutation promise (see useDeposit): only a
+        // receipt naming this key, amount and destination may clear the
+        // pending identity; anything else stays an unknown outcome.
+        const parsed = transferReceiptSchema.safeParse(data);
+        if (!parsed.success
+            || parsed.data.idempotencyKey !== key
+            || !sameAmount(parsed.data.amount, input.amount)
+            || (parsed.data.toIban ?? "").toUpperCase() !== input.toIban.toUpperCase()) {
+          throw malformedSuccessError("transfer");
+        }
+        return parsed.data as Tx;
       });
     },
     onSuccess: (_data, variables) => {
-      const key = keyRef.current;
-      finishPendingOperation(qc, "transfer", key);
+      finishPendingOperation(qc, "transfer", variables.fromAccountId, keyRef.current);
       keyRef.current = null;
       invalidateMoneyMovement(qc, {
         accountIds: [variables.fromAccountId],
         toIban: variables.toIban
       });
     },
-    onError: (err) => {
+    onError: (err, variables) => {
       if (isDefinitiveRejection(err)) {
         // Definitive rejection (validation, funds): the server recorded
         // nothing and this operation identity is free.
-        const key = keyRef.current;
-        finishPendingOperation(qc, "transfer", key);
+        finishPendingOperation(qc, "transfer", variables.fromAccountId, keyRef.current);
         keyRef.current = null;
         return;
       }

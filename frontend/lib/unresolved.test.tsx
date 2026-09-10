@@ -56,6 +56,20 @@ function keysSent() {
   });
 }
 
+/** A receipt that answers THIS replay: echoes the request's key, amount and
+ *  destination the way the ledger does for an identical keyed replay. */
+async function echoTransfer(_path: string, init?: RequestInit) {
+  const headers = (init?.headers ?? {}) as Record<string, string>;
+  const body = JSON.parse(String(init?.body ?? "{}"));
+  return {
+    id: "t-ok", fromIban: "DE11111111", toIban: body.toIban ?? "DE999",
+    amount: body.amount ?? "5.00", currency: "USD", status: "POSTED",
+    kind: "TRANSFER", createdAt: new Date().toISOString(),
+    flagged: false, reviewed: false,
+    idempotencyKey: headers["Idempotency-Key"] ?? "missing"
+  };
+}
+
 describe("unresolved-operation resolution", () => {
   it("a changed memo is a NEW intent: it mints a fresh key and keeps the old record", async () => {
     // Guard for the recovery premise: a replay must be byte-identical, so a
@@ -76,7 +90,7 @@ describe("unresolved-operation resolution", () => {
     first.unmount();
     cleanup();
 
-    vi.mocked(api).mockResolvedValueOnce({ id: "t2", status: "POSTED", flagged: false });
+    vi.mocked(api).mockImplementationOnce(echoTransfer);
     const qc2 = client();
     render(
       <QueryClientProvider client={qc2}>
@@ -96,7 +110,7 @@ describe("unresolved-operation resolution", () => {
     setToken("tok");
     vi.mocked(api)
       .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"))
-      .mockResolvedValueOnce({ id: "t1", status: "POSTED", flagged: false });
+      .mockImplementationOnce(echoTransfer);
     const qc = client();
     const first = render(
       <QueryClientProvider client={qc}>
@@ -128,7 +142,7 @@ describe("unresolved-operation resolution", () => {
     });
     vi.mocked(api).mockResolvedValue({
       account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "60.00", status: "ACTIVE" },
-      operationId: "op-1", idempotencyKey: "kd1", status: "POSTED"
+      operationId: "op-1", idempotencyKey: "kd1", amount: "10.00", status: "POSTED"
     });
     const qc = client();
     const outcome = await resolveUnresolvedOperation(qc, listPendingOperations("u1")[0]);
@@ -182,7 +196,7 @@ describe("unresolved-operation resolution", () => {
     vi.mocked(api).mockRejectedValue(new ApiError(401, "Unauthorized", "Session expired"));
     const outcome = await resolveUnresolvedOperation(client(), listPendingOperations("u1")[0]);
     expect(outcome.kind).toBe("unknown");
-    expect((outcome as { message: string }).message).toContain("session expired");
+    expect((outcome as { message: string }).message).toContain("still unknown");
     expect(listPendingOperations("u1")).toHaveLength(1);
   });
 
@@ -194,11 +208,102 @@ describe("unresolved-operation resolution", () => {
     });
     vi.mocked(api)
       .mockRejectedValueOnce(new ApiError(409, "Idempotency Conflict", "key names another operation"))
-      .mockResolvedValueOnce({ id: "op-x", status: "POSTED", flagged: false });
+      .mockResolvedValueOnce({
+        id: "op-x", fromIban: "DE11111111", toIban: "DE999", amount: "5.00",
+        currency: "USD", status: "POSTED", kind: "TRANSFER",
+        createdAt: new Date().toISOString(), flagged: false, reviewed: false,
+        idempotencyKey: "kt3"
+      });
     const outcome = await resolveUnresolvedOperation(client(), listPendingOperations("u1")[0]);
     expect(outcome.kind).toBe("resolved");
     expect(outcome).toMatchObject({ status: "POSTED" });
     expect(listPendingOperations("u1")).toEqual([]);
-    expect(vi.mocked(api).mock.calls[1][0]).toBe("/v1/operations?key=kt3");
+    // The truth lookup is scoped to the operation's complete identity: the
+    // key AND its originating account AND the operation kind.
+    expect(vi.mocked(api).mock.calls[1][0]).toBe(
+      "/v1/operations?key=kt3&accountId=a1&kind=TRANSFER"
+    );
+  });
+
+  it("a malformed success ({}) on replay keeps the record: an empty object is not a receipt", async () => {
+    setToken("tok");
+    upsertPendingOperation({
+      userId: "u1", kind: "transfer", key: "kt-empty", accountId: "a1",
+      amount: "5.00", toIban: "DE999", createdAt: Date.now() - 1000
+    });
+    // The exact case the brief calls out: an object like {} reaches the old
+    // finish(data.status, data) with an undefined status and cleared the
+    // recovery identity without a valid receipt. It must be an unknown now.
+    vi.mocked(api).mockResolvedValueOnce({});
+    const outcome = await resolveUnresolvedOperation(client(), listPendingOperations("u1")[0]);
+    expect(outcome.kind).toBe("unknown");
+    expect(listPendingOperations("u1")).toHaveLength(1);
+  });
+
+  it("a 403/404/408 on the check is INCONCLUSIVE: the earlier attempt's outcome is still unknown", async () => {
+    for (const status of [403, 404, 408]) {
+      clearAllPendingOperations();
+      setToken("tok");
+      upsertPendingOperation({
+        userId: "u1", kind: "transfer", key: "kt-" + status, accountId: "a1",
+        amount: "5.00", toIban: "DE999", createdAt: Date.now() - 1000
+      });
+      vi.mocked(api).mockRejectedValue(
+        new ApiError(status, "Refused", "the check never ran")
+      );
+      const outcome = await resolveUnresolvedOperation(client(), listPendingOperations("u1")[0]);
+      expect(outcome.kind).toBe("unknown");
+      expect((outcome as { message: string }).message).toContain("still unknown");
+      expect(listPendingOperations("u1")).toHaveLength(1);
+    }
+  });
+
+  it("resolving one account's operation never erases the same key on another account", async () => {
+    setToken("tok");
+    // The SAME key legitimately recorded on two owned accounts (the server
+    // key namespace is the originating account).
+    upsertPendingOperation({
+      userId: "u1", kind: "transfer", key: "shared", accountId: "a1",
+      amount: "5.00", toIban: "DE999", createdAt: Date.now() - 1000
+    });
+    upsertPendingOperation({
+      userId: "u1", kind: "transfer", key: "shared", accountId: "a2",
+      amount: "7.00", toIban: "DE888", createdAt: Date.now() - 900
+    });
+    // Only a1's replay answers with a matching receipt; a2's is not stubbed,
+    // so resolving a1 must not clear a2's record.
+    vi.mocked(api).mockImplementation(async (path, init) => {
+      if (path === "/v1/accounts/a1/deposit") throw new Error("wrong endpoint");
+      if (path === "/v1/transfers") {
+        const headers = (init?.headers ?? {}) as Record<string, string>;
+        const body = JSON.parse(String(init?.body ?? "{}"));
+        if (body.fromAccountId === "a1") return echoTransfer(path, init);
+        throw new Error("replay not stubbed for this test");
+      }
+      throw new Error("unexpected call " + path + " " + ((init?.headers as Record<string, string> | undefined)?.["Idempotency-Key"] ?? ""));
+    });
+    const a1Record = listPendingOperations("u1").find((o) => o.accountId === "a1");
+    const outcome = await resolveUnresolvedOperation(client(), a1Record!);
+    expect(outcome.kind).toBe("resolved");
+    const remaining = listPendingOperations("u1");
+    expect(remaining).toHaveLength(1);
+    expect(remaining[0].accountId).toBe("a2");
+    expect(remaining[0].key).toBe("shared");
+  });
+
+  it("a deposit receipt funded by a DIFFERENT account does not resolve this operation", async () => {
+    setToken("tok");
+    upsertPendingOperation({
+      userId: "u1", kind: "deposit", key: "kd-x", accountId: "a1",
+      amount: "10.00", createdAt: Date.now() - 1000
+    });
+    vi.mocked(api).mockResolvedValueOnce({
+      account: { id: "a-NINE", iban: "DE99", type: "CHECKING", balance: "10.00", status: "ACTIVE" },
+      operationId: "op-x", idempotencyKey: "kd-x", amount: "10.00", status: "POSTED"
+    });
+    const outcome = await resolveUnresolvedOperation(client(), listPendingOperations("u1")[0]);
+    // The receipt answers another account's operation: unknown here.
+    expect(outcome.kind).toBe("unknown");
+    expect(listPendingOperations("u1")).toHaveLength(1);
   });
 });

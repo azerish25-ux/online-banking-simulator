@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   accountListSchema,
   accountSchema,
+  depositReceiptSchema,
   historyPageSchema,
   monthPointListSchema,
   operationListSchema,
   requireShape,
-  transactionSchema
+  sameAmount,
+  transactionSchema,
+  transferReceiptSchema
 } from "./guards";
 
 const account = {
@@ -146,5 +149,38 @@ describe("runtime financial guards", () => {
     expect(() =>
       requireShape(accountListSchema, [account, { ...account, balance: "NaN" }], "account")
     ).toThrow(/Unrecognized account response/);
+  });
+
+  it("a transfer receipt must name its key, kind and a valid decimal amount", () => {
+    const receipt = { ...tx, idempotencyKey: "k-1" };
+    expect(transferReceiptSchema.safeParse(receipt).success).toBe(true);
+    // No key: not a receipt.
+    expect(transferReceiptSchema.safeParse(tx).success).toBe(false);
+    // A foreign kind (e.g. a deposit row on the transfer path): not this receipt.
+    expect(transferReceiptSchema.safeParse({ ...receipt, kind: "DEPOSIT" }).success).toBe(false);
+    // A malformed decimal amount is never money.
+    expect(transferReceiptSchema.safeParse({ ...receipt, amount: "10.5.0" }).success).toBe(false);
+  });
+
+  it("a deposit receipt must carry the account, operation id, key, amount and status", () => {
+    const receipt = {
+      account,
+      operationId: "op-1",
+      idempotencyKey: "k-1",
+      amount: "10.0000",
+      status: "POSTED"
+    };
+    expect(depositReceiptSchema.safeParse(receipt).success).toBe(true);
+    expect(depositReceiptSchema.safeParse({ ...receipt, amount: "" }).success).toBe(false);
+    expect(depositReceiptSchema.safeParse({ ...receipt, status: "SETTLED" }).success).toBe(false);
+    expect(depositReceiptSchema.safeParse({ ...receipt, idempotencyKey: "" }).success).toBe(false);
+  });
+
+  it("sameAmount compares ledger decimals by value, not presentation", () => {
+    expect(sameAmount("10.00", "10.0")).toBe(true);
+    expect(sameAmount("10.0000", "10")).toBe(true);
+    expect(sameAmount("10.00", "10.01")).toBe(false);
+    expect(sameAmount(undefined, undefined)).toBe(true);
+    expect(sameAmount("10.00", undefined)).toBe(false);
   });
 });

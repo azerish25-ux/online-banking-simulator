@@ -35,7 +35,7 @@ function seed(overrides: Partial<Parameters<typeof upsertPendingOperation>[0]> =
   });
 }
 
-function postedTx() {
+function postedTx(key = "k1") {
   return {
     id: "t1",
     fromIban: "DE11111111",
@@ -47,7 +47,8 @@ function postedTx() {
     kind: "TRANSFER",
     createdAt: new Date().toISOString(),
     flagged: false,
-    reviewed: false
+    reviewed: false,
+    idempotencyKey: key
   };
 }
 
@@ -138,7 +139,7 @@ describe("UnresolvedOperations recovery surface", () => {
     // The server recorded this keyed operation: its outcome was never really
     // unknown, so it must not be offered for a retry: the record is cleared
     // and nothing renders.
-    renderCard([{ ...postedTx(), idempotencyKey: "k1" }]);
+    renderCard([{ ...postedTx("k1"), originatingAccountId: "a1" }]);
     await waitFor(() => expect(listPendingOperations("u1")).toEqual([]));
     await waitFor(() => expect(screen.queryByText("Unresolved operations")).not.toBeInTheDocument());
     // No replay was sent.

@@ -80,6 +80,7 @@ describe("transfers page HELD outcome", () => {
       if (path.startsWith("/v1/beneficiaries")) return [];
       if (path.startsWith("/v1/accounts") && !path.includes("deposit")) return [checking, savings];
       if (path === "/v1/transfers" && options?.method === "POST") {
+        const headers = (options.headers ?? {}) as Record<string, string>;
         return {
           id: "tx-held",
           fromIban: checking.iban,
@@ -87,9 +88,11 @@ describe("transfers page HELD outcome", () => {
           amount: "10000.00",
           currency: "USD",
           memo: "big wire",
+          kind: "TRANSFER",
           status: "HELD",
           createdAt: new Date().toISOString(),
-          flagged: true
+          flagged: true,
+          idempotencyKey: headers["Idempotency-Key"]
         };
       }
       return { id: "u1" };

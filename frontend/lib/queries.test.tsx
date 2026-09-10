@@ -11,6 +11,7 @@ import {
   useUnreadCount
 } from "./queries";
 import { ApiError, setToken } from "./api";
+import type { Tx } from "./api-types";
 
 vi.mock("./api", async (importOriginal) => {
   const actual = await importOriginal<typeof import("./api")>();
@@ -82,6 +83,31 @@ function sentKeys() {
   });
 }
 
+/** A receipt that answers THIS dispatch: echoes the request's key, amount
+ *  and destination the way the real ledger does for an identical replay. */
+async function echoTransfer(_path: string, init?: RequestInit) {
+  const headers = (init?.headers ?? {}) as Record<string, string>;
+  const body = JSON.parse(String(init?.body ?? "{}"));
+  return {
+    id: "t-ok", fromIban: "DE11111111", toIban: body.toIban ?? "DE999",
+    amount: body.amount ?? "5.00", currency: "USD", status: "POSTED",
+    kind: "TRANSFER", createdAt: new Date().toISOString(),
+    flagged: false, reviewed: false,
+    idempotencyKey: headers["Idempotency-Key"] ?? "missing"
+  };
+}
+
+async function echoDeposit(_path: string, init?: RequestInit) {
+  const headers = (init?.headers ?? {}) as Record<string, string>;
+  const body = JSON.parse(String(init?.body ?? "{}"));
+  return {
+    account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
+    operationId: "op-ok", status: "POSTED",
+    amount: body.amount ?? "10.00",
+    idempotencyKey: headers["Idempotency-Key"] ?? "missing"
+  };
+}
+
 describe("query hooks", () => {
   it("useAccounts fetches through the proxy and caches under its key", async () => {
     setToken("tok");
@@ -134,9 +160,9 @@ describe("query hooks", () => {
     setToken("tok");
     vi.mocked(api)
       // First attempt: the server committed but the response was lost (5xx).
-      .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"))
-      // Retry after the "reload": dedupe against the original posting.
-      .mockResolvedValueOnce({ id: "t1", toIban: "DE999", amount: "5.00", flagged: false });
+      .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"));
+    // Retry after the "reload": dedupe against the original posting.
+    vi.mocked(api).mockImplementation(echoTransfer);
 
     // First "page life": the attempt fails ambiguously and the page goes away.
     const first = withClient(<TransferSender />);
@@ -172,7 +198,7 @@ describe("query hooks", () => {
     // A DIFFERENT amount is a different intent: it must NOT inherit the older
     // operation's key (that would 409), and the older pending record must
     // survive (still recoverable) rather than being erased by the edit.
-    vi.mocked(api).mockResolvedValueOnce({ id: "t2", toIban: "DE999", amount: "9.00", flagged: false });
+    vi.mocked(api).mockImplementation(echoTransfer);
     function DifferentAmountSender() {
       const transfer = useTransfer();
       return (
@@ -201,9 +227,9 @@ describe("query hooks", () => {
     setToken("tok");
     vi.mocked(api)
       .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom")) // transient → keep key
-      .mockResolvedValueOnce({ id: "t1", toIban: "DE999", amount: "5.00", flagged: false }) // success
+      .mockImplementationOnce(echoTransfer) // success
       .mockRejectedValueOnce(new ApiError(400, "Transfer Rejected", "Insufficient funds")) // 4xx → drop key
-      .mockResolvedValueOnce({ id: "t2", toIban: "DE999", amount: "5.00", flagged: false });
+      .mockImplementationOnce(echoTransfer); // success
     withClient(<TransferSender />);
     const send = screen.getByRole("button", { name: "send" });
 
@@ -234,17 +260,12 @@ describe("query hooks", () => {
     const user = userEvent.setup();
     setToken("tok");
     const paths: string[] = [];
-    vi.mocked(api).mockImplementation(async (path) => {
+    vi.mocked(api).mockImplementation(async (path, init) => {
       paths.push(path);
       if (path.includes("unread-count")) return { unread: 1 };
-      // The deposit endpoint now answers with the recoverable operation
-      // envelope (lifecycle), not a bare account.
-      return {
-        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
-        operationId: "op-d1",
-        idempotencyKey: "dep-k",
-        status: "POSTED"
-      };
+      // The deposit endpoint answers with the recoverable operation envelope
+      // (lifecycle), echoing the dispatched key and amount.
+      return echoDeposit(path, init);
     });
     withClient(
       <>
@@ -270,13 +291,8 @@ describe("query hooks", () => {
     vi.mocked(api)
       // Transient 5xx: the deposit may or may not have posted: the retry must
       // reuse the same key so the server never double-credits.
-      .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"))
-      .mockResolvedValueOnce({
-        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
-        operationId: "op-d2",
-        idempotencyKey: "dep-k",
-        status: "POSTED"
-      });
+      .mockRejectedValueOnce(new ApiError(500, "Server Error", "boom"));
+    vi.mocked(api).mockImplementation(echoDeposit);
     withClient(<DepositSender />);
     const send = screen.getByRole("button", { name: "deposit" });
     await user.click(send);
@@ -297,20 +313,10 @@ describe("query hooks", () => {
       // A 409 means the key already names an operation: never discard it: a
       // retry must resolve the original result, not mint a competing op.
       .mockRejectedValueOnce(new ApiError(409, "Idempotency Conflict", "already used"))
-      .mockResolvedValueOnce({
-        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
-        operationId: "op-d3",
-        idempotencyKey: "dep-k",
-        status: "POSTED"
-      })
+      .mockImplementationOnce(echoDeposit)
       // A definitive rejection (validation) records nothing: the key is free.
       .mockRejectedValueOnce(new ApiError(400, "Transfer Rejected", "limit"))
-      .mockResolvedValueOnce({
-        account: { id: "a1", iban: "DE01", type: "CHECKING", balance: "110.00", status: "ACTIVE" },
-        operationId: "op-d4",
-        idempotencyKey: "dep-k",
-        status: "POSTED"
-      });
+      .mockImplementationOnce(echoDeposit);
     withClient(<DepositSender />);
     const send = screen.getByRole("button", { name: "deposit" });
 
@@ -327,5 +333,54 @@ describe("query hooks", () => {
     await waitFor(() => expect(api).toHaveBeenCalledTimes(4));
     const keys = sentKeys();
     expect(keys[3]).not.toBe(keys[2]);
+  });
+
+  it("treats an HTML 200 body as an UNKNOWN outcome: the key and record survive", async () => {
+    const user = userEvent.setup();
+    setToken("tok");
+    vi.mocked(api)
+      // The server committed, but a proxy or captive portal answered HTML
+      // with status 200: a malformed success, never treated as completion.
+      .mockResolvedValueOnce("<html>502 Bad Gateway</html>" as unknown as Tx)
+      // The retry dedupes against the original posting with the SAME key.
+      .mockImplementationOnce(echoTransfer);
+    withClient(<TransferSender />);
+    const send = screen.getByRole("button", { name: "send" });
+
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    // The malformed success kept the pending identity: the operation is
+    // still recoverable, exactly like a lost response.
+    const { listPendingOperations } = await import("./pending-op");
+    expect(listPendingOperations("u1")).toHaveLength(1);
+    const afterTamper = sentKeys();
+    expect(afterTamper[0]).toBeTruthy();
+
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(2));
+    const keys = sentKeys();
+    expect(keys[1]).toBe(keys[0]);
+    // The verified retry resolved the record.
+    expect(listPendingOperations("u1")).toHaveLength(0);
+  });
+
+  it("treats a receipt for a DIFFERENT operation as unknown: this dispatch is not resolved", async () => {
+    const user = userEvent.setup();
+    setToken("tok");
+    vi.mocked(api).mockResolvedValueOnce({
+      id: "t-x", fromIban: "DE11111111", toIban: "DE999", amount: "5.00",
+      currency: "USD", status: "POSTED", kind: "TRANSFER",
+      createdAt: new Date().toISOString(), flagged: false, reviewed: false,
+      idempotencyKey: "a-different-operation"
+    });
+    withClient(<TransferSender />);
+    const send = screen.getByRole("button", { name: "send" });
+    await user.click(send);
+    await waitFor(() => expect(api).toHaveBeenCalledTimes(1));
+    // The receipt named another key: this operation's identity must survive.
+    const { listPendingOperations } = await import("./pending-op");
+    const stored = listPendingOperations("u1");
+    expect(stored).toHaveLength(1);
+    expect(stored[0].key).toBe(sentKeys()[0]);
   });
 });

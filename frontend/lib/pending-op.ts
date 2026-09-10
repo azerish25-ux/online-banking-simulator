@@ -12,8 +12,11 @@
  *   - userId: who initiated the operation (recovery is owner-scoped)
  *   - kind: "transfer" | "deposit"
  *   - key: the idempotency key (client operation id) the request carried
- *   - accountId: the ORIGINATING account: the server key namespace, so a
- *     status lookup can be scoped to exactly the account the key is unique on
+ *   - accountId: the ORIGINATING account: part of the operation's identity,
+ *     because the server key namespace is the originating account (one key
+ *     may legitimately exist on two accounts or as both a deposit and a
+ *     transfer): records and lookups are namespaced by the complete identity
+ *     and lookup helpers may be handed the identity as a partial record
  *   - a minimal reviewed-intent summary (amount/to) purely so a reloaded
  *     page can describe what it is offering to check: the server owns the
  *     canonical payload
@@ -34,8 +37,12 @@ export interface PendingOperation {
   kind: "transfer" | "deposit";
   /** The idempotency key (client operation id) of the unresolved operation. */
   key: string;
-  /** Originating account id: the server-side key namespace for lookups. */
-  accountId?: string;
+  /**
+   * Originating account id: part of the operation's identity (the server key
+   * namespace is the originating account), not an optional filter. Records
+   * lacking it cannot be replayed safely and are discarded on read.
+   */
+  accountId: string;
   /** Reviewed-intent context so a reloaded page can describe the operation. */
   amount?: string;
   toIban?: string;
@@ -58,6 +65,8 @@ function isValid(op: unknown): op is PendingOperation {
       && (record.kind === "transfer" || record.kind === "deposit")
       && typeof record.key === "string"
       && record.key.length > 0
+      && typeof record.accountId === "string"
+      && record.accountId.length > 0
       && typeof record.createdAt === "number";
 }
 
@@ -101,9 +110,12 @@ function writeAll(store: Store): void {
   }
 }
 
-/** Stable record id for one operation: namespaced by user + kind + key. */
-function opId(op: Pick<PendingOperation, "userId" | "kind" | "key">): string {
-  return op.userId + ":" + op.kind + ":" + op.key;
+/** Stable record id for one operation: the COMPLETE identity (user, kind,
+ *  originating account, key). Two owned accounts, or a deposit and a transfer
+ *  on one account, may legitimately share a key: they are different
+ *  operations and their records must never collide or erase each other. */
+function opId(op: Pick<PendingOperation, "userId" | "kind" | "accountId" | "key">): string {
+  return op.userId + ":" + op.kind + ":" + op.accountId + ":" + op.key;
 }
 
 /**
@@ -144,28 +156,18 @@ export function listPendingOperations(userId: string): PendingOperation[] {
       .sort((a, b) => a.createdAt - b.createdAt);
 }
 
-/** One specific operation record, addressed by user + kind + key. */
-export function findPendingOperation(
-  userId: string,
-  kind: PendingOperation["kind"],
-  key: string
-): PendingOperation | null {
-  const bucket = readAll()[userId];
-  if (!bucket) return null;
-  const op = bucket[opId({ userId, kind, key })];
-  return op && isValid(op) ? op : null;
-}
-
-/** Removes exactly ONE operation record: never another user's or kind's. */
+/** Removes exactly ONE operation record, addressed by its complete identity
+ *  (user + kind + account + key): never another user's, kind's or account's. */
 export function removePendingOperation(
   userId: string,
   kind: PendingOperation["kind"],
+  accountId: string,
   key: string
 ): void {
   const store = readAll();
   const bucket = store[userId];
   if (!bucket) return;
-  delete bucket[opId({ userId, kind, key })];
+  delete bucket[opId({ userId, kind, accountId, key })];
   if (Object.keys(bucket).length === 0) {
     delete store[userId];
   } else {

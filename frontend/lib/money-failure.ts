@@ -17,6 +17,54 @@ export function isDefinitiveRejection(err: unknown): err is ApiError {
       && err.status !== 409 && err.status !== 429;
 }
 
+/**
+ * A 2xx response whose body failed validation is an UNKNOWN outcome, never a
+ * completion: the server may have committed and answered garbage (a proxy,
+ * a captive portal, a broken codec). The operation record and its key must
+ * survive exactly as they would for a network drop.
+ */
+export const MALFORMED_SUCCESS_TITLE = "Malformed Success";
+
+export function malformedSuccessError(kind: "deposit" | "transfer"): ApiError {
+  const what = kind === "deposit" ? "deposit" : "transfer";
+  return new ApiError(0, MALFORMED_SUCCESS_TITLE,
+      "The server answered with an unreadable " + what + " response, so we can't confirm "
+      + "whether it went through. The attempt is saved. Retry to check; it can never double-post.");
+}
+
+export function isMalformedSuccess(err: unknown): err is ApiError {
+  return err instanceof ApiError && err.status === 0 && err.title === MALFORMED_SUCCESS_TITLE;
+}
+
+/**
+ * Statuses that mean the server never PROCESSED the replayed check itself
+ * (authentication, authorization, routing, timeout). They say nothing about
+ * whether an earlier ambiguous attempt committed, so the record stays.
+ * A 400/422 business rejection is different: the server judged the identical
+ * payload and refused it, which proves nothing was recorded for the key.
+ *
+ * Scope: REPLAY CHECKS only (resolveUnresolvedOperation). A FRESH submission
+ * receiving one of these was refused before processing a key this client
+ * minted moments ago: there classifyMoneyFailure is right to call it
+ * definitive, because no earlier attempt exists to be unknown about.
+ */
+const REPLAY_INCONCLUSIVE_STATUSES = new Set([401, 403, 404, 408]);
+
+export function isReplayInconclusive(err: unknown): err is ApiError {
+  return err instanceof ApiError && REPLAY_INCONCLUSIVE_STATUSES.has(err.status);
+}
+
+export function replayInconclusiveFailure(kind: "deposit" | "transfer"): MoneyFailure {
+  const what = kind === "deposit" ? "deposit" : "transfer";
+  return {
+    ambiguous: true,
+    message:
+      "The server refused to process this check, so the outcome of your earlier " + what
+      + " attempt is still unknown. The attempt is saved. Sign in again and retry to check; "
+      + "it can never double-post."
+  };
+}
+
 export type MoneyFailure = {
   message: string;
   /** True when the server may have committed: a retry is the safe check. */
