@@ -6,7 +6,7 @@ COPY src ./src
 RUN mvn -B -DskipTests package
 
 # ---- run ----
-FROM eclipse-temurin:17-jre
+FROM eclipse-temurin:25-jre
 RUN useradd -m appuser
 USER appuser
 WORKDIR /app
